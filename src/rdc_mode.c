@@ -33,8 +33,6 @@
 
 #include "xf86.h"
 #include "xf86_OSproc.h"
-#include "xf86Resources.h"
-#include "xf86RAC.h"
 #include "xf86cmap.h"
 #include "compiler.h"
 #include "mibstore.h"
@@ -119,8 +117,6 @@ RDCSetMode(ScrnInfoPtr pScrn, DisplayModePtr mode)
     CBiosExtension.VideoVirtualAddress = (ULONG)(pRDC->FBVirtualAddr);
 
     
-    
-    
     CBiosArguments.reg.x.AX = OEMFunction;
     CBiosArguments.reg.x.BX = SetDisplay1RefreshRate;
     CBiosArguments.reg.lh.CL = pModePrivate->ucRRate_ID;
@@ -128,28 +124,11 @@ RDCSetMode(ScrnInfoPtr pScrn, DisplayModePtr mode)
 
     usVESAMode = usGetVbeModeNum(pScrn, mode);
     
-    if (pRDC->DeviceInfo.ucNewDeviceID == TVINDEX)
-    {
-        xf86DrvMsgVerb(pScrn->scrnIndex, X_INFO, ErrorLevel, "==RDCSetMode() VBios Set mode entry\n");
-        if (pRDC->pVbe == NULL)
-        {
-            xf86DrvMsgVerb(pScrn->scrnIndex, X_INFO, ErrorLevel, "==RDCSetMode() pVbe = NULL\n");
-            return FALSE;
-        }
-        
-        if (VBESetVBEMode(pRDC->pVbe, usVESAMode, NULL) == FALSE)
-        {
-            xf86DrvMsgVerb(pScrn->scrnIndex, X_INFO, ErrorLevel, "==RDCSetMode() VBois set mode Fail\n");
-            return FALSE;
-        }
-    }
-    else
-    {
-        CBiosArguments.reg.x.AX = VBESetMode;
-        CBiosArguments.reg.x.BX = (0x4000 | usVESAMode);
-        CInt10(&CBiosExtension);
-    }
     
+    CBiosArguments.reg.x.AX = VBESetMode;
+    CBiosArguments.reg.x.BX = (0x4000 | usVESAMode);
+    CInt10(&CBiosExtension);
+
     
     CBiosArguments.reg.x.AX = VBESetGetScanLineLength;
     CBiosArguments.reg.lh.BL = 0x00;
@@ -157,31 +136,7 @@ RDCSetMode(ScrnInfoPtr pScrn, DisplayModePtr mode)
     CInt10(&CBiosExtension);
 
     
-    
-    
-    xf86DrvMsgVerb(pScrn->scrnIndex, X_INFO, 7, "==RDCSetMode() Enable 2D== \n");
-#ifdef Accel_2D
-    if (!pRDC->noAccel) 
-    {
-        if (!pRDC->CMDQInfo.Enable2D(pScrn, pRDC)) 
-        {
-            xf86DrvMsg(pScrn->scrnIndex, X_ERROR, "Enable 2D failed\n");  
-            pRDC->noAccel = TRUE;                        
-        }           
-    }
-#endif
 
-    xf86DrvMsgVerb(pScrn->scrnIndex, X_INFO, 7, "==RDCSetMode() Enable Cursor== \n");
-#ifdef HWC
-    if (!pRDC->noHWC) 
-    {
-        if (!bInitHWC(pScrn, pRDC))
-        {
-            xf86DrvMsg(pScrn->scrnIndex, X_ERROR, "Init HWC failed\n");
-            pRDC->noHWC = TRUE;                         
-        }           
-    }
-#endif       
     xf86DrvMsgVerb(pScrn->scrnIndex, X_INFO, InternalLevel, "==Exit RDCSetMode(), return true== \n");    
     return (TRUE);    
 }
@@ -260,13 +215,13 @@ DisplayModePtr RDCBuildModePool(ScrnInfoPtr pScrn)
             {
                 if (pModePoolHead != NULL)
                 {
-                    pModePoolTail->next = xnfalloc(sizeof(DisplayModeRec));
+                    pModePoolTail->next = xnfcalloc(1, sizeof(DisplayModeRec));
                     pModePoolTail->next->prev = pModePoolTail;
                     pModePoolTail = pModePoolTail->next;
                 }
                 else
                 {
-                    pModePoolHead = xnfalloc(sizeof(DisplayModeRec));
+                    pModePoolHead = xnfcalloc(1, sizeof(DisplayModeRec));
                     pModePoolHead->prev = NULL;
                     pModePoolTail = pModePoolHead;
                 }
@@ -281,7 +236,7 @@ DisplayModePtr RDCBuildModePool(ScrnInfoPtr pScrn)
 
                 
                 pModePoolTail->PrivSize = sizeof(MODE_PRIVATE);
-                pModePoolTail->Private  = xnfalloc(pModePoolTail->PrivSize);
+                pModePoolTail->Private  = xnfcalloc(1, pModePoolTail->PrivSize);
                 pModePrivate = MODE_PRIVATE_PTR(pModePoolTail);
 
                 
@@ -332,13 +287,13 @@ DisplayModePtr RDCBuildModePool(ScrnInfoPtr pScrn)
                 {
                     if (pModePoolHead != NULL)
                     {
-                        pModePoolTail->next = xnfalloc(sizeof(DisplayModeRec));
+                        pModePoolTail->next = xnfcalloc(1, sizeof(DisplayModeRec));
                         pModePoolTail->next->prev = pModePoolTail;
                         pModePoolTail = pModePoolTail->next;
                     }
                     else
                     {
-                        pModePoolHead = xnfalloc(sizeof(DisplayModeRec));
+                        pModePoolHead = xnfcalloc(1, sizeof(DisplayModeRec));
                         pModePoolHead->prev = NULL;
                         pModePoolTail = pModePoolHead;
                     }
@@ -353,7 +308,7 @@ DisplayModePtr RDCBuildModePool(ScrnInfoPtr pScrn)
 
                     
                     pModePoolTail->PrivSize = sizeof(MODE_PRIVATE);
-                    pModePoolTail->Private  = xnfalloc(pModePoolTail->PrivSize);
+                    pModePoolTail->Private  = xnfcalloc(1, pModePoolTail->PrivSize);
                     pModePrivate = MODE_PRIVATE_PTR(pModePoolTail);
 
                     
@@ -419,7 +374,7 @@ char* pcConvertResolutionToString(ULONG ulResolution)
     int iIndex, iStringSize, i;
     char *pcResolution;
     
-    pcResolution = xnfalloc(10);
+    pcResolution = xnfcalloc(1, 10);
     
     
     iIndex = 0;

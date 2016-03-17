@@ -26,7 +26,6 @@
  *     <rdc_xorg@rdc.com.tw>
  */
  
-
 #ifdef HAVE_CONFIG_H
 #include <config.h>
 #endif
@@ -60,13 +59,13 @@ void EnableGamma(ScrnInfoPtr pScrn, BOOL Enable)
 
     
     SetReg(CRTC_PORT, 0xA8);
-    GetReg(CRTC_DATA);
+    CRA8 = GetReg(CRTC_DATA);
 
     if (Enable)
         CRA8 |= BIT1;
     else
         CRA8 &= ~BIT1;
-    
+
     
     while(*(volatile DWORD *)(pRDC->MMIOVirtualAddr) & BIT0);
     while(!(*(volatile DWORD *)(pRDC->MMIOVirtualAddr) & BIT0));

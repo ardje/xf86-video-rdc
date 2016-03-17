@@ -36,8 +36,10 @@
 
 #include "xf86.h"
 #include "xf86_OSproc.h"
+#if GET_ABI_MAJOR(ABI_VIDEODRV_VERSION) < 6
 #include "xf86Resources.h"
 #include "xf86RAC.h"
+#endif
 #include "xf86cmap.h"
 #include "compiler.h"
 #include "mibstore.h"
@@ -119,6 +121,21 @@ static void vFillRDCModeInfo (ScrnInfoPtr pScrn);
 static Bool RDCModeInit(ScrnInfoPtr pScrn, DisplayModePtr mode);
 static void RDCSetHWCaps(RDCRecPtr pRDC);
 
+static Bool RDCRandRGetInfo(ScrnInfoPtr pScrn, Rotation *rotations);
+static Bool RDCRandRSetConfig(ScrnInfoPtr pScrn, xorgRRConfig *config);
+static Bool RDCDriverFunc(ScrnInfoPtr pScrn, xorgDriverFuncOp op, pointer data);
+static void RDCApertureInit(ScrnInfoPtr pScrn);
+
+
+
+
+
+
+
+
+
+
+
 #if XSERVER_LIBPCIACCESS
 #define RDC_DEVICE_MATCH(d,i) \
     { PCI_VENDOR_RDC, (d), PCI_MATCH_ANY, PCI_MATCH_ANY, 0, 0, (i) }
@@ -178,7 +195,8 @@ typedef enum {
     OPTION_ENG_CAPS,   
     OPTION_DBG_SELECT,
     OPTION_NO_DDC,
-    OPTION_ACCELMETHOD
+    OPTION_ACCELMETHOD,
+    OPTION_RANDRROTATION    
 } RDCOpts;
 
 static const OptionInfoRec RDCOptions[] = {
@@ -189,6 +207,7 @@ static const OptionInfoRec RDCOptions[] = {
     {OPTION_ENG_CAPS,   "ENGCaps",      OPTV_INTEGER,   {0},    FALSE},                    
     {OPTION_NO_DDC,     "NoDDC",        OPTV_BOOLEAN,   {0},    FALSE},
     {OPTION_ACCELMETHOD, "AccelMethod", OPTV_STRING,    {0},    FALSE},
+    {OPTION_RANDRROTATION, "RandRRotation", OPTV_BOOLEAN,    {0},    FALSE},
     {-1,                NULL,           OPTV_NONE,      {0},    FALSE}
 };
 
@@ -312,7 +331,7 @@ static XF86ModuleVersionInfo RDCVersRec = {
     {0, 0, 0, 0}
 };
 
-XF86ModuleData rdcModuleData = { &RDCVersRec, RDCSetup, NULL };
+_X_EXPORT XF86ModuleData rdcModuleData = { &RDCVersRec, RDCSetup, NULL };
 
 static pointer
 RDCSetup(pointer module, pointer opts, int *errmaj, int *errmin)
@@ -333,19 +352,6 @@ RDCSetup(pointer module, pointer opts, int *errmaj, int *errmin)
 		      0
 #endif
                      );
-
-        
-        
-        LoaderRefSymLists( vgahwSymbols,
-                           fbSymbols, 
-                           xaaSymbols,
-                           exaSymbols,
-                           ramdacSymbols,
-                           vbeSymbols, 
-                           vbeOptionalSymbols,
-                           ddcSymbols, 
-                           int10Symbols, 
-                           NULL);
 
         
         xf86DrvMsgVerb(0, X_INFO, DefaultLevel, "==Exit1 RDCSetup()== return TRUE\n");
@@ -516,6 +522,8 @@ RDCPreInit(ScrnInfoPtr pScrn, int flags)
     int     i;
     char    *s = NULL;
     MessageType from;
+    int     maxPitch = 0; 
+    int     maxHeight = 0; 
 
     xf86DrvMsgVerb(pScrn->scrnIndex, X_INFO, DefaultLevel, "==Enter RDCPreInit()==\n");
     
@@ -538,8 +546,6 @@ RDCPreInit(ScrnInfoPtr pScrn, int flags)
 
 	if (xf86LoadSubModule(pScrn, "int10") && xf86LoadSubModule(pScrn, "vbe")) 
 	{
-	    xf86LoaderReqSymLists(vbeSymbols, NULL);
-	    
         xf86DrvMsgVerb(pScrn->scrnIndex, X_INFO, DefaultLevel, "==RDCPreInit()==Load Vbe symbol\n");
 
         pVbe = VBEExtendedInit(NULL, 
@@ -556,12 +562,14 @@ RDCPreInit(ScrnInfoPtr pScrn, int flags)
         xf86DrvMsgVerb(pScrn->scrnIndex, X_INFO, ErrorLevel, "==Exit3 RDCPreInit()== return FALSE\n");
         return FALSE;
     }
- 
+
+#ifndef XSERVER_LIBPCIACCESS
     if (xf86RegisterResources(pEnt->index, 0, ResExclusive))
     {
         xf86DrvMsgVerb(pScrn->scrnIndex, X_INFO, ErrorLevel, "==Exit4 RDCPreInit()== return FALSE\n");
         return FALSE;
     }
+#endif
 
     
     if (!xf86LoadSubModule(pScrn, "vgahw"))
@@ -569,7 +577,6 @@ RDCPreInit(ScrnInfoPtr pScrn, int flags)
         xf86DrvMsgVerb(pScrn->scrnIndex, X_INFO, ErrorLevel, "==Exit5 RDCPreInit()== return FALSE\n");
         return FALSE;
     }
-    xf86LoaderReqSymLists(vgahwSymbols, NULL);
  
     
     if (!xf86LoadSubModule(pScrn, "fb"))
@@ -577,7 +584,6 @@ RDCPreInit(ScrnInfoPtr pScrn, int flags)
         xf86DrvMsgVerb(pScrn->scrnIndex, X_INFO, ErrorLevel, "==Exit6 RDCPreInit()== return FALSE\n");
         return FALSE;
     }
-    xf86LoaderReqSymLists(fbSymbols, NULL);      
         
     
     if (!vgaHWGetHWRec(pScrn))
@@ -633,8 +639,10 @@ RDCPreInit(ScrnInfoPtr pScrn, int flags)
     pScrn->progClock = TRUE;
     pScrn->rgbBits = 6;
     pScrn->monitor = pScrn->confScreen->monitor; 
+#ifndef XSERVER_LIBPCIACCESS
     pScrn->racMemFlags = RAC_FB | RAC_COLORMAP | RAC_CURSOR | RAC_VIEWPORT;
-    pScrn->racIoFlags = RAC_COLORMAP | RAC_CURSOR | RAC_VIEWPORT;   
+    pScrn->racIoFlags = RAC_COLORMAP | RAC_CURSOR | RAC_VIEWPORT;
+#endif
        
     
     if (!xf86SetGamma(pScrn, zeros)) 
@@ -685,7 +693,18 @@ RDCPreInit(ScrnInfoPtr pScrn, int flags)
     }      
     memcpy(pRDC->Options, RDCOptions, sizeof(RDCOptions));
     xf86ProcessOptions(pScrn->scrnIndex, pScrn->options, pRDC->Options);
-    
+
+    if (xf86ReturnOptValBool(pRDC->Options, OPTION_RANDRROTATION, FALSE))
+    {
+        xf86DrvMsgVerb(0, X_INFO, DefaultLevel, "Option RandRRotation = true\n");
+        pRDC->bRandRRotation = TRUE;
+        pRDC->rotate = RR_Rotate_0;
+    }
+    else
+    {
+        xf86DrvMsgVerb(0, X_INFO, DefaultLevel, "Option RandRRotation = FALSE\n");
+        pRDC->bRandRRotation = FALSE;
+    }
     
     if (pRDC->pEnt->device->chipset && *pRDC->pEnt->device->chipset)
     {
@@ -859,22 +878,56 @@ RDCPreInit(ScrnInfoPtr pScrn, int flags)
     clockRanges->clockIndex = -1;               
     clockRanges->interlaceAllowed = FALSE;
     clockRanges->doubleScanAllowed = FALSE;
-   
+
+    xf86DrvMsgVerb(0, X_INFO, 0, "Before xf86ValidateModes()\n");
+    xf86DrvMsgVerb(0, X_INFO, 0, " pScrn->modes = 0x%x\n", pScrn->modes);
+    xf86DrvMsgVerb(0, X_INFO, 0, " pScrn->modePool = 0x%x\n", pScrn->modePool);
+    xf86DrvMsgVerb(0, X_INFO, 0, " pScrn->display->modes = 0x%x\n", pScrn->display->modes);
+    xf86DrvMsgVerb(0, X_INFO, 0, " *pScrn->display->modes = %s\n", *pScrn->display->modes);
+    xf86DrvMsgVerb(0, X_INFO, 0, " pScrn->bitsPerPixel = %d\n", pScrn->bitsPerPixel);
+    xf86DrvMsgVerb(0, X_INFO, 0, " pScrn->display->virtualX = %d\n", pScrn->display->virtualX);
+    xf86DrvMsgVerb(0, X_INFO, 0, " pScrn->display->virtualY = %d\n", pScrn->display->virtualY);
+    xf86DrvMsgVerb(0, X_INFO, 0, " pRDC->FbMapSize = 0x%x\n", pRDC->FbMapSize);
+    xf86DrvMsgVerb(0, X_INFO, 0, " pScrn->virtualX = %d\n", pScrn->virtualX);
+    xf86DrvMsgVerb(0, X_INFO, 0, " pScrn->virtualY = %d\n", pScrn->virtualY);
+
 #ifdef FPGA
-    i = xf86ValidateModes(pScrn, pScrn->monitor->Modes,
+    i = xf86ValidateModes(pScrn, pScrn->modePool,
                           pScrn->display->modes, clockRanges,
                           0, 320, 1024, 8 * pScrn->bitsPerPixel,
                           200, 768,
                           pScrn->display->virtualX, pScrn->display->virtualY,
                           pRDC->FbMapSize, LOOKUP_BEST_REFRESH);
-#else   
-    i = xf86ValidateModes(pScrn, pScrn->monitor->Modes,
+#else
+    if (pRDC->bRandRRotation)
+    {
+        maxPitch = 1280;
+        maxHeight = 1024;
+    }
+    else
+    {
+        maxPitch = 1920;
+        maxHeight = 1200;
+    }
+    
+    i = xf86ValidateModes(pScrn, pScrn->modePool,
                           pScrn->display->modes, clockRanges,
-                          0, 320, 1920, 8 * pScrn->bitsPerPixel,
-                          200, 1200,
+                          0, 320, maxPitch, 8 * pScrn->bitsPerPixel,
+                          200, maxHeight,
                           pScrn->display->virtualX, pScrn->display->virtualY,
                           pRDC->FbMapSize, LOOKUP_BEST_REFRESH);
 #endif
+    xf86DrvMsgVerb(0, X_INFO, 0, "After xf86ValidateModes()\n");
+    xf86DrvMsgVerb(0, X_INFO, 0, " pScrn->modes = 0x%x\n", pScrn->modes);
+    xf86DrvMsgVerb(0, X_INFO, 0, " pScrn->modePool = 0x%x\n", pScrn->modePool);
+    xf86DrvMsgVerb(0, X_INFO, 0, " pScrn->display->modes = 0x%x\n", pScrn->display->modes);
+    xf86DrvMsgVerb(0, X_INFO, 0, " *pScrn->display->modes = %s\n", *pScrn->display->modes);
+    xf86DrvMsgVerb(0, X_INFO, 0, " pScrn->bitsPerPixel = %d\n", pScrn->bitsPerPixel);
+    xf86DrvMsgVerb(0, X_INFO, 0, " pScrn->display->virtualX = %d\n", pScrn->display->virtualX);
+    xf86DrvMsgVerb(0, X_INFO, 0, " pScrn->display->virtualY = %d\n", pScrn->display->virtualY);
+    xf86DrvMsgVerb(0, X_INFO, 0, " pRDC->FbMapSize = 0x%x\n", pRDC->FbMapSize);
+    xf86DrvMsgVerb(0, X_INFO, 0, " pScrn->virtualX = %d\n", pScrn->virtualX);
+    xf86DrvMsgVerb(0, X_INFO, 0, " pScrn->virtualY = %d\n", pScrn->virtualY);
 
     if (i == -1)
     {
@@ -900,11 +953,20 @@ RDCPreInit(ScrnInfoPtr pScrn, int flags)
     xf86PrintModes(pScrn);
  
     xf86SetDpi(pScrn, 0, 0);
+
+    pRDC->AvailableFBsize -= CAPTURE_BUFFER_SIZE;
  
     
     pRDC->noAccel = TRUE;
     pRDC->AccelInfoPtr = NULL; 
     pRDC->CMDQInfo.ulCMDQSize = 0;      
+
+    if (pRDC->bRandRRotation)
+    {
+        RDCApertureInit(pScrn);
+    }      
+
+    
 #ifdef    Accel_2D
     if (!xf86ReturnOptValBool(pRDC->Options, OPTION_NOACCEL, FALSE))
     {
@@ -933,11 +995,9 @@ RDCPreInit(ScrnInfoPtr pScrn, int flags)
     		                   &errmaj, &errmin)) 
     		{
         		LoaderErrorMsg(NULL, "exa", errmaj, errmin);
-        		VIAFreeRec(pScrn);
+        		RDCFreeRec(pScrn);
         		return FALSE;
     		}
-    		
-	        xf86LoaderReqSymLists(exaSymbols, NULL);
 	    }        
 	    else
         {
@@ -947,7 +1007,6 @@ RDCPreInit(ScrnInfoPtr pScrn, int flags)
                 xf86DrvMsgVerb(0, X_INFO, ErrorLevel, "==Exit22 RDCPreInit()== return FALSE\n");
                 return FALSE;
             }       
-            xf86LoaderReqSymLists(xaaSymbols, NULL);
         }
         
         pRDC->noAccel = FALSE; 
@@ -986,7 +1045,6 @@ RDCPreInit(ScrnInfoPtr pScrn, int flags)
             xf86DrvMsgVerb(0, X_INFO, ErrorLevel, "==Exit23 RDCPreInit()== return FALSE\n");
             return FALSE;
         }
-        xf86LoaderReqSymLists(ramdacSymbols, NULL);
       
         pRDC->noHWC = FALSE;  
         pRDC->HWCInfo.HWC_NUM = DEFAULT_HWC_NUM;
@@ -1008,8 +1066,10 @@ RDCPreInit(ScrnInfoPtr pScrn, int flags)
 #endif
 
     
+#ifndef XSERVER_LIBPCIACCESS
     xf86SetOperatingState(resVgaIo, pRDC->pEnt->index, ResUnusedOpr);
     xf86SetOperatingState(resVgaMem, pRDC->pEnt->index, ResDisableOpr);
+#endif
     xf86DrvMsgVerb(pScrn->scrnIndex, X_INFO, DefaultLevel, "==Exit24 RDCPreInit()== return TRUE\n");
     return TRUE;
 }
@@ -1140,6 +1200,12 @@ RDCScreenInit(int scrnIndex, ScreenPtr pScreen, int argc, char **argv)
             pRDC->noHWC = TRUE;                      
         }
     }
+
+    if (pRDC->bRandRRotation)
+    {
+        xf86DrvMsgVerb(0, X_INFO, DefaultLevel, "assign pScrn->DriverFunc\n");
+        pScrn->DriverFunc = RDCDriverFunc;
+    }      
     
     if (!miCreateDefColormap(pScreen))
     {
@@ -1175,6 +1241,21 @@ RDCScreenInit(int scrnIndex, ScreenPtr pScreen, int argc, char **argv)
     if (serverGeneration == 1)
         xf86ShowUnusedOptions(pScrn->scrnIndex, pScrn->options);
 
+    
+#ifdef Accel_2D
+    if (!pRDC->noAccel)
+    {
+        if ((DEVICE_ID(pRDC->PciInfo) == PCI_CHIP_M2010) || (DEVICE_ID(pRDC->PciInfo) == PCI_CHIP_M2010_A0))
+        {
+            bInitCMDQInfo(pScrn, pRDC);
+        }
+        else
+        {
+            bCRInitCMDQInfo(pScrn, pRDC);
+        }
+    }
+#endif
+    
     RDCSave(pScrn);     
     if (!RDCModeInit(pScrn, pScrn->currentMode))
     {
@@ -1198,13 +1279,6 @@ Bool RDCSwitchMode(int scrnIndex, DisplayModePtr mode, int flags)
     Bool RetStatus = FALSE;
     
     xf86DrvMsgVerb(pScrn->scrnIndex, X_INFO, DefaultLevel, "==Enter RDCSwitchMode()== \n");
-#ifdef HWC
-    pRDC->HWCInfoPtr->HideCursor(pScrn);
-#endif
-
-#ifdef Accel_2D 
-    pRDC->CMDQInfo.Disable2D(pScrn, pRDC);
-#endif
    
     RetStatus = RDCModeInit(pScrn, mode);
 
@@ -1218,12 +1292,55 @@ RDCAdjustFrame(int scrnIndex, int x, int y, int flags)
     ScrnInfoPtr pScrn = xf86Screens[scrnIndex];
     RDCRecPtr   pRDC  = RDCPTR(pScrn);
     ULONG base;
+    int rot_x, rot_y;
 
     xf86DrvMsgVerb(scrnIndex, X_INFO, DefaultLevel, "==Enter RDCAdjustFrame(x = %d, y = %d)== \n", x, y);
 
-    base = y * pRDC->VideoModeInfo.ScreenPitch + 
-           x * pRDC->VideoModeInfo.bitsPerPixel / 8;
-        
+    xf86DrvMsgVerb(pScrn->scrnIndex, X_INFO, InternalLevel, "  pScrn->virtualX = %d\n", pScrn->virtualX);
+    xf86DrvMsgVerb(pScrn->scrnIndex, X_INFO, InternalLevel, "  pScrn->virtualY = %d\n", pScrn->virtualY);
+    xf86DrvMsgVerb(pScrn->scrnIndex, X_INFO, InternalLevel, "  pScrn->displayWidth = %d\n", pScrn->displayWidth);
+    xf86DrvMsgVerb(pScrn->scrnIndex, X_INFO, InternalLevel, "  pRDC->VideoModeInfo.ScreenWidth = %d\n", pRDC->VideoModeInfo.ScreenWidth);
+    xf86DrvMsgVerb(pScrn->scrnIndex, X_INFO, InternalLevel, "  pRDC->VideoModeInfo.ScreenHeight = %d\n", pRDC->VideoModeInfo.ScreenHeight);
+    xf86DrvMsgVerb(pScrn->scrnIndex, X_INFO, InternalLevel, "  pRDC->VideoModeInfo.ScreenPitch = %d\n", pRDC->VideoModeInfo.ScreenPitch);
+    xf86DrvMsgVerb(pScrn->scrnIndex, X_INFO, InternalLevel, "  pRDC->VideoModeInfo.Bpp = %d\n", pRDC->VideoModeInfo.Bpp);
+
+    
+    switch(pRDC->rotate)
+    {
+        case RR_Rotate_0:
+            xf86DrvMsgVerb(pScrn->scrnIndex, X_INFO, DefaultLevel, " case RR_Rotate_0\n");
+            rot_x = x;
+            rot_y = y;
+            break;
+
+        case RR_Rotate_90:
+            xf86DrvMsgVerb(pScrn->scrnIndex, X_INFO, DefaultLevel, " case RR_Rotate_90\n");
+            rot_x = y;
+            rot_y = pScrn->displayWidth - pRDC->VideoModeInfo.ScreenHeight - x;
+            break;
+
+        case RR_Rotate_180:
+            xf86DrvMsgVerb(pScrn->scrnIndex, X_INFO, DefaultLevel, " case RR_Rotate_180\n");
+            rot_x = pScrn->displayWidth - pRDC->VideoModeInfo.ScreenWidth - x;
+            rot_y = pScrn->virtualY - pRDC->VideoModeInfo.ScreenHeight - y;
+            break;
+
+
+        case RR_Rotate_270:
+            xf86DrvMsgVerb(pScrn->scrnIndex, X_INFO, DefaultLevel, " case RR_Rotate_270\n");
+            rot_x = pScrn->displayWidth - pRDC->VideoModeInfo.ScreenWidth - y;
+            rot_y = x;
+            break;
+
+        default:
+            xf86DrvMsgVerb(pScrn->scrnIndex, X_ERROR, ErrorLevel, "  Unexpected rotation in RDCAdjustFrame\n");
+            return;
+    }
+    
+    base = rot_y * pRDC->VideoModeInfo.ScreenPitch + 
+           rot_x * pRDC->VideoModeInfo.Bpp;
+
+    xf86DrvMsgVerb(pScrn->scrnIndex, X_INFO, InternalLevel, "  base = %x\n", base);
     vSetStartAddressCRT1(pRDC, base);
 
     xf86DrvMsgVerb(scrnIndex, X_INFO, DefaultLevel, "==Exit1 RDCAdjustFrame()== \n");
@@ -1260,7 +1377,10 @@ RDCLeaveVT(int scrnIndex, int flags)
     xf86DrvMsgVerb(pScrn->scrnIndex, X_INFO, DefaultLevel, "==Enter RDCLeaveVT();== \n");
     
 #ifdef HWC
-    pRDC->HWCInfoPtr->HideCursor(pScrn);
+    if (!xf86ReturnOptValBool(pRDC->Options, OPTION_SW_CURSOR, FALSE))
+    {
+        pRDC->HWCInfoPtr->HideCursor(pScrn);
+    }
 #endif
 
 #ifdef Accel_2D  
@@ -1324,16 +1444,16 @@ RDCValidMode(int scrnIndex, DisplayModePtr mode, Bool verbose, int flags)
 
     if (pRDC->DeviceInfo.ucDeviceID == TVINDEX) 
     {
-        if ((mode->HDisplay == 640) && (mode->VDisplay == 480))
+        if (((mode->HDisplay == 640) && (mode->VDisplay == 480)) ||
+            ((mode->HDisplay == 800) && (mode->VDisplay == 600)) ||
+            ((mode->HDisplay ==1024) && (mode->VDisplay == 768)))
         {
             return MODE_OK;
-        }
-        
-        if ((mode->HDisplay == 800) && (mode->VDisplay == 600))
+        }else
         {
-            return MODE_OK;
+            return MODE_BAD;
         }
-        return MODE_BAD;
+                    
     }
     else
     {
@@ -1347,6 +1467,11 @@ RDCValidMode(int scrnIndex, DisplayModePtr mode, Bool verbose, int flags)
             return MODE_BAD;
         }
 
+        if (mode->HDisplay ==720) 
+        {
+            return MODE_BAD;
+        }
+        
         if ((mode->HDisplay >= 1280) && 
             ((pScrn->bitsPerPixel > 16) || (mode->VRefresh > 62.0)))
         {
@@ -1442,11 +1567,8 @@ RDCCloseScreen(int scrnIndex, ScreenPtr pScreen)
 
         if (pRDC->DeviceInfo.ucDeviceID == TVINDEX) 
         {
-            if (VBESetVBEMode(pRDC->pVbe, 3, NULL) == FALSE)
-            {
-                xf86DrvMsgVerb(pScrn->scrnIndex, X_INFO, ErrorLevel, "==RDCVBESetMode() Fail\n");
-                return FALSE;
-            }
+            UnLockCR0ToCR7();
+            LoadTVTiming(pRDC->DeviceInfo.ucDisplayPath, 0x3, pRDC->DeviceInfo.ucDeviceID); 
         }
     }
 
@@ -1625,7 +1747,17 @@ RDCModeInit(ScrnInfoPtr pScrn, DisplayModePtr mode)
     hwp = VGAHWPTR(pScrn);
     pRDC = RDCPTR(pScrn);
 
+    xorgRRConfig    config;
+    
     xf86DrvMsgVerb(pScrn->scrnIndex, X_INFO, DefaultLevel, "==Enter RDCModeInit()== \n");
+
+#ifdef HWC
+    pRDC->HWCInfoPtr->HideCursor(pScrn);
+#endif
+
+#ifdef Accel_2D 
+    pRDC->CMDQInfo.Disable2D(pScrn, pRDC);
+#endif
 
     CBiosExtension.pCBiosArguments = &CBiosArguments;
     CBiosExtension.IOAddress = (USHORT)(pRDC->RelocateIO);
@@ -1659,6 +1791,14 @@ RDCModeInit(ScrnInfoPtr pScrn, DisplayModePtr mode)
         xf86DrvMsgVerb(pScrn->scrnIndex, X_INFO, ErrorLevel, "==RDCModeInit() RDCSetMode Fail== return FALSE\n");
         return FALSE;
     }    
+
+    
+    config.rotation = pRDC->rotate;
+    RDCRandRSetConfig(pScrn, &config);
+
+    
+    pRDC->VideoModeInfo.ScreenWidth = mode->HDisplay;
+    pRDC->VideoModeInfo.ScreenHeight = mode->VDisplay;
 
     
     CBiosArguments.reg.x.AX = OEMFunction;
@@ -1706,6 +1846,30 @@ RDCModeInit(ScrnInfoPtr pScrn, DisplayModePtr mode)
  
     vgaHWProtect(pScrn, FALSE);
 
+#ifdef Accel_2D
+    xf86DrvMsgVerb(pScrn->scrnIndex, X_INFO, 7, "==RDCModeInit() Enable 2D== \n");
+    if (!pRDC->noAccel) 
+    {
+        if (!pRDC->CMDQInfo.Enable2D(pScrn, pRDC)) 
+        {
+            xf86DrvMsg(pScrn->scrnIndex, X_ERROR, "Enable 2D failed\n");  
+            pRDC->noAccel = TRUE;                        
+        }           
+    }
+#endif
+
+#ifdef HWC
+    xf86DrvMsgVerb(pScrn->scrnIndex, X_INFO, 7, "==RDCModeInit() Enable Cursor== \n");
+    if (!pRDC->noHWC) 
+    {
+        if (!bInitHWC(pScrn, pRDC))
+        {
+            xf86DrvMsg(pScrn->scrnIndex, X_ERROR, "Init HWC failed\n");
+            pRDC->noHWC = TRUE;                         
+        }           
+    }
+#endif       
+
     xf86DrvMsgVerb(pScrn->scrnIndex, X_INFO, DefaultLevel, "==Exit RDCModeInit()== return TRUE\n");
     return TRUE;
 }
@@ -1724,6 +1888,7 @@ static void RDCSetHWCaps(RDCRecPtr pRDC)
             break;
         case PCI_CHIP_M2012:
             pRDC->ENGCaps |= ENG_CAP_VIDEO_DISP;
+            pRDC->ENGCaps |= ENG_CAP_VIDEO_POST;
             pRDC->ENGCaps |= ENG_CAP_HWC_MMIO;
             pRDC->ENGCaps |= ENG_CAP_CR_SUPPORT;
             break;
@@ -1733,4 +1898,160 @@ static void RDCSetHWCaps(RDCRecPtr pRDC)
             break;
     }
     xf86DrvMsgVerb(0, X_INFO, DefaultLevel, "==RDCSetHWCaps() Exit Caps = 0x%x==\n",pRDC->ENGCaps);
+}
+
+
+static Bool
+RDCRandRGetInfo(ScrnInfoPtr pScrn, Rotation *rotations)
+{
+    xf86DrvMsgVerb(pScrn->scrnIndex, X_INFO, DefaultLevel, "RDCRandRGetInfo\n");
+    
+    *rotations = (RR_Rotate_0|RR_Rotate_90|RR_Rotate_180|RR_Rotate_270);
+
+    return TRUE;
+}
+
+static Bool
+RDCRandRSetConfig(ScrnInfoPtr pScrn, xorgRRConfig *config)
+{
+    xf86DrvMsgVerb(pScrn->scrnIndex, X_INFO, DefaultLevel, "RDCRandRSetConfig\n");
+    RDCRecPtr   pRDC = RDCPTR(pScrn);
+    ULONG       ulROTAP_CTL0 = 0;
+
+    if (pScrn->bitsPerPixel == 16)
+    {
+        ulROTAP_CTL0 |= ROTAPS_16BPP;
+    }
+    else if ((pScrn->bitsPerPixel == 24) || (pScrn->bitsPerPixel == 32))
+    {
+        ulROTAP_CTL0 |= ROTAPS_32BPP;
+    }
+    else
+    {
+        return FALSE;
+    }
+
+    xf86DrvMsgVerb(pScrn->scrnIndex, X_INFO, InternalLevel, "  config->width = %d\n", config->width);
+    xf86DrvMsgVerb(pScrn->scrnIndex, X_INFO, InternalLevel, "  config->height = %d\n", config->height);
+    xf86DrvMsgVerb(pScrn->scrnIndex, X_INFO, InternalLevel, "  config->rate = %d\n", config->rate);
+
+    switch(config->rotation)
+    {
+        case RR_Rotate_0:
+            xf86DrvMsgVerb(pScrn->scrnIndex, X_INFO, DefaultLevel, " case RR_Rotate_0\n");
+            pRDC->rotate = config->rotation;
+            *(ULONG *)(pRDC->MMIOVirtualAddr + 0x8094) = 0x0;
+            ulROTAP_CTL0 &= ~(ROTAPS_ENABLE);
+
+            xf86DrvMsgVerb(pScrn->scrnIndex, X_INFO, InternalLevel, "  0x8094 = %08x\n", *(pRDC->MMIOVirtualAddr + 0x8094));
+            xf86DrvMsgVerb(pScrn->scrnIndex, X_INFO, InternalLevel, "  ROTAP_END_ADDR0 = %08x\n", *ROTAP_END_ADDR0);
+            xf86DrvMsgVerb(pScrn->scrnIndex, X_INFO, InternalLevel, "  ROTAP_PITCH0 = %08x\n", *ROTAP_PITCH0);
+            xf86DrvMsgVerb(pScrn->scrnIndex, X_INFO, InternalLevel, "  ROTAP_SRC_PITCH_RECI0 = %08x\n", *ROTAP_SRC_PITCH_RECI0);
+            xf86DrvMsgVerb(pScrn->scrnIndex, X_INFO, InternalLevel, "  ROTAP_WH0 = %08x\n", *ROTAP_WH0);
+            xf86DrvMsgVerb(pScrn->scrnIndex, X_INFO, InternalLevel, "  ROTAP_CTL0 = %08x\n", *ROTAP_CTL0);
+            break;
+
+        case RR_Rotate_90:
+            xf86DrvMsgVerb(pScrn->scrnIndex, X_INFO, DefaultLevel, " case RR_Rotate_90\n");
+            pRDC->rotate = config->rotation;
+            *(ULONG *)(pRDC->MMIOVirtualAddr + 0x8094) = 0x5;
+            *ROTAP_END_ADDR0 = pRDC->VideoModeInfo.ScreenPitch * pScrn->displayWidth;
+            *ROTAP_PITCH0 = (pScrn->displayWidth << 16) | pScrn->displayWidth;
+            *ROTAP_SRC_PITCH_RECI0 = ((1 << 30) + (pScrn->displayWidth >> 1)) / pScrn->displayWidth;
+            *ROTAP_WH0 = ((pScrn->displayWidth-1) << 16) | (pScrn->displayWidth - 1);
+            ulROTAP_CTL0 |= ROTAPS_ENABLE;
+
+            xf86DrvMsgVerb(pScrn->scrnIndex, X_INFO, InternalLevel, "  0x8094 = %08x\n", *(pRDC->MMIOVirtualAddr + 0x8094));
+            xf86DrvMsgVerb(pScrn->scrnIndex, X_INFO, InternalLevel, "  ROTAP_END_ADDR0 = %08x\n", *ROTAP_END_ADDR0);
+            xf86DrvMsgVerb(pScrn->scrnIndex, X_INFO, InternalLevel, "  ROTAP_PITCH0 = %08x\n", *ROTAP_PITCH0);
+            xf86DrvMsgVerb(pScrn->scrnIndex, X_INFO, InternalLevel, "  ROTAP_SRC_PITCH_RECI0 = %08x\n", *ROTAP_SRC_PITCH_RECI0);
+            xf86DrvMsgVerb(pScrn->scrnIndex, X_INFO, InternalLevel, "  ROTAP_WH0 = %08x\n", *ROTAP_WH0);
+            xf86DrvMsgVerb(pScrn->scrnIndex, X_INFO, InternalLevel, "  ROTAP_CTL0 = %08x\n", *ROTAP_CTL0);
+            break;
+
+        case RR_Rotate_180:
+            xf86DrvMsgVerb(pScrn->scrnIndex, X_INFO, DefaultLevel, " case RR_Rotate_180\n");
+            pRDC->rotate = config->rotation;
+            *(ULONG *)(pRDC->MMIOVirtualAddr + 0x8094) = 0x6;
+            *ROTAP_END_ADDR0 = pRDC->VideoModeInfo.ScreenPitch * pScrn->virtualY;
+            *ROTAP_PITCH0 = (pScrn->displayWidth << 16) | pScrn->displayWidth;
+            *ROTAP_SRC_PITCH_RECI0 = ((1 << 30) + (pScrn->displayWidth >> 1)) / pScrn->displayWidth;
+            *ROTAP_WH0 = ((pScrn->virtualY-1) << 16) | (pScrn->displayWidth - 1);
+            ulROTAP_CTL0 |= ROTAPS_ENABLE;
+
+            xf86DrvMsgVerb(pScrn->scrnIndex, X_INFO, InternalLevel, "  0x8094 = %08x\n", *(pRDC->MMIOVirtualAddr + 0x8094));
+            xf86DrvMsgVerb(pScrn->scrnIndex, X_INFO, InternalLevel, "  ROTAP_END_ADDR0 = %08x\n", *ROTAP_END_ADDR0);
+            xf86DrvMsgVerb(pScrn->scrnIndex, X_INFO, InternalLevel, "  ROTAP_PITCH0 = %08x\n", *ROTAP_PITCH0);
+            xf86DrvMsgVerb(pScrn->scrnIndex, X_INFO, InternalLevel, "  ROTAP_SRC_PITCH_RECI0 = %08x\n", *ROTAP_SRC_PITCH_RECI0);
+            xf86DrvMsgVerb(pScrn->scrnIndex, X_INFO, InternalLevel, "  ROTAP_WH0 = %08x\n", *ROTAP_WH0);
+            xf86DrvMsgVerb(pScrn->scrnIndex, X_INFO, InternalLevel, "  ROTAP_CTL0 = %08x\n", *ROTAP_CTL0);
+            break;
+
+
+        case RR_Rotate_270:
+            xf86DrvMsgVerb(pScrn->scrnIndex, X_INFO, DefaultLevel, " case RR_Rotate_270\n");
+            pRDC->rotate = config->rotation;
+            *(ULONG *)(pRDC->MMIOVirtualAddr + 0x8094) = 0x7;
+            *ROTAP_END_ADDR0 = pRDC->VideoModeInfo.ScreenPitch * pScrn->displayWidth;
+            *ROTAP_PITCH0 = (pScrn->displayWidth << 16) | pScrn->displayWidth;
+            *ROTAP_SRC_PITCH_RECI0 = ((1 << 30) + (pScrn->displayWidth >> 1)) / pScrn->displayWidth;
+            *ROTAP_WH0 = ((pScrn->displayWidth-1) << 16) | (pScrn->displayWidth - 1);
+            ulROTAP_CTL0 |= ROTAPS_ENABLE;
+            
+            xf86DrvMsgVerb(pScrn->scrnIndex, X_INFO, InternalLevel, "  0x8094 = %08x\n", *(pRDC->MMIOVirtualAddr + 0x8094));
+            xf86DrvMsgVerb(pScrn->scrnIndex, X_INFO, InternalLevel, "  ROTAP_END_ADDR0 = %08x\n", *ROTAP_END_ADDR0);
+            xf86DrvMsgVerb(pScrn->scrnIndex, X_INFO, InternalLevel, "  ROTAP_PITCH0 = %08x\n", *ROTAP_PITCH0);
+            xf86DrvMsgVerb(pScrn->scrnIndex, X_INFO, InternalLevel, "  ROTAP_SRC_PITCH_RECI0 = %08x\n", *ROTAP_SRC_PITCH_RECI0);
+            xf86DrvMsgVerb(pScrn->scrnIndex, X_INFO, InternalLevel, "  ROTAP_WH0 = %08x\n", *ROTAP_WH0);
+            xf86DrvMsgVerb(pScrn->scrnIndex, X_INFO, InternalLevel, "  ROTAP_CTL0 = %08x\n", *ROTAP_CTL0);
+            break;
+
+        default:
+            xf86DrvMsgVerb(pScrn->scrnIndex, X_ERROR, ErrorLevel, "Unexpected rotation in RDCRandRSetConfig\n");
+            pRDC->rotate = RR_Rotate_0;
+            return FALSE;
+    }
+
+    *ROTAP_CTL0 = ulROTAP_CTL0;
+            
+    return TRUE;
+}
+
+
+
+
+static Bool
+RDCDriverFunc(ScrnInfoPtr pScrn, xorgDriverFuncOp op, pointer data)
+{
+    xf86DrvMsgVerb(pScrn->scrnIndex, X_INFO, DefaultLevel, "RDCDriverFunc Operation: %d\n", op);
+    
+    switch(op)
+    {
+        case RR_GET_INFO:          
+            return RDCRandRGetInfo(pScrn, (Rotation*)data);
+        case RR_SET_CONFIG:          
+            return RDCRandRSetConfig(pScrn, (xorgRRConfig*)data);
+        default:
+            return FALSE;
+    }
+    return FALSE;
+}
+
+static void RDCApertureInit(ScrnInfoPtr pScrn)
+{
+    RDCRecPtr pRDC = RDCPTR(pScrn);
+    *ROTAP_CTL0             = 0;
+    *ROTAP_START_ADDR0      = 0;
+    *ROTAP_END_ADDR0        = 0;
+    *ROTAP_PITCH0           = 0;
+    *ROTAP_SRC_PITCH_RECI0  = 0;
+    *ROTAP_WH0              = 0;
+
+    *ROTAP_CTL1             = 0;
+    *ROTAP_START_ADDR1      = 0;
+    *ROTAP_END_ADDR1        = 0;
+    *ROTAP_PITCH0           = 0;
+    *ROTAP_SRC_PITCH_RECI1  = 0;
+    *ROTAP_WH1              = 0;
+
 }

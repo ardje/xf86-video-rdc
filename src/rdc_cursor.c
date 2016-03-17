@@ -33,8 +33,6 @@
 
 #include "xf86.h"
 #include "xf86_OSproc.h"
-#include "xf86Resources.h"
-#include "xf86RAC.h"
 #include "xf86cmap.h"
 #include "compiler.h"
 #include "mibstore.h"
@@ -176,7 +174,9 @@ RDCShowCursor(ScrnInfoPtr pScrn)
     jReg= 0x02;
     if (pRDC->HWCInfo.cursortype ==HWC_COLOR)
         jReg |= 0x01;
-               
+    else
+        jReg &= ~BIT0;
+        
     SetIndexRegMask(CRTC_PORT, 0xCB, 0xFC, jReg);         
 #if HWC_DEBUG
     xf86DrvMsgVerb(pScrn->scrnIndex, X_INFO, DefaultLevel, "==Exit RDCShowCursor()== \n");
@@ -286,7 +286,7 @@ RDCLoadCursorImage(ScrnInfoPtr pScrn, UCHAR *src)
     RDCRecPtr   pRDC = RDCPTR(pScrn);   
     int         i, j, k;
     UCHAR       *pjSrcAnd, *pjSrcXor, *pjDstData;
-    ULONG       ulTempDstAnd32[2], ulTempDstXor32[2], ulTempDstData32[2];
+    ULONG       ulTempDstAnd32[2], ulTempDstData32[2];
     UCHAR       jTempSrcAnd32, jTempSrcXor32;
     ULONG       ulCheckSum = 0;                         
     ULONG       ulPatternAddr;
@@ -315,12 +315,10 @@ RDCLoadCursorImage(ScrnInfoPtr pScrn, UCHAR *src)
                 jTempSrcAnd32 = *((UCHAR *) pjSrcAnd);
                 jTempSrcXor32 = *((UCHAR *) pjSrcXor);
                 ulTempDstAnd32[0] = ((jTempSrcAnd32 >> k) & 0x01) ? 0x00008000L:0x00L;
-                ulTempDstXor32[0] = ((jTempSrcXor32 >> k) & 0x01) ? 0x00004000L:0x00L;
                 ulTempDstData32[0] = ((jTempSrcXor32 >> k) & 0x01) ? pRDC->HWCInfo.MonoHWC.fg:pRDC->HWCInfo.MonoHWC.bg;
                 ulTempDstAnd32[1] = ((jTempSrcAnd32 >> (k-1)) & 0x01) ? 0x80000000L:0x00L;
-                ulTempDstXor32[1] = ((jTempSrcXor32 >> (k-1)) & 0x01) ? 0x40000000L:0x00L;
                 ulTempDstData32[1] = ((jTempSrcXor32 >> (k-1)) & 0x01) ? (pRDC->HWCInfo.MonoHWC.fg << 16):(pRDC->HWCInfo.MonoHWC.bg << 16);
-                *((ULONG *) pjDstData) = ulTempDstAnd32[0] | ulTempDstXor32[0] | ulTempDstData32[0] | ulTempDstAnd32[1] | ulTempDstXor32[1] | ulTempDstData32[1];
+                *((ULONG *) pjDstData) = ulTempDstAnd32[0] | ulTempDstData32[0] | ulTempDstAnd32[1] | ulTempDstData32[1];
                 ulCheckSum += *((ULONG *) pjDstData);                               
                 pjDstData += 4;
             }
@@ -354,9 +352,68 @@ RDCLoadCursorImage(ScrnInfoPtr pScrn, UCHAR *src)
 static Bool 
 RDCUseHWCursor(ScreenPtr pScreen, CursorPtr pCurs)
 {
+    ScrnInfoPtr     pScrn = xf86Screens[pScreen->myNum];
+    RDCRecPtr       pRDC = RDCPTR(pScrn);
+
 #if HWC_DEBUG
     xf86DrvMsgVerb(0, X_INFO, DefaultLevel, "==Enter RDCUseHWCursor(), return TRUE== \n");
+    xf86DrvMsgVerb(0, X_INFO, DefaultLevel, "hot spot (x, y) = (%d, %d)\n", pCurs->bits->xhot, pCurs->bits->yhot);
 #endif
+    pRDC->HWCInfo.cursortype = HWC_MONO;
+    
+
+    
+    if (pRDC->bRandRRotation)
+    {
+        switch (pRDC->rotate)
+        {
+            case RR_Rotate_0:
+                pRDC->HWCInfo.width = MAX_HWC_WIDTH;
+                pRDC->HWCInfo.height = MAX_HWC_WIDTH;
+                pRDC->HWCInfo.xhot = pCurs->bits->xhot;
+                pRDC->HWCInfo.yhot = pCurs->bits->yhot;
+                pRDC->HWCInfo.offset_x = 0;
+                pRDC->HWCInfo.offset_y = 0;
+                break;
+
+            case RR_Rotate_90:
+                pRDC->HWCInfo.width = MAX_HWC_WIDTH;
+                pRDC->HWCInfo.height = pCurs->bits->width;
+                pRDC->HWCInfo.xhot = pCurs->bits->yhot;
+                pRDC->HWCInfo.yhot = pCurs->bits->width - pCurs->bits->xhot - 1;
+                pRDC->HWCInfo.offset_x = 0;
+                pRDC->HWCInfo.offset_y = MAX_HWC_WIDTH - pCurs->bits->width;
+                break;
+
+            case RR_Rotate_180:
+                pRDC->HWCInfo.width = pCurs->bits->width;
+                pRDC->HWCInfo.height = pCurs->bits->height;
+                pRDC->HWCInfo.xhot = pCurs->bits->width - pCurs->bits->xhot - 1;
+                pRDC->HWCInfo.yhot = pCurs->bits->height - pCurs->bits->yhot - 1;
+                pRDC->HWCInfo.offset_x = MAX_HWC_HEIGHT - pCurs->bits->height;
+                pRDC->HWCInfo.offset_y = MAX_HWC_WIDTH - pCurs->bits->width;
+                break;
+
+            case RR_Rotate_270:
+                pRDC->HWCInfo.width = pCurs->bits->height;
+                pRDC->HWCInfo.height = MAX_HWC_HEIGHT;
+                pRDC->HWCInfo.xhot = pCurs->bits->height - pCurs->bits->yhot - 1;
+                pRDC->HWCInfo.yhot = pCurs->bits->xhot;
+                pRDC->HWCInfo.offset_x = MAX_HWC_HEIGHT - pCurs->bits->height;
+                pRDC->HWCInfo.offset_y = 0;
+                break;
+        }
+    }
+    else
+    {
+        pRDC->HWCInfo.width = MAX_HWC_WIDTH;
+        pRDC->HWCInfo.height = MAX_HWC_WIDTH;
+        pRDC->HWCInfo.xhot = pCurs->bits->xhot;
+        pRDC->HWCInfo.yhot = pCurs->bits->yhot;
+        pRDC->HWCInfo.offset_x = 0;
+        pRDC->HWCInfo.offset_y = 0;
+    }
+
     return TRUE;
 }
 
@@ -386,6 +443,7 @@ RDCLoadCursorARGB(ScrnInfoPtr pScrn, CursorPtr pCurs)
 
 #if HWC_DEBUG
     xf86DrvMsgVerb(pScrn->scrnIndex, X_INFO, DefaultLevel, "==Enter RDCLoadCursorARGB()== \n");
+    xf86DrvMsgVerb(pScrn->scrnIndex, X_INFO, DefaultLevel, "hot spot (x, y) = (%d, %d)\n", pCurs->bits->xhot, pCurs->bits->yhot);
 #endif
     
     pRDC->HWCInfo.cursortype = HWC_COLOR;
@@ -464,9 +522,67 @@ RDCLoadCursorARGB(ScrnInfoPtr pScrn, CursorPtr pCurs)
 static Bool 
 RDCUseHWCursorARGB(ScreenPtr pScreen, CursorPtr pCurs)
 {
+    ScrnInfoPtr     pScrn = xf86Screens[pScreen->myNum];
+    RDCRecPtr       pRDC = RDCPTR(pScrn);
+
 #if HWC_DEBUG
     xf86DrvMsgVerb(0, X_INFO, DefaultLevel, "==Enter RDCUseHWCursorARGB(), return TRUE== \n");
+    xf86DrvMsgVerb(0, X_INFO, DefaultLevel, "hot spot (x, y) = (%d, %d)\n", pCurs->bits->xhot, pCurs->bits->yhot);
 #endif
+
+    pRDC->HWCInfo.cursortype = HWC_COLOR;
+
+    if (pRDC->bRandRRotation)
+    {
+        switch (pRDC->rotate)
+        {
+            case RR_Rotate_0:
+                pRDC->HWCInfo.width  = pCurs->bits->width;
+                pRDC->HWCInfo.height = pCurs->bits->height;
+                pRDC->HWCInfo.xhot = pCurs->bits->xhot;
+                pRDC->HWCInfo.yhot = pCurs->bits->yhot;
+                pRDC->HWCInfo.offset_x = MAX_HWC_WIDTH - pRDC->HWCInfo.width;
+                pRDC->HWCInfo.offset_y = MAX_HWC_HEIGHT - pRDC->HWCInfo.height;
+                break;
+
+            case RR_Rotate_90:
+                pRDC->HWCInfo.width  = pCurs->bits->height;
+                pRDC->HWCInfo.height = pCurs->bits->width;
+                pRDC->HWCInfo.xhot = pCurs->bits->yhot;
+                pRDC->HWCInfo.yhot = pCurs->bits->width - pCurs->bits->xhot - 1;
+                pRDC->HWCInfo.offset_x = MAX_HWC_HEIGHT - pRDC->HWCInfo.height;
+                pRDC->HWCInfo.offset_y = MAX_HWC_WIDTH - pRDC->HWCInfo.width;
+                break;
+
+            case RR_Rotate_180:
+                pRDC->HWCInfo.width  = pCurs->bits->width;
+                pRDC->HWCInfo.height = pCurs->bits->height;
+                pRDC->HWCInfo.xhot = pCurs->bits->width - pCurs->bits->xhot - 1;
+                pRDC->HWCInfo.yhot = pCurs->bits->height - pCurs->bits->yhot - 1;
+                pRDC->HWCInfo.offset_x = MAX_HWC_WIDTH - pRDC->HWCInfo.width;
+                pRDC->HWCInfo.offset_y = MAX_HWC_HEIGHT - pRDC->HWCInfo.height;
+                break;
+
+            case RR_Rotate_270:
+                pRDC->HWCInfo.width  = pCurs->bits->height;
+                pRDC->HWCInfo.height = pCurs->bits->width;
+                pRDC->HWCInfo.xhot = pCurs->bits->height - pCurs->bits->yhot - 1;
+                pRDC->HWCInfo.yhot = pCurs->bits->xhot;
+                pRDC->HWCInfo.offset_x = MAX_HWC_HEIGHT - pRDC->HWCInfo.height;
+                pRDC->HWCInfo.offset_y = MAX_HWC_WIDTH - pRDC->HWCInfo.width;
+                break;
+        }
+    }
+    else
+    {
+        pRDC->HWCInfo.width  = pCurs->bits->width;
+        pRDC->HWCInfo.height = pCurs->bits->height;
+        pRDC->HWCInfo.xhot = pCurs->bits->xhot;
+        pRDC->HWCInfo.yhot = pCurs->bits->yhot;
+        pRDC->HWCInfo.offset_x = MAX_HWC_WIDTH - pRDC->HWCInfo.width;
+        pRDC->HWCInfo.offset_y = MAX_HWC_HEIGHT - pRDC->HWCInfo.height;
+    }
+
     return TRUE;
 }
 
@@ -507,6 +623,8 @@ static void RDCShowCursor_HQ(ScrnInfoPtr pScrn)
 
     if (pRDC->HWCInfo.cursortype ==HWC_COLOR)
         ulCursorCTRL |= BIT0;
+    else
+        ulCursorCTRL &= ~BIT0;
         
     *((volatile ULONG*)(pRDC->MMIOVirtualAddr + HWC_MMIO_CTRL)) = (ulCursorCTRL | BIT1);
 
@@ -527,9 +645,10 @@ static void RDCSetCursorColors_HQ(ScrnInfoPtr pScrn, int bg, int fg)
     int         i, j, k;
     UCHAR       *pjSrcAnd, *pjSrcXor;
     UCHAR       jTempSrcAnd, jTempSrcXor;
-    ULONG       ulTempDstXor32, ulTempDstAnd32, ulTempDstData32;
+    ULONG       ulTempDstAnd32, ulTempDstData32;
     ULONG       *pulDstData;
-  
+    ULONG       ulROTAP_CTL1 = 0;
+    
 #if HWC_DEBUG
     xf86DrvMsgVerb(pScrn->scrnIndex, X_INFO, DefaultLevel, "==Enter RDCSetCursorColors_HQ(bg = %x, fg = %x)== \n", bg, fg);
 #endif
@@ -539,7 +658,30 @@ static void RDCSetCursorColors_HQ(ScrnInfoPtr pScrn, int bg, int fg)
 
     pjSrcXor = pRDC->HWCInfo.MonoHWC.ucXorBitmap;
     pjSrcAnd = pRDC->HWCInfo.MonoHWC.ucAndBitmap;
-    pulDstData = (ULONG*)(pRDC->HWCInfo.MonoHWC.pjPatternVirtualAddr);
+    pulDstData = (ULONG*)(pRDC->HWCInfo.pjHWCVirtualAddr + HQ_HWC_SIZE*pRDC->HWCInfo.HWC_NUM_Next);
+
+
+    if (pRDC->bRandRRotation)
+    {
+        ulROTAP_CTL1 |= ROTAPS_32BPP;
+
+        if (pRDC->rotate == RR_Rotate_0)
+        {
+                ulROTAP_CTL1 &= ~(ROTAPS_ENABLE);
+        }
+        else
+        {
+            ulROTAP_CTL1 |= ROTAPS_ENABLE;
+            *ROTAP_PITCH1 = (MAX_HWC_HEIGHT << 16) | (MAX_HWC_WIDTH);
+            *ROTAP_SRC_PITCH_RECI1 = (1 << 30) / (MAX_HWC_WIDTH);
+            *ROTAP_START_ADDR1  = pRDC->HWCInfo.ulHWCOffsetAddr +
+                                  HQ_HWC_SIZE * pRDC->HWCInfo.HWC_NUM_Next;
+            *ROTAP_END_ADDR1    = pRDC->HWCInfo.ulHWCOffsetAddr +
+                                  HQ_HWC_SIZE * (pRDC->HWCInfo.HWC_NUM_Next + 1);
+            *ROTAP_WH1 = ((MAX_HWC_HEIGHT-1) << 16) | (MAX_HWC_WIDTH- 1);
+        }
+        *ROTAP_CTL1 = ulROTAP_CTL1;
+    }
 
     for (j = 0; j < MAX_HWC_HEIGHT; j++)
     {
@@ -551,9 +693,8 @@ static void RDCSetCursorColors_HQ(ScrnInfoPtr pScrn, int bg, int fg)
             for (k=7; k>=0; k--)
             {
                 ulTempDstAnd32 = ((jTempSrcAnd >> k) & 0x01) ? 0x80000000L:0x00L;
-                ulTempDstXor32 = ((jTempSrcXor >> k) & 0x01) ? 0x40000000L:0x00L;
                 ulTempDstData32 = ((jTempSrcXor >> k) & 0x01) ? fg:bg;
-                *pulDstData = ulTempDstAnd32|ulTempDstXor32|ulTempDstData32;
+                *pulDstData = ulTempDstAnd32|ulTempDstData32;
                 pulDstData++;
             }
 
@@ -561,38 +702,30 @@ static void RDCSetCursorColors_HQ(ScrnInfoPtr pScrn, int bg, int fg)
             pjSrcAnd++;
         }        
     }                    
+
+    ulROTAP_CTL1 = 0;
+    
+    
+    pRDC->HWCInfo.HWC_NUM_Next = (pRDC->HWCInfo.HWC_NUM_Next+1) % pRDC->HWCInfo.HWC_NUM;
+
 }
 
 static void RDCLoadCursorImage_HQ(ScrnInfoPtr pScrn, UCHAR *src)
 {
     RDCRecPtr   pRDC = RDCPTR(pScrn);   
-    UCHAR       *pjSrcAnd, *pjSrcXor;
     ULONG       ulPatternOffset;
     
 #if HWC_DEBUG
     xf86DrvMsgVerb(pScrn->scrnIndex, X_INFO, DefaultLevel, "==Enter RDCLoadCursorImage_HQ()== \n");
 #endif 
     
-    pRDC->HWCInfo.cursortype = HWC_MONO;
-    pRDC->HWCInfo.width  = (USHORT) MAX_HWC_WIDTH;
-    pRDC->HWCInfo.height = (USHORT) MAX_HWC_HEIGHT;
-    pRDC->HWCInfo.offset_x = MAX_HWC_WIDTH - pRDC->HWCInfo.width;
-    pRDC->HWCInfo.offset_y = MAX_HWC_HEIGHT - pRDC->HWCInfo.height;
+    memcpy(&(pRDC->HWCInfo.MonoHWC.ucXorBitmap), src, sizeof(pRDC->HWCInfo.MonoHWC.ucXorBitmap));
+    memcpy(&(pRDC->HWCInfo.MonoHWC.ucAndBitmap), src + (MAX_HWC_WIDTH*MAX_HWC_HEIGHT/8), sizeof(pRDC->HWCInfo.MonoHWC.ucAndBitmap));
 
     
-    pjSrcXor = src;
-    pjSrcAnd = src + (MAX_HWC_WIDTH*MAX_HWC_HEIGHT/8);
-
-    memcpy(&(pRDC->HWCInfo.MonoHWC.ucXorBitmap),pjSrcXor, sizeof(pRDC->HWCInfo.MonoHWC.ucXorBitmap));
-    memcpy(&(pRDC->HWCInfo.MonoHWC.ucAndBitmap),pjSrcAnd, sizeof(pRDC->HWCInfo.MonoHWC.ucAndBitmap));
-
-    
-    ulPatternOffset = pRDC->HWCInfo.ulHWCOffsetAddr+HQ_HWC_SIZE*pRDC->HWCInfo.HWC_NUM_Next;
-    pRDC->HWCInfo.MonoHWC.pjPatternVirtualAddr = pRDC->FBVirtualAddr + ulPatternOffset;
+    ulPatternOffset = pRDC->HWCInfo.ulHWCOffsetAddr + HQ_HWC_SIZE * pRDC->HWCInfo.HWC_NUM_Next;
     *((ULONG*)(pRDC->MMIOVirtualAddr + HWC_MMIO_ADDRESS)) = ((ulPatternOffset >> 3) & 0xFFFFFF);
 
-    
-    pRDC->HWCInfo.HWC_NUM_Next = (pRDC->HWCInfo.HWC_NUM_Next+1) % pRDC->HWCInfo.HWC_NUM;
     
 #if HWC_DEBUG
     xf86DrvMsgVerb(pScrn->scrnIndex, X_INFO, DefaultLevel, "==Exit RDCLoadCursorImage_HQ()== \n");
@@ -606,30 +739,111 @@ static void RDCLoadCursorARGB_HQ(ScrnInfoPtr pScrn, CursorPtr pCurs)
     ULONG       j, ulSrcWidthInByte, ulSrcHeight;
     LONG        ulDstCursorPitch;
     ULONG       ulPatternAddr;
+    ULONG       ulROTAP_CTL1 = 0;
 
 #if HWC_DEBUG
     xf86DrvMsgVerb(pScrn->scrnIndex, X_INFO, DefaultLevel, "==Enter RDCLoadCursorARGB_HQ()== \n");
+    xf86DrvMsgVerb(pScrn->scrnIndex, X_INFO, DefaultLevel, "hot spot (x, y) = (%d, %d)\n", pCurs->bits->xhot, pCurs->bits->yhot);
 #endif
     
-    pRDC->HWCInfo.cursortype = HWC_COLOR;
-    pRDC->HWCInfo.width  = pCurs->bits->width;
-    pRDC->HWCInfo.height = pCurs->bits->height;
-    pRDC->HWCInfo.xhot = pCurs->bits->xhot;
-    pRDC->HWCInfo.yhot = pCurs->bits->yhot;
-    pRDC->HWCInfo.offset_x = MAX_HWC_WIDTH - pRDC->HWCInfo.width;
-    pRDC->HWCInfo.offset_y = MAX_HWC_HEIGHT - pRDC->HWCInfo.height;
-    
-    
-    ulSrcWidthInByte = pRDC->HWCInfo.width << 2;  
-    ulSrcHeight = pRDC->HWCInfo.height;  
-        
-    ulDstCursorPitch = MAX_HWC_WIDTH << 2;
+    ulSrcWidthInByte    = pCurs->bits->width << 2;  
+    ulSrcHeight         = pCurs->bits->height;  
+    ulDstCursorPitch    = MAX_HWC_WIDTH << 2;
+    pjSrcXor            = (UCHAR *) pCurs->bits->argb;
 
-    pjSrcXor  = (UCHAR *) pCurs->bits->argb;
-    pjDstXor  = (UCHAR *) pRDC->HWCInfo.pjHWCVirtualAddr + 
-                HQ_HWC_SIZE*pRDC->HWCInfo.HWC_NUM_Next +
-                (MAX_HWC_HEIGHT - ulSrcHeight) * ulDstCursorPitch +
-                (ulDstCursorPitch - ulSrcWidthInByte);
+    if (pRDC->bRandRRotation)
+    {
+        ulROTAP_CTL1 |= ROTAPS_32BPP;
+
+        switch (pRDC->rotate)
+        {
+            case RR_Rotate_0:
+                pRDC->HWCInfo.width  = pCurs->bits->width;
+                pRDC->HWCInfo.height = pCurs->bits->height;
+                pRDC->HWCInfo.xhot = pCurs->bits->xhot;
+                pRDC->HWCInfo.yhot = pCurs->bits->yhot;
+                pRDC->HWCInfo.offset_x = MAX_HWC_WIDTH - pRDC->HWCInfo.width;
+                pRDC->HWCInfo.offset_y = MAX_HWC_HEIGHT - pRDC->HWCInfo.height;
+
+                pjDstXor = (UCHAR *) pRDC->HWCInfo.pjHWCVirtualAddr + 
+                           HQ_HWC_SIZE*pRDC->HWCInfo.HWC_NUM_Next +
+                           (MAX_HWC_HEIGHT - ulSrcHeight) * ulDstCursorPitch +
+                           (ulDstCursorPitch - ulSrcWidthInByte);
+                ulROTAP_CTL1 &= ~(ROTAPS_ENABLE);
+                break;
+
+            case RR_Rotate_90:
+                pRDC->HWCInfo.width  = pCurs->bits->height;
+                pRDC->HWCInfo.height = pCurs->bits->width;
+                pRDC->HWCInfo.xhot = pCurs->bits->yhot;
+                pRDC->HWCInfo.yhot = pCurs->bits->width - pCurs->bits->xhot - 1;
+                pRDC->HWCInfo.offset_x = MAX_HWC_HEIGHT - pRDC->HWCInfo.height;
+                pRDC->HWCInfo.offset_y = MAX_HWC_WIDTH - pRDC->HWCInfo.width;
+
+                *ROTAP_PITCH1 = (MAX_HWC_HEIGHT << 16) | (MAX_HWC_WIDTH);
+                ulROTAP_CTL1 |= ROTAPS_ENABLE;
+
+                pjDstXor = (UCHAR *) pRDC->HWCInfo.pjHWCVirtualAddr + 
+                           HQ_HWC_SIZE*pRDC->HWCInfo.HWC_NUM_Next +
+                           (MAX_HWC_HEIGHT - ulSrcHeight) * ulDstCursorPitch;
+                break;
+
+            case RR_Rotate_180:
+                pRDC->HWCInfo.width  = pCurs->bits->width;
+                pRDC->HWCInfo.height = pCurs->bits->height;
+                pRDC->HWCInfo.xhot = pCurs->bits->width - pCurs->bits->xhot - 1;
+                pRDC->HWCInfo.yhot = pCurs->bits->height - pCurs->bits->yhot - 1;
+                pRDC->HWCInfo.offset_x = MAX_HWC_WIDTH - pRDC->HWCInfo.width;
+                pRDC->HWCInfo.offset_y = MAX_HWC_HEIGHT - pRDC->HWCInfo.height;
+
+                *ROTAP_PITCH1 = (MAX_HWC_WIDTH << 16) | (MAX_HWC_WIDTH);
+                ulROTAP_CTL1 |= ROTAPS_ENABLE;
+
+            
+                pjDstXor = (UCHAR *) pRDC->HWCInfo.pjHWCVirtualAddr + 
+                           HQ_HWC_SIZE*pRDC->HWCInfo.HWC_NUM_Next;
+                break;
+
+            case RR_Rotate_270:
+                pRDC->HWCInfo.width  = pCurs->bits->height;
+                pRDC->HWCInfo.height = pCurs->bits->width;
+                pRDC->HWCInfo.xhot = pCurs->bits->height - pCurs->bits->yhot - 1;
+                pRDC->HWCInfo.yhot = pCurs->bits->xhot;
+                pRDC->HWCInfo.offset_x = MAX_HWC_HEIGHT - pRDC->HWCInfo.height;
+                pRDC->HWCInfo.offset_y = MAX_HWC_WIDTH - pRDC->HWCInfo.width;
+
+                *ROTAP_PITCH1 = (MAX_HWC_HEIGHT << 16) | (MAX_HWC_WIDTH);
+                ulROTAP_CTL1 |= ROTAPS_ENABLE;
+            
+                pjDstXor = (UCHAR *) pRDC->HWCInfo.pjHWCVirtualAddr + 
+                           HQ_HWC_SIZE*pRDC->HWCInfo.HWC_NUM_Next +
+                           (ulDstCursorPitch - ulSrcWidthInByte);
+                break;
+        }
+        *ROTAP_SRC_PITCH_RECI1 = (1 << 30) / (MAX_HWC_WIDTH);
+        *ROTAP_START_ADDR1  = pRDC->HWCInfo.ulHWCOffsetAddr +
+                              HQ_HWC_SIZE * pRDC->HWCInfo.HWC_NUM_Next;
+        *ROTAP_END_ADDR1    = pRDC->HWCInfo.ulHWCOffsetAddr +
+                              HQ_HWC_SIZE * (pRDC->HWCInfo.HWC_NUM_Next + 1);
+        *ROTAP_WH1 = ((MAX_HWC_HEIGHT-1) << 16) | (MAX_HWC_WIDTH- 1);
+
+        *ROTAP_CTL1 = ulROTAP_CTL1;
+    }
+    else
+    {
+        pRDC->HWCInfo.width  = pCurs->bits->width;
+        pRDC->HWCInfo.height = pCurs->bits->height;
+        pRDC->HWCInfo.xhot = pCurs->bits->xhot;
+        pRDC->HWCInfo.yhot = pCurs->bits->yhot;
+        pRDC->HWCInfo.offset_x = MAX_HWC_WIDTH - pRDC->HWCInfo.width;
+        pRDC->HWCInfo.offset_y = MAX_HWC_HEIGHT - pRDC->HWCInfo.height;
+
+        pjDstXor  = (UCHAR *) pRDC->HWCInfo.pjHWCVirtualAddr + 
+                    HQ_HWC_SIZE*pRDC->HWCInfo.HWC_NUM_Next +
+                    (MAX_HWC_HEIGHT - ulSrcHeight) * ulDstCursorPitch +
+                    (ulDstCursorPitch - ulSrcWidthInByte);
+    }
+    
     
     for (j = 0; j < ulSrcHeight; j++)
     {
@@ -639,6 +853,9 @@ static void RDCLoadCursorARGB_HQ(ScrnInfoPtr pScrn, CursorPtr pCurs)
         pjSrcXor += ulSrcWidthInByte;
         pjDstXor += ulDstCursorPitch;
     } 
+
+    
+    *ROTAP_CTL1 = 0;
 
     
     ulPatternAddr = 
@@ -671,16 +888,55 @@ static void RDCSetCursorPosition_HQ(ScrnInfoPtr pScrn, int x, int y)
     int         iOverlayFetchCnt;
     ULONG       ulCursorCtrl;
     Bool        bNeedAdjustFrame = false;
+    ULONG       ulHorScalingFactor = pRDC->DeviceInfo.ScalerConfig.ulHorScalingFactor;
+    ULONG       ulVerScalingFactor = pRDC->DeviceInfo.ScalerConfig.ulVerScalingFactor;
 
+    
+    y++;
+
+    int         ori_x = x, ori_y = y;
 #if HWC_DEBUG
     xf86DrvMsgVerb(pScrn->scrnIndex, X_INFO, InternalLevel, "==Enter RDCSetCursorPosition_HQ(x = %d, y = %d)== \n", x, y);
 #endif
 
+    if (pRDC->bRandRRotation)
+    {
+        switch (pRDC->rotate)
+        {
+            case RR_Rotate_0:
+                break;
+            case RR_Rotate_90:
+                x = ori_y;
+                y = pRDC->VideoModeInfo.ScreenHeight - ori_x -1;
+                y -= (pRDC->HWCInfo.height- 1);
+                break;
+            case RR_Rotate_180:
+                x = pRDC->VideoModeInfo.ScreenWidth - ori_x -1;
+                y = pRDC->VideoModeInfo.ScreenHeight - ori_y -1;
+                x -= (pRDC->HWCInfo.width - 1);
+                y -= (pRDC->HWCInfo.height- 1);
+                break;
+            case RR_Rotate_270:
+                x = pRDC->VideoModeInfo.ScreenWidth - ori_y -1;
+                y = ori_x;
+                x -= (pRDC->HWCInfo.width - 1);
+                break;
+
+        }
+    }
+
     xhot = pRDC->HWCInfo.xhot;
     yhot = pRDC->HWCInfo.yhot;
+#if HWC_DEBUG
+    xf86DrvMsgVerb(pScrn->scrnIndex, X_INFO, InternalLevel, "hot spot (x, y) = (%d, %d)\n", xhot, yhot);
+#endif
 
     x_offset = pRDC->HWCInfo.offset_x;
     y_offset = pRDC->HWCInfo.offset_y;
+
+#if HWC_DEBUG
+    xf86DrvMsgVerb(pScrn->scrnIndex, X_INFO, InternalLevel, "offset (x, y) = (%d, %d)\n", x_offset, y_offset);
+#endif
 
     
     if ((x+xhot) >= mode->HDisplay)
@@ -702,6 +958,11 @@ static void RDCSetCursorPosition_HQ(ScrnInfoPtr pScrn, int x, int y)
     {
         y = (-yhot);
     }
+
+#if HWC_DEBUG
+    xf86DrvMsgVerb(pScrn->scrnIndex, X_INFO, InternalLevel, "iScreenOffset_(x, y) = (%d, %d)\n",
+                   pHWCInfo->iScreenOffset_x, pHWCInfo->iScreenOffset_y);
+#endif
 
     
     if ((pRDC->DeviceInfo.ucDeviceID == LCDINDEX) &&
@@ -859,9 +1120,6 @@ static void RDCSetCursorPosition_HQ(ScrnInfoPtr pScrn, int x, int y)
         }
     }
 
-    
-    y++;
-
     if(x < 0)
     {
         x_offset = (-x) + pRDC->HWCInfo.offset_x;
@@ -876,19 +1134,21 @@ static void RDCSetCursorPosition_HQ(ScrnInfoPtr pScrn, int x, int y)
 
     if ( pRDC->DeviceInfo.ScalerConfig.EnableHorScaler)
     {
-        x = (x * pRDC->DeviceInfo.ScalerConfig.ulHorScalingFactor + 4095) >> 12;
+        x = (x * ulHorScalingFactor) / 4096;
 #if HWC_DEBUG
-        xf86DrvMsgVerb(pScrn->scrnIndex, X_INFO, InternalLevel, "H scaling factor = %x\n", pRDC->DeviceInfo.ScalerConfig.ulHorScalingFactor);
+        xf86DrvMsgVerb(pScrn->scrnIndex, X_INFO, InternalLevel, "H scaling factor = %x\n", ulHorScalingFactor);
 #endif
-
     }
 
     y_end = y + (MAX_HWC_HEIGHT - y_offset);
 
     if (pRDC->DeviceInfo.ScalerConfig.EnableVerScaler)
     {
-        y = (y * pRDC->DeviceInfo.ScalerConfig.ulVerScalingFactor + 2047) >>11;
-        y_end =  ((y_end * pRDC->DeviceInfo.ScalerConfig.ulVerScalingFactor + 2047) >> 11) - 1;
+#if HWC_DEBUG
+        xf86DrvMsgVerb(pScrn->scrnIndex, X_INFO, InternalLevel, "V scaling factor = %x\n", ulVerScalingFactor);
+#endif
+        y = (y * ulVerScalingFactor) / 2048;
+        y_end = (((y_end - 1) * ulVerScalingFactor) / 2048);
     }
     else
     {
@@ -897,7 +1157,11 @@ static void RDCSetCursorPosition_HQ(ScrnInfoPtr pScrn, int x, int y)
 
     if(mode->Flags & V_DBLSCAN)
         y *= 2;
- 
+
+#if HWC_DEBUG
+    xf86DrvMsgVerb(pScrn->scrnIndex, X_INFO, InternalLevel, "(x, y) = (%d, %d)\n", x, y);
+    xf86DrvMsgVerb(pScrn->scrnIndex, X_INFO, InternalLevel, "(x, y)_offset = (%d, %d)\n", x_offset, y_offset);
+#endif
     
     *((volatile ULONG*)(pRDC->MMIOVirtualAddr + HWC_MMIO_OFFSET)) = 
         (x_offset & 0x3F) | ((y_offset & 0x3F) << 8) | ((y_end & 0x7FF) << 16);

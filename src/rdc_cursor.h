@@ -26,7 +26,6 @@
  *     <rdc_xorg@rdc.com.tw>
  */
  
-
 #define MAX_HWC_WIDTH           64
 #define MAX_HWC_HEIGHT          64
 #define HWC_SIZE                (MAX_HWC_WIDTH*MAX_HWC_HEIGHT*2)

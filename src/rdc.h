@@ -26,15 +26,25 @@
  *     <rdc_xorg@rdc.com.tw>
  */
  
+#ifdef HAVE_CONFIG_H
+#include <config.h>
+#endif
+
+
+#include "xf86Cursor.h"
+ 
 #if XSERVER_LIBPCIACCESS
 #include <pciaccess.h>
 #endif
 
 #include "xaa.h"
 #include "xaarop.h"
+#include "xf86.h"
 
 
 #include "exa.h"
+
+#include "vbe.h"
 
 #define PCI_DEV_MAP_FLAG_WRITABLE       (1U<<0)
 #define PCI_DEV_MAP_FLAG_WRITE_COMBINE  (1U<<1)
@@ -63,6 +73,10 @@
 
 #define     HWC
 #define     HWC_DEBUG               0
+
+
+#define NTSC                 0
+#define PAL                  1
 
 
 #ifndef PCI_VENDOR_RDC
@@ -101,7 +115,7 @@ typedef enum _CHIP_ID {
 #define RDC_DRIVER_NAME         "rdc"
 #define RDC_MAJOR_VERSION       0
 #define RDC_MINOR_VERSION       0
-#define RDC_PATCH_VERSION       6
+#define RDC_PATCH_VERSION       9
 #define RDC_VERSION    \
         ((RDC_MAJOR_VERSION << 20) | (RDC_MINOR_VERSION << 10) | RDC_PATCH_VERSION)
 
@@ -112,6 +126,7 @@ typedef enum _CHIP_ID {
 #define MIN_CMDQ_SIZE           0x00040000
 #define CMD_QUEUE_GUARD_BAND    0x00000020
 #define DEFAULT_HWC_NUM         0x00000002
+#define CAPTURE_BUFFER_SIZE     0x00300000
 
 
 typedef INT32       LONG;
@@ -162,6 +177,29 @@ typedef CARD32      ULONG;
 #define BIOS_ROM_PATH_FILE      "//root//RDCVBIOS.ROM"
 #define BIOS_ROM_SIZE           32*1024
 #define BIOS_ROM_PHY_BASE       0xC0000
+
+
+ 
+#define ALIGN_TO_2(f)             (((f) + 1) & ~1)
+#define ALIGN_TO_4(f)             (((f) + 3) & ~3)
+#define ALIGN_TO_8(f)             (((f) + 7) & ~7)
+#define ALIGN_TO_16(f)            (((f) + 15) & ~15)
+#define ALIGN_TO_32(f)            (((f) + 31) & ~31)
+#define ALIGN_TO_64(f)            (((f) + 63) & ~63)
+#define ALIGN_TO_128(f)           (((f) + 127) & ~127)
+#define ALIGN_TO_256(f)           (((f) + 255) & ~255)
+
+
+//CR Lock Control Header
+#define CR_LOCK_ID                  0x00009570
+#define CR_JUMP_ID                  0x00009571
+#define CR_LOCK_2DDMA_ID            BIT31
+//CR Lock Control Engine
+#define CR_LOCK_2D                  BIT24
+#define CR_LOCK_DMA                 BIT25
+#define CR_LOCK_VIDEO               BIT26
+#define CR_LOCK_SUB_PIC             BIT27
+#define CR_LOCK_DSP                 BIT28
 
 typedef struct _RDCRec* RDCRecPtr;
 typedef struct _RDCRec RDCRec;
@@ -220,7 +258,6 @@ typedef struct {
 
     ULONG   fg;
     ULONG   bg;
-    UCHAR   *pjPatternVirtualAddr;
     UCHAR   ucXorBitmap[64*64/8];
     UCHAR   ucAndBitmap[64*64/8];
         
@@ -268,6 +305,81 @@ typedef struct {
     
 } DEVICEINFO;
 
+
+//Structure defination for Video function
+
+#define     PI                      3.1415926535897932
+#define     BRIGHTNESS_DEFAULT      10000
+#define     CONTRAST_DEFAULT        10000
+#define     HUE_DEFAULT             0
+#define     SATURATION_DEFAULT      10000
+
+// OVERLAYRECORD define
+#define VIDEO_SHOW              0x80000000  
+#define VIDEO_HIDE              0x00000000  
+#define VIDEO_POST_INUSE        0x08000000  
+#define VIDEO_CAP_SUBPIC_INUSE  0x00000008  
+
+typedef struct _Cofe
+{
+	float A1;
+	float A2;
+	float A3;
+	float B1;
+	float B2;
+	float B3;
+	float C1;
+	float C2;
+	float C3;
+	float D1;
+	float D2;
+	float D3;
+
+	CARD32 dwIA1;
+	CARD32 dwIB1;
+	CARD32 dwIC1;
+	CARD32 dwID1;
+	CARD32 dwIA2;
+	CARD32 dwIB2;
+	CARD32 dwIC2;
+	CARD32 dwID2;
+	CARD32 dwIA3;
+	CARD32 dwIB3;
+	CARD32 dwIC3;
+	CARD32 dwID3;
+
+	CARD32 dwPA1;
+	CARD32 dwPB1;
+	CARD32 dwPC1;
+	CARD32 dwPD1;
+	CARD32 dwPA2;
+	CARD32 dwPB2;
+	CARD32 dwPC2;
+	CARD32 dwPD2;
+	CARD32 dwPA3;
+	CARD32 dwPB3;
+	CARD32 dwPC3;
+	CARD32 dwPD3;
+}Cofe;
+
+typedef struct _VIDCOLORENHANCE
+{
+    ULONG    ulScaleBrightness;         
+    ULONG    ulScaleContrast;           
+    ULONG    ulScaleHue;                
+    ULONG    ulScaleSaturation;         
+} VIDCOLORENHANCE, *LPVIDCOLORENHANCE;
+
+typedef struct _COLORKEY    
+{
+    CARD32 dwColorKeyOn;
+    CARD32 dwChromaKeyOn;
+    CARD32 dwKeyLow;
+    CARD32 dwKeyHigh;
+    CARD32 dwChromaLow;
+    CARD32 dwChromaHigh;
+}COLORKEY, *LPCOLORKEY;
+
 typedef struct {
     Bool    	bOverlayEnable;
     int         iSrcWidth;
@@ -278,7 +390,10 @@ typedef struct {
     int         iDstHeight;
     ULONG       ulVidDispCtrl;
     Bool        bPanningOverlayEnable;
-} OVERLAY_STATUS;
+
+    
+    VIDCOLORENHANCE VidColorEnhance;
+} OVERLAY_STATUS, *POVERLAY_STATUS;
 
 typedef struct{
     ULONG       ulSrcBase;
@@ -370,7 +485,7 @@ typedef struct _ECINFO
 } ECINFO;
 
 #define EC_ACCESS_SUCCESS   0x0
-#define EC_ACCESS_FAIL      0xFFFFFFFF    
+#define EC_ACCESS_FAIL      0xFFFFFFFF
 
 struct _RDCRec
 {
@@ -439,6 +554,10 @@ struct _RDCRec
     UCHAR GammaRampR[256];
     UCHAR GammaRampG[256];
     UCHAR GammaRampB[256];
+
+    
+    Bool                bRandRRotation;
+    Rotation            rotate; 
 };
 
 
@@ -452,4 +571,5 @@ struct _RDCRec
 #include "rdc_cursor.h"
 #include "CInt10.h"
 #include "rdc_video.h"
+#include "rdc_rotation.h"
 

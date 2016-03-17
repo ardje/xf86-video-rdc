@@ -66,10 +66,8 @@
 #define SetDisplay1RefreshRate      0x8301
 #define SetLCDPWMLevel              0x8302
 #define SetDisplay2RefreshRate      0x8381
-#define SetTVType                   0x8400
-#define SetTV2Type                  0x8480
-#define SetTVConnectType            0x8401
-#define SetTV2ConnectType           0x8481
+#define SetTVConfiguration          0x8400
+#define SetTV2Configuration         0x8480
 #define SetHDTVConnectType          0x8501
 #define SetHDTV2ConnectType         0x8581
 #define SetHDMIType                 0x8600

@@ -73,7 +73,8 @@ LTLIBRARIES = $(rdc_drv_la_LTLIBRARIES)
 rdc_drv_la_LIBADD =
 am_rdc_drv_la_OBJECTS = rdc_2dtool.lo rdc_accel.lo rdc_cursor.lo \
 	rdc_driver.lo rdc_mode.lo rdc_tool.lo rdc_vgatool.lo \
-	rdc_video.lo rdc_extension.lo CInt10.lo gamma.lo
+	rdc_video.lo rdc_extension.lo CInt10.lo gamma.lo saa7105.lo \
+	vidinit.lo
 rdc_drv_la_OBJECTS = $(am_rdc_drv_la_OBJECTS)
 rdc_drv_la_LINK = $(LIBTOOL) --tag=CC $(AM_LIBTOOLFLAGS) \
 	$(LIBTOOLFLAGS) --mode=link $(CCLD) $(AM_CFLAGS) $(CFLAGS) \
@@ -95,7 +96,7 @@ DIST_SOURCES = $(rdc_drv_la_SOURCES)
 ETAGS = etags
 CTAGS = ctags
 DISTFILES = $(DIST_COMMON) $(DIST_SOURCES) $(TEXINFOS) $(EXTRA_DIST)
-ACLOCAL = aclocal -I /home/pub/Xorg/1.6.0/share/aclocal
+ACLOCAL = aclocal -I /home/pub/Xorg/1.7.5/share/aclocal
 ADMIN_MAN_DIR = $(mandir)/man$(ADMIN_MAN_SUFFIX)
 ADMIN_MAN_SUFFIX = 8
 AMTAR = ${SHELL} /home/jason/Desktop/Xorg/driver/xf86-video-rdc/missing --run tar
@@ -165,8 +166,8 @@ SET_MAKE =
 SHELL = /bin/sh
 STRIP = strip
 VERSION = 0.80
-XORG_CFLAGS = -I/home/jason/Desktop/Xorg/compiled/1.6.0//include/xorg -I/home/jason/Desktop/Xorg/compiled/1.6.0//include/pixman-1 -I/home/jason/Desktop/Xorg/compiled/1.6.0//include -I/home/jason/Desktop/Xorg/compiled/1.6.0/include  
-XORG_LIBS = -L/home/jason/Desktop/Xorg/compiled/1.6.0//lib -lpixman-1 -lpciaccess  
+XORG_CFLAGS = -fvisibility=hidden -I/home/pub/Xorg/1.7.5/include/xorg -I/home/pub/Xorg/1.7.5/include/pixman-1 -I/home/pub/Xorg/1.7.5/include  
+XORG_LIBS = -L/home/pub/Xorg/1.7.5/lib -lpixman-1 -lpciaccess  
 abs_builddir = /home/jason/Desktop/Xorg/driver/xf86-video-rdc/src
 abs_srcdir = /home/jason/Desktop/Xorg/driver/xf86-video-rdc/src
 abs_top_builddir = /home/jason/Desktop/Xorg/driver/xf86-video-rdc
@@ -225,7 +226,7 @@ top_srcdir = ..
 # -avoid-version prevents gratuitous .0.0.0 version numbers on the end
 # _ladir passes a dummy rpath to libtool so the thing will actually link
 # TODO: -nostdlib/-Bstatic/-lgcc platform magic, not installing the .a, etc.
-AM_CFLAGS = -I/home/jason/Desktop/Xorg/compiled/1.6.0//include/xorg -I/home/jason/Desktop/Xorg/compiled/1.6.0//include/pixman-1 -I/home/jason/Desktop/Xorg/compiled/1.6.0//include -I/home/jason/Desktop/Xorg/compiled/1.6.0/include  
+AM_CFLAGS = -fvisibility=hidden -I/home/pub/Xorg/1.7.5/include/xorg -I/home/pub/Xorg/1.7.5/include/pixman-1 -I/home/pub/Xorg/1.7.5/include  
 rdc_drv_la_LTLIBRARIES = rdc_drv.la
 rdc_drv_la_LDFLAGS = -module -avoid-version 
 rdc_drv_ladir = ${exec_prefix}/lib/xorg/modules/drivers
@@ -240,7 +241,9 @@ rdc_drv_la_SOURCES = \
 	rdc_video.c	\
 	rdc_extension.c \
 	CInt10.c \
-	gamma.c
+	gamma.c \
+	saa7105.c \
+	vidinit.c
 
 all: all-am
 
@@ -322,6 +325,8 @@ include ./$(DEPDIR)/rdc_mode.Plo
 include ./$(DEPDIR)/rdc_tool.Plo
 include ./$(DEPDIR)/rdc_vgatool.Plo
 include ./$(DEPDIR)/rdc_video.Plo
+include ./$(DEPDIR)/saa7105.Plo
+include ./$(DEPDIR)/vidinit.Plo
 
 .c.o:
 	$(COMPILE) -MT $@ -MD -MP -MF $(DEPDIR)/$*.Tpo -c -o $@ $<

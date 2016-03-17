@@ -99,7 +99,7 @@
     do {                                        \
         UCHAR __Temp;                           \
         outb(base,index);                       \
-         __Temp = (inb((base)+1)&(and))|(val);  \
+         __Temp = (inb((base)+1)&(and))|(val & ~(and));  \
         SetIndexReg(base,index,__Temp);         \
     } while (0)
 

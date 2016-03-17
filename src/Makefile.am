@@ -40,5 +40,6 @@ rdc_drv_la_SOURCES =	\
 	rdc_video.c	\
 	rdc_extension.c \
 	CInt10.c \
-	gamma.c
-
+	gamma.c \
+	saa7105.c \
+	vidinit.c

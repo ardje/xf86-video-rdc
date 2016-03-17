@@ -48,6 +48,12 @@
 
 USHORT Relocate_IOAddress;
 
+extern UCHAR bSetSAA7105Reg(UCHAR bDisplayPath, USHORT wModeNum, UCHAR ucTVType, UCHAR ucI2Cport, UCHAR ucDevAddress);
+extern void SetSAA7105DACPower(UCHAR ucI2Cport, UCHAR ucDevAddress, UCHAR ucTVConnectorType);
+extern void SetSAA7105InitReg(UCHAR ucI2Cport, UCHAR ucDevAddress);
+extern void SetSAA7105CCRSLevel(UCHAR ucI2Cport, UCHAR ucDevAddress, UCHAR Level);
+extern void GetSAA7105CCRSLevel(UCHAR ucI2Cport, UCHAR ucDevAddress, UCHAR *Level);
+
 
 __inline void OutPort(UCHAR Index,UCHAR Value)     
 {              
@@ -68,48 +74,40 @@ __inline UCHAR InPort(UCHAR Index)
 
 void I2CWriteClock(UCHAR I2CPort, UCHAR data)
 {
-    UCHAR i;
-    UCHAR ujCRB7, jtemp;
-    
+    ULONG i;
+    UCHAR ucMaskData=1, ucTmpData;
+    if(data)            
+        ucMaskData &= 0;
     for (i=0;i<0x1000; i++)
     {
-        ujCRB7 = ((data & 0x01) ? 0:1);            
-        SetCRReg(I2CPort, ujCRB7, 0xFE);
-        
-        jtemp = GetCRReg(I2CPort) & 0x01;
-        
-        if (ujCRB7 == jtemp) break;
+        SetCRReg(I2CPort, ucMaskData, 0x1);
+        ucTmpData = GetCRReg(I2CPort) & 0x01;
+        if (ucMaskData == ucTmpData) 
+            break;
     }
 }
 
 void I2CDelay(UCHAR I2CPort)
 {
-    ULONG     i;
-    UCHAR     jtemp;
-         
-    
-             
+    UCHAR     i,jtemp;
     
     for (i=0;i<100;i++)
-    {
-        
-        jtemp = inb(0x80);
-    }    
+        jtemp = GetCRReg(I2CPort);
 }
 
 void I2CWriteData(UCHAR I2CPort, UCHAR data)
 {
-    UCHAR       ujCRB7, jtemp;
-    ULONG    i;
-    
+
+    ULONG i;
+    UCHAR ucMaskData=0x4, ucTmpData;
+    if(data)            
+        ucMaskData &= 0;
     for (i=0;i<0x1000; i++)
-    {        
-        ujCRB7 = ((data & 0x01) ? 0:1) << 2;        
-        SetCRReg(I2CPort, ujCRB7, 0xFB);
-        
-        jtemp = GetCRReg(I2CPort) & 0x04;
-        
-        if (ujCRB7 == jtemp) break;        
+    {
+        SetCRReg(I2CPort, ucMaskData, 0x4);
+        ucTmpData = GetCRReg(I2CPort) & 0x04;
+        if (ucMaskData == ucTmpData) 
+            break;
     }
 }
 
@@ -129,16 +127,17 @@ void I2CStart(UCHAR I2CPort)
 
 void SendI2CDataByte(UCHAR I2CPort, UCHAR Data)
 {
-    UCHAR jData;
-    UCHAR i;
+    char i;
 
     for (i=7;i>=0;i--)
     {
         I2CWriteClock(I2CPort, 0x00);           
         I2CDelay(I2CPort);         
+        if((Data>>i)&0x1)
+            I2CWriteData(I2CPort, 0x1);           
+        else
+            I2CWriteData(I2CPort, 0x0);           
         
-        jData = ((Data >> i) & 0x01) ? 1:0;
-        I2CWriteData(I2CPort, jData);           
         I2CDelay(I2CPort);         
         
         I2CWriteClock(I2CPort, 0x01);           
@@ -146,27 +145,22 @@ void SendI2CDataByte(UCHAR I2CPort, UCHAR Data)
     }                
 }
 
-bool CheckACK(UCHAR I2CPort)
-{
-    UCHAR Data;
-    
+UCHAR CheckACK(UCHAR I2CPort)
+{    
     I2CWriteClock(I2CPort, 0x00);               
     I2CDelay(I2CPort);    
     I2CWriteData(I2CPort, 0x01);                
     I2CDelay(I2CPort);    
     I2CWriteClock(I2CPort, 0x01);               
-    I2CDelay(I2CPort);    
-    Data = (GetCRReg(I2CPort) & 0x20) >> 5;     
-
-                  
-    return ((Data & 0x01) ? 0:1);                
+    I2CDelay(I2CPort);             
+    return ((GetCRReg(I2CPort) & 0x20) ? 0:1);                
 }
 
 UCHAR ReceiveI2CDataByte(UCHAR I2CPort, UCHAR I2CSlave)
 {
-    
-    UCHAR jData=0, jTempData;   
-    UCHAR i, j;
+    UCHAR jData=0, jTempData;
+    char i;
+    ULONG j;
 
     for (i=7;i>=0;i--)
     {
@@ -181,7 +175,8 @@ UCHAR ReceiveI2CDataByte(UCHAR I2CPort, UCHAR I2CSlave)
         
         for (j=0; j<0x1000; j++)
         {   
-            if (((GetCRReg(I2CPort) & 0x10) >> 4)) break;
+            if (((GetCRReg(I2CPort) & 0x10) >> 4))
+                break;
         }    
                     
         jTempData =  (GetCRReg(I2CPort) & 0x20) >> 5;
@@ -224,7 +219,8 @@ UCHAR ReadI2C(UCHAR I2CPort, UCHAR I2CSlave, UCHAR RegIdx, UCHAR* RegData)
     I2CStart(I2CPort);
 
     
-    SendI2CDataByte(I2CPort, I2CSlave|I2CWriteCMD);
+    SendI2CDataByte(I2CPort, I2CSlave);
+    
     if (!CheckACK(I2CPort))
     {
         return I2C_ERROR;
@@ -232,24 +228,26 @@ UCHAR ReadI2C(UCHAR I2CPort, UCHAR I2CSlave, UCHAR RegIdx, UCHAR* RegData)
 
     
     SendI2CDataByte(I2CPort, RegIdx);
+
     if (!CheckACK(I2CPort))
     {
         return I2C_ERROR;
     }    
-        
+    
     I2CStart(I2CPort);
    
     
-    SendI2CDataByte(I2CPort, I2CSlave|I2CReadCMD);
+    SendI2CDataByte(I2CPort, I2CSlave+1);
+    
     if (!CheckACK(I2CPort))
     {
         return I2C_ERROR;
     }    
-   
     
     *RegData = ReceiveI2CDataByte(I2CPort, I2CSlave);
+
     SendNACK(I2CPort);
-         
+
     I2CStop(I2CPort);
 
     return I2C_OK;       
@@ -260,7 +258,7 @@ UCHAR WriteI2C(UCHAR I2CPort, UCHAR I2CSlave, UCHAR RegIdx, UCHAR RegData)
     I2CStart(I2CPort);
 
     
-    SendI2CDataByte(I2CPort, I2CSlave|I2CWriteCMD);
+    SendI2CDataByte(I2CPort, I2CSlave);
     if (!CheckACK(I2CPort))
     {
         return I2C_ERROR;
@@ -904,16 +902,20 @@ void LoadTiming(UCHAR bDisplayPath, USHORT wModeNum)
 
     switch(bDeviceIndex)
     {
-       case CRT_ID:
-       case CRT2_ID:
-       case DVI_ID:
-       case DVI2_ID:
+        case CRT_ID:
+        case CRT2_ID:
+        case DVI_ID:
+        case DVI2_ID:
             LoadVESATiming(bDisplayPath, wModeNum);
             break;
 
-       case LCD_ID:
-       case LCD2_ID:
+        case LCD_ID:
+        case LCD2_ID:
             LoadLCDTiming(bDisplayPath, wModeNum);
+        case TV_ID:
+        case TV2_ID:
+            LoadTVTiming(bDisplayPath, wModeNum, bDeviceIndex);
+            TurnOnTVClock();
             break;
     }
 
@@ -962,6 +964,33 @@ void LoadLCDTiming(UCHAR bDisplayPath, USHORT wModeNum)
 
     xf86DrvMsgVerb(0, X_INFO, DefaultLevel, "==Exit LoadLCDTiming()==\n");
 }
+
+
+void LoadTVTiming(UCHAR bDisplayPath, USHORT wModeNum, UCHAR bDeviceIndex)
+{
+    UCHAR ucTVType;
+    PORT_CONFIG *pDevicePortConfig;    
+    ucTVType = Get_TV_Type();
+    if(GetDevicePortConfig(bDeviceIndex, &pDevicePortConfig))
+    {
+        if(pDevicePortConfig->TX_Enc_ID == ENC_SAA7105)
+        {
+            if(bSetSAA7105Reg(bDisplayPath, wModeNum, ucTVType, pDevicePortConfig->TX_I2C_Port, pDevicePortConfig->TX_I2C_Addr))
+            {
+                xf86DrvMsgVerb(0, X_INFO, DefaultLevel, "==SAA7105 Load TV Timing Success()==\n");
+                if(pDevicePortConfig->PortID & DVP1) 
+                    SetDVP1DPA(0x4);
+                else
+                    SetDVP2DPA(0x4);
+            }
+            else
+                xf86DrvMsgVerb(0, X_INFO, DefaultLevel, "==SAA7105 Load TV Timing Fail()==\n");
+        }else
+            xf86DrvMsgVerb(0, X_INFO, DefaultLevel, "==Can not Load TV Timing ==\n");
+    }else
+        xf86DrvMsgVerb(0, X_INFO, DefaultLevel, "==Can not Load TV Timing ==\n");
+}
+
 
 void SetScalingFactor(UCHAR bDisplayPath, MODE_INFO *pUserModeInfo, MODE_INFO *pPanelModeInfo)
 {
@@ -1715,6 +1744,30 @@ void Set24BitDVP()
     SetSRReg(0x1E, 0x08, BIT3);
 }
 
+void SetDVP1DPA(UCHAR ucDPA)
+{
+    UCHAR ucTmp;
+    ucTmp = ucDPA&0x7;
+    SetSRReg(0x21, 0x07, ucTmp);
+}
+
+void SetDVP2DPA(UCHAR ucDPA)
+{
+    UCHAR ucTmp;
+    ucTmp = (ucDPA&0x7)<<3;
+    SetSRReg(0x21, 0x38, ucTmp);
+}
+
+void TurnOnPowerSequenceByPASS()
+{
+    SetSRReg(0x32, 0x01, BIT0);
+}
+
+void TurnOffPowerSequenceByPASS()
+{
+    SetSRReg(0x32, 0x00, BIT0);
+}
+
 void TurnOnDAC()
 {
     SetCRReg(0xDF, 0x00, BIT2);
@@ -1722,6 +1775,36 @@ void TurnOnDAC()
 void TurnOffDAC()
 {
     SetCRReg(0xDF, 0x04, BIT2);
+}
+
+void TurnOnTVClock()
+{
+    UCHAR ucTVConnectorType;
+    PORT_CONFIG *pDevicePortConfig;
+    ucTVConnectorType = Get_TV_ConnectorType();
+    if(GetDevicePortConfig(TV_ID, &pDevicePortConfig))
+    {
+        if(pDevicePortConfig->TX_Enc_ID == ENC_SAA7105)
+        {
+            SetSAA7105DACPower(pDevicePortConfig->TX_I2C_Port, pDevicePortConfig->TX_I2C_Addr,ucTVConnectorType);
+        }
+    }
+    SetCRReg(0xD0, 0x40, BIT6);
+    TurnOnPowerSequenceByPASS();
+}
+
+void TurnOffTVClock()
+{
+    PORT_CONFIG *pDevicePortConfig;
+    TurnOffPowerSequenceByPASS();
+    if(GetDevicePortConfig(TV_ID, &pDevicePortConfig))
+    {
+        if(pDevicePortConfig->TX_Enc_ID == ENC_SAA7105)
+        {
+            SetSAA7105DACPower(pDevicePortConfig->TX_I2C_Port, pDevicePortConfig->TX_I2C_Addr,0);
+        }
+    }
+    SetCRReg(0xD0, 0x00, BIT6);
 }
 
 #if 0
@@ -2127,6 +2210,21 @@ void Set_LCD_TABLE_INDEX(UCHAR bLCDIndex)
     WriteScratch(IDX_LCD1_TABLE_INDEX, bLCDIndex);
 }
 
+UCHAR Get_TV_ConnectorType(void)
+{
+    return ReadScratch(IDX_TV1_CONNECTION_TYPE);
+}
+
+UCHAR Get_TV_Type(void)
+{
+    return ReadScratch(IDX_TV1_TYPE);
+}
+
+void Set_TV_Confiuration(UCHAR TVConfig)
+{
+    WriteScratch(IDX_TV1_TYPE, (TVConfig&0xF));
+    WriteScratch(IDX_TV1_CONNECTION_TYPE, ((TVConfig>>4)&0x3));
+}
 
 USHORT Get_VESA_MODE(UCHAR DisplayPath)
 {
@@ -2467,6 +2565,31 @@ USHORT GetVESAMEMSize()
     return (2 << (bHWStrapping+3));
 }
 
+
+void SetTV_CVBS_CCRSLevel(UCHAR *Level)
+{
+    PORT_CONFIG *pDevicePortConfig = pPortConfig;
+    if (GetDevicePortConfig(TV_ID, &pDevicePortConfig))
+    {
+        xf86DrvMsgVerb(0, X_INFO, InfoLevel, "CCRSLevel Set = %x\n",*Level);
+        if(pDevicePortConfig->TX_Enc_ID == ENC_SAA7105)
+            SetSAA7105CCRSLevel(pDevicePortConfig->TX_I2C_Port,pDevicePortConfig->TX_I2C_Addr,*Level);
+    }    
+
+}
+
+UCHAR ucGetTV_CVBS_CCRSLevel(UCHAR *Level)
+{
+    PORT_CONFIG *pDevicePortConfig = pPortConfig;
+    if (GetDevicePortConfig(TV_ID, &pDevicePortConfig))
+    {
+        if(pDevicePortConfig->TX_Enc_ID == ENC_SAA7105)
+            GetSAA7105CCRSLevel(pDevicePortConfig->TX_I2C_Port,pDevicePortConfig->TX_I2C_Addr, Level);
+    }
+    xf86DrvMsgVerb(0, X_INFO, InfoLevel, "CCRSLevel Get = %x\n",*Level);
+    return TRUE;
+}
+
 void SetDeviceSupport()
 {
     PORT_CONFIG *pDevicePortConfig = pPortConfig;
@@ -2480,20 +2603,25 @@ void SetDeviceSupport()
     if (GetDevicePortConfig(LCD_ID, &pDevicePortConfig))
     {
         xf86DrvMsgVerb(0, X_INFO, InfoLevel, "LCD supported\n");
-        bLCDSUPPORT = true;
+        WriteScratch(IDX_LVDS1_TX_ID,pDevicePortConfig->TX_Enc_ID);
+        bLCDSUPPORT = true;        
     }
 
     if (GetDevicePortConfig(DVI_ID, &pDevicePortConfig))
     {
         xf86DrvMsgVerb(0, X_INFO, InfoLevel, "DVI supported\n");
-        bDVISUPPORT = true;
+        WriteScratch(IDX_TMDS1_TX_ID,pDevicePortConfig->TX_Enc_ID);
+        bDVISUPPORT = true;        
     }
     
     if (GetDevicePortConfig(TV_ID, &pDevicePortConfig))
     {
         xf86DrvMsgVerb(0, X_INFO, InfoLevel, "TV supported\n");
+        WriteScratch(IDX_TV1_ENCODER_ID,pDevicePortConfig->TX_Enc_ID);
+        if(pDevicePortConfig->TX_Enc_ID == ENC_SAA7105)
+            SetSAA7105InitReg(pDevicePortConfig->TX_I2C_Port,pDevicePortConfig->TX_I2C_Addr);
         bTVSUPPORT = true;
-    }
+    }    
 }
 
 CI_STATUS VBE_SetMode(CBIOS_Extension *pCBIOSExtension)
@@ -2531,6 +2659,9 @@ CI_STATUS VBE_SetMode(CBIOS_Extension *pCBIOSExtension)
 
     
     TurnOffScaler(DISP1);
+
+    
+    TurnOffTVClock();
     
     if (bCurDeviceID != bNewDeviceID)
     {
@@ -2541,7 +2672,7 @@ CI_STATUS VBE_SetMode(CBIOS_Extension *pCBIOSExtension)
 
         
         TurnOffDigitalPort(bCurDeviceID);
-
+        
         
         Set_DEV_ID(bNewDeviceID, DISP1);
     }
@@ -2569,11 +2700,6 @@ CI_STATUS VBE_SetMode(CBIOS_Extension *pCBIOSExtension)
     
 
     
-    xf86DrvMsgVerb(0, X_INFO, InfoLevel, " \n");
-    if(!(pCBIOSExtension->pCBiosArguments->reg.x.BX & BIT15))
-    {
-        ClearFrameBuffer(DISP1,(ULONG*)(pCBIOSExtension->VideoVirtualAddress),pModeInfo,bColorDepth);
-    }
 
     
     xf86DrvMsgVerb(0, X_INFO, InfoLevel, " \n");
@@ -2739,7 +2865,7 @@ CI_STATUS OEM_QueryBiosInfo (CBIOS_ARGUMENTS *pCBiosArguments)
     	bProjCode = atoi(szPrj) ;
     	wCustomerCode = atoi(szMajor);
     	bRelVersion = atoi(szMinor);
-        pCBiosArguments->reg.ex.EBX = (bProjCode<<24) | (wCustomerCode<8) | bRelVersion;
+        pCBiosArguments->reg.ex.EBX = (bProjCode<<24) | (wCustomerCode<<8) | bRelVersion;
 
 #if CBIOS_DEBUG
     xf86DrvMsgVerb(0, X_INFO, InfoLevel, "Bios version : %d\n",pCBiosArguments->reg.ex.EBX);
@@ -2926,6 +3052,8 @@ CI_STATUS OEM_QueryDeviceConnectStatus (CBIOS_ARGUMENTS *pCBiosArguments)
     
     if (*(USHORT*)(pucPCIDataStruct + OFF_DID) == 0x2010)
     {
+        SetSRReg(0x4f, 0x82, 0xFF);
+        LongWait();
         if (GetSRReg(0x3c) & BIT0)
         {
             pCBiosArguments->reg.x.BX |= B_CRT;   
@@ -2938,7 +3066,7 @@ CI_STATUS OEM_QueryDeviceConnectStatus (CBIOS_ARGUMENTS *pCBiosArguments)
     
     if (bLCDSUPPORT)
     {
-        pCBiosArguments->reg.x.BX |= B_LCD;   
+        pCBiosArguments->reg.x.BX |= B_LCD;
     }
 
     if (bDVISUPPORT)
@@ -2959,6 +3087,7 @@ CI_STATUS OEM_QueryDeviceConnectStatus (CBIOS_ARGUMENTS *pCBiosArguments)
     if (bTVSUPPORT)
     {
         
+        pCBiosArguments->reg.x.BX |= B_TV;
     }
     
     SetVBERerurnStatus(VBEFunctionCallSuccessful, pCBiosArguments);
@@ -3230,6 +3359,10 @@ CI_STATUS OEM_QueryLCDPWMLevel(CBIOS_ARGUMENTS *pCBiosArguments)
 
 CI_STATUS OEM_QueryTVConfiguration (CBIOS_ARGUMENTS *pCBiosArguments)
 {
+    
+    pCBiosArguments->reg.lh.BH = Get_TV_ConnectorType();
+    pCBiosArguments->reg.lh.BL = Get_TV_Type();
+    SetVBERerurnStatus(VBEFunctionCallSuccessful, pCBiosArguments);
     return true;
 }
 CI_STATUS OEM_QueryTV2Configuration (CBIOS_ARGUMENTS *pCBiosArguments)
@@ -3467,23 +3600,17 @@ CI_STATUS OEM_SetRefreshRate (CBIOS_ARGUMENTS *pCBiosArguments)
 CI_STATUS OEM_SetLCDPWMLevel (CBIOS_ARGUMENTS *pCBiosArguments)
 {
     SetSRReg(0x2F,7,0xFF);
-    SetSRReg(0x30,pCBiosArguments->reg.lh.CL,0xFF);            
+    SetSRReg(0x30,pCBiosArguments->reg.lh.CL,0xFF);
     return true;
 }
 
-CI_STATUS OEM_SetTVType (CBIOS_ARGUMENTS *pCBiosArguments)
+CI_STATUS OEM_SetTVConfiguration (CBIOS_ARGUMENTS *pCBiosArguments)
 {
+    Set_TV_Confiuration(pCBiosArguments->reg.lh.CL);
+    SetVBERerurnStatus(VBEFunctionCallSuccessful, pCBiosArguments);
     return true;
 }
-CI_STATUS OEM_SetTV2Type (CBIOS_ARGUMENTS *pCBiosArguments)
-{
-    return true;
-}
-CI_STATUS OEM_SetTVConnectType (CBIOS_ARGUMENTS *pCBiosArguments)
-{
-    return true;
-}
-CI_STATUS OEM_SetTV2ConnectType (CBIOS_ARGUMENTS *pCBiosArguments)
+CI_STATUS OEM_SetTV2Configuration (CBIOS_ARGUMENTS *pCBiosArguments)
 {
     return true;
 }
@@ -3708,13 +3835,14 @@ CI_STATUS CInt10(CBIOS_Extension *pCBIOSExtension)
                 case QuerySupportedMode:        
                     CInt10_Status = OEM_QuerySupportedMode(pCBIOSExtension->pCBiosArguments);
                     break;
-                case QueryLCDPanelSizeMode:        
+                case QueryLCDPanelSizeMode:      
                     CInt10_Status = OEM_QueryLCDPanelSizeMode(pCBIOSExtension->pCBiosArguments);
                     break;
-                case QueryLCDPWMLevel:          
+                case QueryLCDPWMLevel:           
                     CInt10_Status = OEM_QueryLCDPWMLevel(pCBIOSExtension->pCBiosArguments);
                     break;
-                case QueryTVConfiguration:
+                case QueryTVConfiguration:       
+                    CInt10_Status = OEM_QueryTVConfiguration(pCBIOSExtension->pCBiosArguments);
                     break;
                 case QueryTV2Configuration:
                     break;
@@ -3747,13 +3875,8 @@ CI_STATUS CInt10(CBIOS_Extension *pCBIOSExtension)
                 case SetLCDPWMLevel:            
                     CInt10_Status = OEM_SetLCDPWMLevel(pCBIOSExtension->pCBiosArguments);
                     break;
-                case SetTVType:
-                    break;
-                case SetTV2Type:
-                    break;
-                case SetTVConnectType:
-                    break;
-                case SetTV2ConnectType:
+                case SetTVConfiguration:        
+                    CInt10_Status = OEM_SetTVConfiguration(pCBIOSExtension->pCBiosArguments);
                     break;
                 case SetHDTVConnectType:
                     break;

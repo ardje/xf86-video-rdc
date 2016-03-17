@@ -37,8 +37,6 @@
 
 #include "xf86.h"
 #include "xf86_OSproc.h"
-#include "xf86Resources.h"
-#include "xf86RAC.h"
 #include "xf86cmap.h"
 #include "compiler.h"
 #include "mibstore.h"
@@ -81,7 +79,6 @@ CARD32 *inBufPtr, *outBufPtr ;
 
 
 int g_ScreenNumber;
-
 
 
 static int ProcRDCGFXQueryVersion (ClientPtr client)
@@ -432,8 +429,10 @@ int RDCGFXUtilityProc(xRDCGFXCommandReq* req)
             
         case UT_SET_GAMMA:
             {
+                
                 if (req->inBufferSize != sizeof(GammaTbl) ||
-                    ((pGammaTbl)inBufPtr)->dwSize != MAX_CLUT_SIZE)
+                    ((pGammaTbl)inBufPtr)->dwSize != MAX_CLUT_SIZE ||
+                    ((1<<(pRDC->DeviceInfo.ucDeviceID-1)) != ((pGammaTbl)inBufPtr)->device))
                     return UT_FAIL;
 
                 
@@ -451,10 +450,6 @@ int RDCGFXUtilityProc(xRDCGFXCommandReq* req)
             if (pRDC->ECChipInfo.bECExist)
             {
                 return EC_SetLCDPWM(pRDC, (char *)(inBufPtr));
-            }
-            else
-            {
-               return BIOS_SetLCDPWM(&CBIOSExtension, (char *)(inBufPtr));
             };
             break;
 
@@ -465,10 +460,6 @@ int RDCGFXUtilityProc(xRDCGFXCommandReq* req)
             if(pRDC->ECChipInfo.bECExist)
             {
                 return EC_QueryLCDPWM(pRDC, (char *)(outBufPtr));
-            }
-            else
-            {
-                return BIOS_QueryLCDPWM(&CBIOSExtension, (char *)(outBufPtr));
             };
             break;
 
@@ -496,6 +487,130 @@ int RDCGFXUtilityProc(xRDCGFXCommandReq* req)
                 return(UT_SUCCESS);
             }
             break;
+        case UT_SET_TV_INFO:
+            {
+                PTVINFO TVConfig;
+                if (req->inBufferSize != sizeof(TVINFO))
+                   return UT_FAIL;
+                TVConfig = (PTVINFO)inBufPtr;
+
+                xf86DrvMsgVerb(pScrn->scrnIndex, X_INFO, 4, "DrvEscape: Set TV info ,type =%x , Connector = %x\n",TVConfig->wType,TVConfig->bConnector);
+                if(!TVConfig->bConnector) 
+                {
+                    CBiosArguments.reg.x.AX = OEMFunction;
+                    CBiosArguments.reg.x.BX = QueryTVConfiguration;
+                    CInt10(&CBIOSExtension);
+                    TVConfig->bConnector = CBiosArguments.reg.lh.BH;
+                    TVConfig->wType      = (CBiosArguments.reg.x.BX)&0xFF;
+                }
+                CBiosArguments.reg.x.AX = OEMFunction;
+                CBiosArguments.reg.x.BX = SetTVConfiguration;
+                CBiosArguments.reg.lh.CL= (TVConfig->bConnector<<4) | (UCHAR)(TVConfig->wType);
+                
+                
+                if (CInt10(&CBIOSExtension))
+                {
+                    return(UT_SUCCESS);
+                }
+                else
+                {
+                    return (UT_NOT_IMPLEMENT);
+                }
+                break;
+            }
+        case UT_QUERY_TV_INFO:
+            if (req->outBufferSize != sizeof(TVINFO))
+                return UT_FAIL;
+            CBiosArguments.reg.x.AX = OEMFunction;
+            CBiosArguments.reg.x.BX = QueryTVConfiguration;
+            if (CInt10(&CBIOSExtension))
+            {
+                PTVINFO TVConfig;
+                TVConfig = (PTVINFO)outBufPtr;
+                TVConfig->wType      = (WORD)CBiosArguments.reg.lh.BL;
+                TVConfig->bConnector = CBiosArguments.reg.lh.BH;
+                xf86DrvMsgVerb(pScrn->scrnIndex, X_INFO, 4, "DrvEscape: Query TV info Type=%x, Connector =%x\n",TVConfig->wType,TVConfig->bConnector);
+                return(UT_SUCCESS);
+            }else
+            {
+                return (UT_NOT_IMPLEMENT);
+            }
+            break;
+            
+        case UT_SET_TV_CCRS_LEVEL:
+            if (req->inBufferSize != sizeof(UCHAR))
+                return UT_FAIL;
+            SetTV_CVBS_CCRSLevel((UCHAR *)(inBufPtr));
+            xf86DrvMsgVerb(pScrn->scrnIndex, X_INFO, 4, "DrvEscape: Set TV CCRS Done\n");
+            break;
+                
+        case UT_QUERY_TV_CCRS_LEVEL:            
+            if (req->outBufferSize != sizeof(UCHAR))
+                return UT_FAIL;
+            return ucGetTV_CVBS_CCRSLevel((UCHAR *)(outBufPtr));
+            break;
+
+        case UT_QUERY_VIDEO_CONTRAST:            
+            if (req->outBufferSize != sizeof(ULONG))
+                return UT_INVALID;
+
+            *(ULONG*)outBufPtr = pRDC->OverlayStatus.VidColorEnhance.ulScaleContrast;
+            return UT_SUCCESS;            
+
+        case UT_SET_VIDEO_CONTRAST:            
+            if (req->inBufferSize != sizeof(ULONG))
+                return UT_INVALID;
+                
+            pRDC->OverlayStatus.VidColorEnhance.ulScaleContrast = *(ULONG*)inBufPtr;
+            SetVIDColor(pRDC);
+            return UT_SUCCESS;
+
+
+        case UT_QUERY_VIDEO_BRIGHT:            
+            if (req->outBufferSize != sizeof(ULONG))
+                return UT_INVALID;
+
+            *(ULONG*)outBufPtr = pRDC->OverlayStatus.VidColorEnhance.ulScaleBrightness;
+            return UT_SUCCESS;            
+
+        case UT_SET_VIDEO_BRIGHT:            
+            if (req->inBufferSize != sizeof(ULONG))
+                return UT_INVALID;
+                
+            pRDC->OverlayStatus.VidColorEnhance.ulScaleBrightness = *(ULONG*)inBufPtr;
+            SetVIDColor(pRDC);
+            return UT_SUCCESS;
+
+        case UT_QUERY_VIDEO_HUE:            
+            if (req->outBufferSize != sizeof(ULONG))
+                return UT_INVALID;
+
+            *(ULONG*)outBufPtr = pRDC->OverlayStatus.VidColorEnhance.ulScaleHue;
+            return UT_SUCCESS;            
+
+        case UT_SET_VIDEO_HUE:            
+            if (req->inBufferSize != sizeof(ULONG))
+                return UT_INVALID;
+                
+            pRDC->OverlayStatus.VidColorEnhance.ulScaleHue = *(ULONG*)inBufPtr;
+            SetVIDColor(pRDC);
+            return UT_SUCCESS;
+
+
+        case UT_QUERY_VIDEO_SATURATION:            
+            if (req->outBufferSize != sizeof(ULONG))
+                return UT_INVALID;
+
+            *(ULONG*)outBufPtr = pRDC->OverlayStatus.VidColorEnhance.ulScaleSaturation;
+            return UT_SUCCESS;            
+
+        case UT_SET_VIDEO_SATURATION:            
+            if (req->inBufferSize != sizeof(ULONG))
+                return UT_INVALID;
+                
+            pRDC->OverlayStatus.VidColorEnhance.ulScaleSaturation = *(ULONG*)inBufPtr;
+            SetVIDColor(pRDC);
+            return UT_SUCCESS;
 #if 0
 
 #endif
@@ -568,46 +683,4 @@ int EC_QueryLCDPWM(ScrnInfoPtr pScrn, char *level)
         *level = bLevel;
         return UT_SUCCESS;
     }
-}
-
-
-int BIOS_SetLCDPWM(CBIOS_Extension *CBIOSExtension, char *level)
-{
-    xf86DrvMsgVerb(0, X_INFO, 5, "==Enter BIOS_SetLCDPWM()== \n");
-
-    CBIOS_ARGUMENTS *BiosArguments = CBIOSExtension->pCBiosArguments;
-    ULONG   Status = UT_FAIL;
-   
-    BiosArguments->reg.x.AX = OEMFunction;
-    BiosArguments->reg.x.BX = SetLCDPWMLevel;
-    BiosArguments->reg.lh.CL = *level;
-    if (CInt10(CBIOSExtension))
-    {
-        return(UT_SUCCESS);
-    }
-
-    xf86DrvMsgVerb(0, X_INFO, 5, "==Leave BIOS_SetLCDPWM()== \n");
-    
-    return  Status;
-}
-
-
-int BIOS_QueryLCDPWM(CBIOS_Extension *CBIOSExtension, char *level)
-{
-    xf86DrvMsgVerb(0, X_INFO, 5, "==Enter BIOS_QueryLCDPWM()== \n");
-
-    CBIOS_ARGUMENTS *BiosArguments = CBIOSExtension->pCBiosArguments;
-    ULONG Status = UT_FAIL;
-    
-    BiosArguments->reg.x.AX = OEMFunction;
-    BiosArguments->reg.x.BX = QueryLCDPWMLevel;
-    if (CInt10(CBIOSExtension))
-    {
-        *(UCHAR*)level = BiosArguments->reg.lh.BL;
-        return(UT_SUCCESS);
-    }
-
-    xf86DrvMsgVerb(0, X_INFO, 5, "==Leave BIOS_QueryLCDPWM()== \n");
-    
-    return Status;
 }

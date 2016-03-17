@@ -45,9 +45,10 @@
                      ENG_CAP_Clipping);
 
 #define    ENG_CAP_VIDEO_DISP                   0x00000400
-#define    ENG_CAP_VIDEO_POS                    0x00000800
+#define    ENG_CAP_VIDEO_POST                   0x00000800
 #define    ENG_CAP_HWC_MMIO                     0x00001000
 #define    ENG_CAP_CR_SUPPORT                   0x00002000
+#define    ENG_CAP_HWROTATE                     0x00004000   
 
 
 #define    VM_CMD_QUEUE             0
@@ -64,6 +65,8 @@
 
 #define    PKT_SINGLE_LENGTH        8
 #define    PKT_SINGLE_CMD_HEADER    0x00009562
+#define    PKT_DMA_CMD_HEADER       0x0000956E
+#define    PKT_VIDEO_CMD_HEADER     0x0000956F
 
 typedef struct  _PKT_SC
 {

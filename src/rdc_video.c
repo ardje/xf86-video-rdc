@@ -33,8 +33,6 @@
 
 #include "xf86.h"
 #include "xf86_OSproc.h"
-#include "xf86Resources.h"
-#include "xf86RAC.h"
 #include "xf86cmap.h"
 #include "compiler.h"
 #include "mibstore.h"
@@ -83,6 +81,14 @@ void RDCUpdateVID(RDCRecPtr, RDCPortPrivPtr, BYTE);
 void RDCCopyFOURCC(RDCRecPtr, unsigned char*, RDCPortPrivPtr, unsigned long, 
                    unsigned long, int, short, short);
 
+    
+static void RDCStopVideoPost(ScrnInfoPtr,pointer,Bool);
+static int RDCPutImageVPOST(ScrnInfoPtr,short,short,short,short,short,short,short,short,
+		               int,unsigned char*,short,short,Bool,RegionPtr,pointer,DrawablePtr);
+void RDCAllocateVPOSTMem(ScrnInfoPtr, RDCPortPrivPtr, short, short);
+void RDCCopyFourCCVPOST(RDCRecPtr, RDCPortPrivPtr, unsigned char*, short, short, short, short);
+void RDCUpdateVideo(RDCRecPtr, RDCPortPrivPtr, BYTE);
+
 
 #define IMAGE_MAX_WIDTH		1280
 #define IMAGE_MAX_HEIGHT	1024
@@ -103,10 +109,18 @@ static XF86AttributeRec Attributes[NUM_ATTRIBUTES] =
    {XvSettable | XvGettable, 0, 20000, "XV_SATURATION"},
 };
 
-#define NUM_IMAGES 1
-static XF86ImageRec Images[NUM_IMAGES] = 
+#define NUM_IMAGES_VDISP 1
+static XF86ImageRec Images_VDisp[NUM_IMAGES_VDISP] = 
 {
     XVIMAGE_YUY2
+};
+
+#define NUM_IMAGES_VPOST 3
+static XF86ImageRec Images_VPost[NUM_IMAGES_VPOST] = 
+{
+    XVIMAGE_YUY2,
+    XVIMAGE_YV12,
+    XVIMAGE_I420
 };
 
 #define MAKE_ATOM(a) MakeAtom(a, sizeof(a) - 1, TRUE)
@@ -155,6 +169,12 @@ void RDCVideoInit(ScreenPtr pScreen)
         if (!bTrue)
 	    xf86DrvMsgVerb(0,X_INFO,DefaultLevel,"==RDCVideoInit() XVScreenInit Fail==\n");
     }
+
+    
+    pRDC->OverlayStatus.VidColorEnhance.ulScaleBrightness = BRIGHTNESS_DEFAULT;
+    pRDC->OverlayStatus.VidColorEnhance.ulScaleContrast = CONTRAST_DEFAULT;
+    pRDC->OverlayStatus.VidColorEnhance.ulScaleHue = HUE_DEFAULT; 
+    pRDC->OverlayStatus.VidColorEnhance.ulScaleSaturation = SATURATION_DEFAULT;
 	    
     xf86DrvMsgVerb(0, X_INFO, DefaultLevel, "==RDCVideoInit()  Exit==\n");
     xfree(adaptors);
@@ -202,17 +222,28 @@ RDCSetupImageVideoOverlay(ScreenPtr pScreen)
     adapt->nAttributes = NUM_ATTRIBUTES;
     adapt->pAttributes = Attributes;
 
-    adapt->nImages = NUM_IMAGES;
-    adapt->pImages = Images;
+    if (pRDC->ENGCaps & ENG_CAP_VIDEO_POST)
+    {
+        adapt->nImages = NUM_IMAGES_VPOST;
+        adapt->pImages = Images_VPost;
+        adapt->PutImage = RDCPutImageVPOST;
+        adapt->StopVideo = RDCStopVideoPost;
+    }
+    else
+    {
+        adapt->nImages = NUM_IMAGES_VDISP;
+        adapt->pImages = Images_VDisp;
+        adapt->PutImage = RDCPutImage;
+        adapt->StopVideo = RDCStopVideo;
+    }
+    
     adapt->PutVideo = NULL;
     adapt->PutStill = NULL;
     adapt->GetVideo = NULL;
     adapt->GetStill = NULL;
-    adapt->StopVideo = RDCStopVideo;
     adapt->SetPortAttribute = RDCSetPortAttribute;
     adapt->GetPortAttribute = RDCGetPortAttribute;
     adapt->QueryBestSize = RDCQueryBestSize;
-    adapt->PutImage = RDCPutImage;
     adapt->QueryImageAttributes = RDCQueryImageAttributesOverlay;
 
     
@@ -405,7 +436,6 @@ RDCQueryBestSize(ScrnInfoPtr pScrn,
 }
 
 
-
 static int
 RDCPutImage(ScrnInfoPtr pScrn,
 	     short src_x, short src_y,
@@ -470,6 +500,7 @@ RDCPutImage(ScrnInfoPtr pScrn,
     switch(id)
     {
     case FOURCC_YV12:
+    case FOURCC_I420:
         SrcPitch = (width + 3) & ~3;
         break;
     case FOURCC_YUY2:
@@ -485,7 +516,7 @@ RDCPutImage(ScrnInfoPtr pScrn,
     pRDCPortPriv->SrcPitch = DstPitch;
     
     
-    if(!(pRDCPortPriv->PackedBuf0 = RDCAllocateMemory(pScrn, pRDCPortPriv->PackedBuf0, 
+    if(!(pRDCPortPriv->PackedBuf[0] = RDCAllocateMemory(pScrn, pRDCPortPriv->PackedBuf[0], 
 		(pScrn->bitsPerPixel == 16) ? size : (size >> 1))))
 	    return BadAlloc;
 	    
@@ -523,7 +554,7 @@ RDCPutImage(ScrnInfoPtr pScrn,
 
     pRDCPortPriv->rSrc.right = src_x + src_w; 
     pRDCPortPriv->rDst.right = drw_x + drw_w;
-    if (ViewWidth != ScreenWidth) 
+    if (pRDC->DeviceInfo.ScalerConfig.EnableHorScaler) 
     {
         if ((drw_x + drw_w) > ScreenWidth)
         {
@@ -552,7 +583,7 @@ RDCPutImage(ScrnInfoPtr pScrn,
 
     pRDCPortPriv->rSrc.bottom = src_y + src_h;
     pRDCPortPriv->rDst.bottom = drw_y + drw_h;
-    if (ViewHeight != ScreenHeight) 
+    if (pRDC->DeviceInfo.ScalerConfig.EnableVerScaler) 
     {
         if ((drw_y + drw_h) > ScreenHeight)
         {
@@ -606,6 +637,7 @@ RDCQueryImageAttributesOverlay(ScrnInfoPtr pScrn,int id,
     switch (id)
     {
     case FOURCC_YV12:
+    case FOURCC_I420:
         
         *w = (*w + 3) & ~3;
         *h = (*h + 1) & ~1;
@@ -760,7 +792,7 @@ void RDCUpdateVID(RDCRecPtr  pRDC, RDCPortPrivPtr pRDCPortPriv, BYTE bEnable)
     DstHeight = pRDst->bottom - pRDst->top;
     
     dwVSrcPitch = pRDCPortPriv->SrcPitch;
-    dwVIDBuffer[0] = pRDCPortPriv->Packed0Offset;
+    dwVIDBuffer[0] = pRDCPortPriv->PackedBufOffset[0];
 
     dwVDisplayCount = ((pRSrc->bottom - 1) << 16) | (pRSrc->right - 1);
     dwVideoSrcOffset = (pRSrc->left << 16) | pRSrc->top;
@@ -889,13 +921,13 @@ void RDCCopyFOURCC(RDCRecPtr  pRDC, unsigned char* pSrcStart, RDCPortPrivPtr pRD
     unsigned char* pDst = NULL;
     
     xf86DrvMsgVerb(0, X_INFO, DefaultLevel, "==RDCCopyFOURCC()  Entry==\n");
-    xf86DrvMsgVerb(0, X_INFO, 8, "==Packed1 Offset  0x%x==\n", pRDCPortPriv->PackedBuf0->offset);
+    xf86DrvMsgVerb(0, X_INFO, 8, "==Packed1 Offset  0x%x==\n", pRDCPortPriv->PackedBuf[0]->offset);
     xf86DrvMsgVerb(0, X_INFO, 8, "==Per Pixel Bits 0x%x==\n",pRDC->VideoModeInfo.Bpp);
 
-    pRDCPortPriv->Packed0Offset = 
-        (pRDCPortPriv->PackedBuf0->offset * pRDC->VideoModeInfo.Bpp);
+    pRDCPortPriv->PackedBufOffset[0] = 
+        (pRDCPortPriv->PackedBuf[0]->offset * pRDC->VideoModeInfo.Bpp);
 
-    pDst = pRDC->FBVirtualAddr + pRDCPortPriv->Packed0Offset;
+    pDst = pRDC->FBVirtualAddr + pRDCPortPriv->PackedBufOffset[0];
     
     xf86DrvMsgVerb(0, X_INFO, 8, "==FB  Base  0x%x==\n", (unsigned long)((unsigned long*)pRDC->FBVirtualAddr));
     xf86DrvMsgVerb(0, X_INFO, 6, "==Dst Start 0x%x==\n", (unsigned long)((unsigned long*)pDst));
@@ -954,4 +986,568 @@ void RDCCopyFOURCC(RDCRecPtr  pRDC, unsigned char* pSrcStart, RDCPortPrivPtr pRD
     }
     
     xf86DrvMsgVerb(0, X_INFO, DefaultLevel, "==RDCCopyFOURCC()  Exit==\n");
+}
+
+static void
+RDCStopVideoPost(ScrnInfoPtr pScrn, pointer data, Bool shutdown)
+{
+    RDCRecPtr pRDC = RDCPTR(pScrn);
+    RDCPortPrivPtr pXVPriv = (RDCPortPrivPtr)data;
+    
+    xf86DrvMsgVerb(0, X_INFO, DefaultLevel, "==RDCStopVideo()  Entry==\n");
+
+    REGION_EMPTY(pScrn->pScreen, &pXVPriv->clip);
+
+    
+    if (shutdown)
+    {
+        PKT_SC *pSingleCMD;
+        xf86DrvMsgVerb(0, X_INFO, DefaultLevel, "==RDCStopVideo()  Stop Overlay==\n");
+
+        pSingleCMD = (PPKT_SC)pjRequestCMDQ(pRDC, PKT_SINGLE_LENGTH*7);
+       
+        pSingleCMD->PKT_SC_dwHeader  = (ULONG) CR_LOCK_ID; 
+        pSingleCMD->PKT_SC_dwData[0] = CR_LOCK_VIDEO;  
+        pSingleCMD++; 
+        pSingleCMD->PKT_SC_dwHeader  = (ULONG) PKT_VIDEO_CMD_HEADER | VDP_START_LOCATION_I;
+        pSingleCMD->PKT_SC_dwData[0] = 0x0;  
+        pSingleCMD++;
+        pSingleCMD->PKT_SC_dwHeader  = (ULONG) PKT_VIDEO_CMD_HEADER | VDP_END_LOCATION_I;
+        pSingleCMD->PKT_SC_dwData[0] = 0x0;  
+        pSingleCMD++;
+        pSingleCMD->PKT_SC_dwHeader  = (ULONG) PKT_VIDEO_CMD_HEADER | VDP_ZOOM_CTL_I;
+        pSingleCMD->PKT_SC_dwData[0] = 0x0;  
+        pSingleCMD++;
+        pSingleCMD->PKT_SC_dwHeader  = (ULONG) PKT_VIDEO_CMD_HEADER | VDP_CTL_I;
+        pSingleCMD->PKT_SC_dwData[0] = 0x0;  
+        pSingleCMD++;
+        pSingleCMD->PKT_SC_dwHeader  = (ULONG) PKT_VIDEO_CMD_HEADER | VDP_REG_UPDATE_MOD_SELECT_I;
+        pSingleCMD->PKT_SC_dwData[0] = VDPS_FIRE;  
+        pSingleCMD++;
+        pSingleCMD->PKT_SC_dwHeader  = (ULONG) PKT_VIDEO_CMD_HEADER | VP_STREAM_CTL_I;
+        pSingleCMD->PKT_SC_dwData[0] = 0x0;  
+        pSingleCMD++;
+        
+        mUpdateWritePointer;
+    }
+
+    xf86DrvMsgVerb(0, X_INFO, DefaultLevel, "==RDCStopVideo()  Exit==\n");
+}
+
+void RDCCopyFourCCVPOST(RDCRecPtr  pRDC, RDCPortPrivPtr pRDCPortPriv, unsigned char* pSrc,
+                        short SrcX, short SrcY, short Width, short Height)
+{
+    int             i,j;
+    unsigned long   ulSrcPitch, ulDestPitch;
+    unsigned char*  pDest = NULL;
+    VIDHWINFOPtr    pVIDHwInfo = &pRDCPortPriv->VidhwInfo;
+    VPOSTHWINFOPtr  pVPHwInfo = &pRDCPortPriv->VPosthwInfo;
+
+    switch (pRDCPortPriv->YUVFormat)
+    {
+    case FOURCC_YV12:
+        {
+            ULONG   ulShift = 0;
+            ULONG   ulTempH;
+            
+            for (i = 0; i < 3; i++)
+            {
+                ulSrcPitch = ALIGN_TO_4(Width);
+                if ( i > 0)
+                {
+                    ulShift = 1;
+                    ulSrcPitch = (Width >> ulShift);
+                    ulTempH = Height >> ulShift;
+                }    
+                ulDestPitch = pRDCPortPriv->PackedBufStride[i];
+                pDest = pRDC->FBVirtualAddr + pRDCPortPriv->PackedBufOffset[i];
+                while(ulTempH--)
+                {
+                    memcpy(pDest, pSrc, (Width >> ulShift));
+                    pSrc += ulSrcPitch;
+                    pDest += ulDestPitch;
+                }
+
+            }            
+        }
+        break;
+    case FOURCC_YUY2:
+        {
+            ulDestPitch = pRDCPortPriv->PackedBufStride[0];
+            ulSrcPitch = ALIGN_TO_2(Width << 1);
+            pDest = pRDC->FBVirtualAddr + pRDCPortPriv->PackedBufOffset[0];
+            
+            while(Height--)
+            {
+                memcpy(pDest, pSrc, (Width << 1));
+                pSrc += ulSrcPitch;
+                pDest += ulDestPitch;
+            }
+        }
+        break;
+    }
+}
+
+
+void RDCUpdateVideo(RDCRecPtr pRDC, RDCPortPrivPtr pRDCPortPriv, BYTE bEnable)
+{
+    unsigned long   SrcWidth, DstWidth, SrcHeight, DstHeight;
+    PKT_SC          *pSingleCMD;
+    double          dbXfactor, dbYfactor;
+    ULONG           ulTempTop, ulTempLeft;
+    int             i = 0;
+    OVERLAY_STATUS  *pOverlayStatus = &pRDC->OverlayStatus;
+    VIDHWINFOPtr    pVIDHwInfo = &pRDCPortPriv->VidhwInfo;
+    VPOSTHWINFOPtr  pVPHwInfo = &pRDCPortPriv->VPosthwInfo;
+    OV_RECTLPtr     pRSrc      = &pRDCPortPriv->rSrc;
+    OV_RECTLPtr     pRDst      = &pRDCPortPriv->rDst;
+
+    dbXfactor = dbYfactor = 1.0;
+    
+    
+    ULONG           dwVideoSrcOffset;                             
+    ULONG           dwFetch;                  
+    ULONG           dwVDisplayCount;          
+    ULONG           dwVSrcPitch;              
+    ULONG           dwWinStartXY;
+    ULONG           dwWinEndXY;
+    ULONG           dwzoomCtl;
+    ULONG           dwVIDBuffer[3];           
+
+    
+    ULONG           dwVPVideoSize;
+    ULONG           dwVPStreamCtrl;
+    ULONG           dwVPOST_H_Scale;
+    ULONG           dwVPOST_V_Scale;
+    ULONG           dwVPLumaPitch;
+    ULONG           dwVPChromaPitch;
+    ULONG           dwVPBuffer[3];            
+    
+    SrcWidth = pRSrc->right - pRSrc->left;
+    SrcHeight = pRSrc->bottom - pRSrc->top;
+    DstWidth = pRDst->right - pRDst->left;
+    DstHeight = pRDst->bottom - pRDst->top;
+
+    
+    switch (pRDCPortPriv->YUVFormat)
+    {
+    case FOURCC_YUY2:
+        dwVPStreamCtrl = VPS_STREAM_YUY2;
+        break;
+    case FOURCC_YV12:
+    case FOURCC_I420:
+        dwVPStreamCtrl = VPS_STREAM_YV12;
+        break;
+    }
+    
+    dwVPStreamCtrl |=  VPS_ENABLE|
+                       VPS_TRIPLE_BUFFER|
+                       VPS_SRC_CAPTURE|
+                       VPS_INT_ENABLE;
+
+    pOverlayStatus->ulVidDispCtrl = VDPS_ENABLE|
+                                    VDPS_SW_FLIP|
+                                    VDPS_DISP_REQ_EXPIRE|
+                                    VDPS_DISP_PRE_FETCH|
+                                    VDPS_DISP1;    
+    
+    dwVPVideoSize = ((SrcWidth - 1) << 16) |
+                    (SrcHeight -1);
+    
+    dwVDisplayCount = ((pRSrc->bottom - 1) << 16) | (pRSrc->right - 1);
+    dwVideoSrcOffset = (pRSrc->left << 16) | pRSrc->top;
+    dwWinStartXY = (pRDst->left << 16) | pRDst->top;
+    dwWinEndXY = ((pRDst->right - 1) << 16) | (pRDst->bottom - 1);
+
+    
+    dwFetch = ((SrcWidth << 1) + 7) >> 3;
+    if (dwFetch < 4)
+        dwFetch = 4;
+
+        
+    if (SrcWidth > DstWidth)
+    {
+        double dbXfactor = SrcWidth / DstWidth;   
+        
+        dwVPOST_H_Scale = VPS_SCALE_ENABLE | VPS_SCALE_DOWN;
+        dwVPOST_H_Scale |= ((SrcWidth<<12)/DstWidth);
+        dwFetch = ((DstWidth << 1) + 7) >> 3;
+    }
+    else if (SrcWidth == DstWidth)
+    {
+        
+        dwzoomCtl &= 0x0000FFFF;
+        dwVPOST_H_Scale |= 0x0000FFFF;
+        dwFetch = ((SrcWidth << 1) + 7) >> 3;
+    }
+    else
+    {
+        
+        dwzoomCtl |=((ULONG)(((SrcWidth*0x1000)/DstWidth)&0x0FFF)<<16)|
+                                VDPS_H_ZOOM_ENABLE|VDPS_H_INTERP;   
+        dwFetch = ((SrcWidth << 1) + 7) >> 3;
+    }
+    
+    dwVDisplayCount = ((((ULONG)(SrcWidth/dbXfactor))-1) & 0x0000FFFF);
+    dwVideoSrcOffset = (((ULONG)((double)pRSrc->left/dbXfactor))<<16);  
+        
+    
+    if (SrcHeight > DstHeight)
+    {
+        double dbYfactor = SrcHeight / DstHeight;
+        
+        dwVPOST_V_Scale = VPS_SCALE_ENABLE | VPS_SCALE_DOWN;
+        dwVPOST_V_Scale |= ((SrcHeight<<12) / DstHeight);
+    }
+    else if (SrcHeight == DstWidth) 
+    {
+        
+        dwzoomCtl &= 0xFFFF0000;
+        dwVPOST_V_Scale |= 0x0000FFFF;
+    }
+    else
+    {
+        
+        dwzoomCtl |=(ULONG)(((SrcHeight*0x1000)/DstHeight)&0x0FFF)|
+                                VDPS_V_ZOOM_ENABLE|VDPS_V_INTERP; 
+    }
+    
+    dwVDisplayCount |= ((((ULONG)(SrcHeight/dbYfactor)<<16)-1) & 0xFFFF0000);
+    dwVideoSrcOffset |= ((ULONG)((double)pRSrc->top /dbYfactor));   
+
+
+    
+    pVIDHwInfo->dwVSrcPitch = dwVSrcPitch = pRDCPortPriv->SrcPitch;
+    dwVPLumaPitch = pRDCPortPriv->PackedBufStride[0];
+    dwVPChromaPitch = pRDCPortPriv->PackedBufStride[1];
+    
+    
+    for (i = 0; i++; i < 3)
+    {
+        dwVPBuffer[i] = pRDCPortPriv->PackedBufOffset[i];
+        dwVIDBuffer[i] = pVPHwInfo->ulVP_DestBuf_Offset[i];
+    }
+    
+    
+    pSingleCMD = (PKT_SC *) pjRequestCMDQ(pRDC, PKT_SINGLE_LENGTH*1);
+    pSingleCMD->PKT_SC_dwHeader  = (ULONG)(CR_LOCK_ID); 
+    pSingleCMD->PKT_SC_dwData[0] = (ULONG)(CR_LOCK_VIDEO); 
+    pSingleCMD++;
+    
+    if ((dwVPStreamCtrl != pVPHwInfo->ulVP_StreamCtrl) ||
+        (pOverlayStatus->ulVidDispCtrl != pVIDHwInfo->dwVidCtl))
+    {
+        pVPHwInfo->ulVP_StreamCtrl = dwVPStreamCtrl;
+        pVIDHwInfo->dwVidCtl = pOverlayStatus->ulVidDispCtrl;
+        
+        pSingleCMD = (PKT_SC *) pjRequestCMDQ(pRDC, PKT_SINGLE_LENGTH*4);
+        pSingleCMD->PKT_SC_dwHeader  = (ULONG) PKT_VIDEO_CMD_HEADER | VP_STREAM_CTL_I;
+        pSingleCMD->PKT_SC_dwData[0] = dwVPStreamCtrl;
+        pSingleCMD++;
+        pSingleCMD->PKT_SC_dwHeader  = (ULONG) PKT_VIDEO_CMD_HEADER | VDP_CTL_I;
+        pSingleCMD->PKT_SC_dwData[0] = pVIDHwInfo->dwVidCtl;
+        pSingleCMD++;
+        pSingleCMD->PKT_SC_dwHeader  = (ULONG) PKT_VIDEO_CMD_HEADER | VDP_FIFO_THRESHOLD_I;
+        pSingleCMD->PKT_SC_dwData[0] = (ULONG)(VDPS_FIFO_THRESHOLD);
+        pSingleCMD++;
+        pSingleCMD->PKT_SC_dwHeader  = (ULONG) PKT_VIDEO_CMD_HEADER | VDP_FIRST_COLORKEY_I;
+        pSingleCMD->PKT_SC_dwData[0] = (ULONG)(pVIDHwInfo->dwColorKey | VDPS_ENABLE_CK);
+        pSingleCMD++;
+    }
+      
+
+    if (dwVPVideoSize != pVPHwInfo->ulVP_VideoSize)
+    {
+        
+        pVPHwInfo->ulVP_VideoSize = dwVPVideoSize;
+        pVPHwInfo->ulVP_SrcLumaStride = dwVPLumaPitch;
+        pVPHwInfo->ulVP_Dest_SrcChroma_Stride = (dwVPChromaPitch << 19) |
+                                                (dwVSrcPitch);
+                                                
+        pSingleCMD = (PKT_SC *) pjRequestCMDQ(pRDC, PKT_SINGLE_LENGTH*10);
+        pSingleCMD->PKT_SC_dwHeader  = (ULONG) PKT_VIDEO_CMD_HEADER | VP_VIDEO_SIZE_I;
+        pSingleCMD->PKT_SC_dwData[0] = pVPHwInfo->ulVP_VideoSize;
+        pSingleCMD++;
+        pSingleCMD->PKT_SC_dwHeader  = (ULONG) PKT_VIDEO_CMD_HEADER | VP_SRC_BUF_STRIDE_I;
+        pSingleCMD->PKT_SC_dwData[0] = pVPHwInfo->ulVP_SrcLumaStride;
+        pSingleCMD++;
+        pSingleCMD->PKT_SC_dwHeader  = (ULONG) PKT_VIDEO_CMD_HEADER | VP_DEST_STRIDE_I;
+        pSingleCMD->PKT_SC_dwData[0] = pVPHwInfo->ulVP_Dest_SrcChroma_Stride;
+        pSingleCMD++;
+        pSingleCMD->PKT_SC_dwHeader  = (ULONG) PKT_VIDEO_CMD_HEADER | VP_SW_SRC_BUF_LUMA_START_I;
+        pSingleCMD->PKT_SC_dwData[0] = pVPHwInfo->ulVP_SrcBuf[0];
+        pSingleCMD++;
+        pSingleCMD->PKT_SC_dwHeader  = (ULONG) PKT_VIDEO_CMD_HEADER | VP_SW_SRC_BUF_CHROMA_START_I;
+        pSingleCMD->PKT_SC_dwData[0] = pVPHwInfo->ulVP_SrcBuf[1];
+        pSingleCMD++;
+        pSingleCMD->PKT_SC_dwHeader  = (ULONG) PKT_VIDEO_CMD_HEADER | VP_YV12_V_BASE_I;
+        pSingleCMD->PKT_SC_dwData[0] = pVPHwInfo->ulVP_SrcBuf[2];
+        pSingleCMD++;
+        pSingleCMD->PKT_SC_dwHeader  = (ULONG) PKT_VIDEO_CMD_HEADER | VDP_FB0_I;
+        pSingleCMD->PKT_SC_dwData[0] = dwVIDBuffer[0];
+        pSingleCMD++;
+        pSingleCMD->PKT_SC_dwHeader  = (ULONG) PKT_VIDEO_CMD_HEADER | VDP_FB1_I;
+        pSingleCMD->PKT_SC_dwData[0] = dwVIDBuffer[1];
+        pSingleCMD++;
+        pSingleCMD->PKT_SC_dwHeader  = (ULONG) PKT_VIDEO_CMD_HEADER | VDP_FB2_I;
+        pSingleCMD->PKT_SC_dwData[0] = dwVIDBuffer[2];
+        pSingleCMD++;
+        pSingleCMD->PKT_SC_dwHeader  = (ULONG) PKT_VIDEO_CMD_HEADER | VDP_FB_STRIDE_I;
+        pSingleCMD->PKT_SC_dwData[0] = pVIDHwInfo->dwVSrcPitch;
+        pSingleCMD++;
+    }
+
+    if ((dwVDisplayCount != pVIDHwInfo->dwVDisplayCount) ||
+        (dwVideoSrcOffset != pVIDHwInfo->dwVideoSrcOffset) ||
+        (dwWinStartXY != pVIDHwInfo->dwWinStartXY)  ||
+        (dwWinEndXY != pVIDHwInfo->dwWinEndXY))
+    {
+        
+        pVIDHwInfo->dwVDisplayCount = dwVDisplayCount;
+        pVIDHwInfo->dwVideoSrcOffset = dwVideoSrcOffset;
+        pVIDHwInfo->dwzoomCtl = dwzoomCtl;
+        pVIDHwInfo->dwFetch = dwFetch;
+        pVIDHwInfo->dwWinStartXY = dwWinStartXY;
+        pVIDHwInfo->dwWinEndXY = dwWinEndXY;
+        pVPHwInfo->ulVP_HScale = dwVPOST_H_Scale;
+        pVPHwInfo->ulVP_VScale = dwVPOST_V_Scale;
+        
+        pSingleCMD = (PKT_SC *) pjRequestCMDQ(pRDC, PKT_SINGLE_LENGTH*9);
+        pSingleCMD->PKT_SC_dwHeader = (ULONG) PKT_VIDEO_CMD_HEADER | VP_H_SCALE_I;
+        pSingleCMD->PKT_SC_dwData[0] = pVPHwInfo->ulVP_HScale;
+        pSingleCMD++;
+        pSingleCMD->PKT_SC_dwHeader = (ULONG) PKT_VIDEO_CMD_HEADER | VP_V_SCALE_I;
+        pSingleCMD->PKT_SC_dwData[0] = pVPHwInfo->ulVP_VScale;
+        pSingleCMD++;
+        pSingleCMD->PKT_SC_dwHeader = (ULONG) PKT_VIDEO_CMD_HEADER | VDP_ZOOM_CTL_I;
+        pSingleCMD->PKT_SC_dwData[0] = pVIDHwInfo->dwzoomCtl;
+        pSingleCMD++;
+        pSingleCMD->PKT_SC_dwHeader = (ULONG) PKT_VIDEO_CMD_HEADER | VDP_SRC_DISP_COUNT_ON_SCR_I;
+        pSingleCMD->PKT_SC_dwData[0] = pVIDHwInfo->dwVDisplayCount;
+        pSingleCMD++;
+        pSingleCMD->PKT_SC_dwHeader = (ULONG) PKT_VIDEO_CMD_HEADER | VDP_START_OFFSET_I;
+        pSingleCMD->PKT_SC_dwData[0] = pVIDHwInfo->dwVideoSrcOffset;
+        pSingleCMD++;
+        pSingleCMD->PKT_SC_dwHeader = (ULONG) PKT_VIDEO_CMD_HEADER | VDP_START_OFFSET_I;
+        pSingleCMD->PKT_SC_dwData[0] = pVIDHwInfo->dwVideoSrcOffset;
+        pSingleCMD++;
+        pSingleCMD->PKT_SC_dwHeader = (ULONG) PKT_VIDEO_CMD_HEADER | VDP_FETCH_COUNT_I;
+        pSingleCMD->PKT_SC_dwData[0] = pVIDHwInfo->dwFetch;
+        pSingleCMD++;
+        pSingleCMD->PKT_SC_dwHeader = (ULONG) PKT_VIDEO_CMD_HEADER | VDP_START_LOCATION_I;
+        pSingleCMD->PKT_SC_dwData[0] = pVIDHwInfo->dwWinStartXY;
+        pSingleCMD++;
+        pSingleCMD->PKT_SC_dwHeader = (ULONG) PKT_VIDEO_CMD_HEADER | VDP_END_LOCATION_I;
+        pSingleCMD->PKT_SC_dwData[0] = pVIDHwInfo->dwWinEndXY;
+        pSingleCMD++;
+    }
+    
+    pSingleCMD = (PKT_SC *) pjRequestCMDQ(pRDC, PKT_SINGLE_LENGTH*1);
+    pSingleCMD->PKT_SC_dwHeader  = (ULONG)(PKT_VIDEO_CMD_HEADER | VDP_REG_UPDATE_MOD_SELECT_I); 
+    pSingleCMD->PKT_SC_dwData[0] = (ULONG)(VDPS_FIRE); 
+    pSingleCMD++;
+    mUpdateWritePointer;
+}
+
+
+
+void RDCAllocateVPOSTMem(ScrnInfoPtr pScrn, RDCPortPrivPtr pRDCPortPriv, short width, short height)
+{
+    int             size, i, shift;
+    ULONG           ulPitch;
+    RDCRecPtr       pRDC = RDCPTR(pScrn);
+    VIDHWINFOPtr    pVIDHwInfo = &pRDCPortPriv->VidhwInfo;
+    VPOSTHWINFOPtr  pVPHwInfo = &pRDCPortPriv->VPosthwInfo;
+    
+    
+    
+    ulPitch = ALIGN_TO_8(width << 1);
+    
+    
+    pRDCPortPriv->SrcPitch = ulPitch;
+    
+    size = ulPitch * height;
+
+    for (i = 0; i < 3; i++)
+    {
+        pVPHwInfo->pVPDestBuffer[i] = 
+            RDCAllocateMemory(pScrn, 
+                              pVPHwInfo->pVPDestBuffer[i],
+                              (pScrn->bitsPerPixel == 16) ? size:(size >> 1));
+        pVPHwInfo->ulVP_DestBuf_Offset[i] = 
+            pVPHwInfo->pVPDestBuffer[i]->offset * pRDC->VideoModeInfo.Bpp;
+    }
+
+    
+    
+    switch (pRDCPortPriv->YUVFormat)
+    {
+    case FOURCC_YV12:
+    case FOURCC_I420:
+        
+        
+        for (i = 0; i < 3; i++)
+        {
+            if (i > 0)
+                shift = 1;
+                
+            ulPitch = ALIGN_TO_8(width >> shift);
+            pRDCPortPriv->PackedBufStride[i] = ulPitch;
+            size = ulPitch * (height >> shift);
+            pRDCPortPriv->PackedBuf[i] = 
+                RDCAllocateMemory(pScrn,
+                                  pRDCPortPriv->PackedBuf[i],
+                                  (pScrn->bitsPerPixel == 16) ? size:(size >> 1));
+            pRDCPortPriv->PackedBufOffset[i] = 
+                pRDCPortPriv->PackedBuf[i]->offset * pRDC->VideoModeInfo.Bpp;
+        }    
+        break;
+    case FOURCC_YUY2:
+        
+        ulPitch = ALIGN_TO_8(width << 1);
+        pRDCPortPriv->PackedBufStride[0] = ulPitch;
+        size = ulPitch * height;
+        pRDCPortPriv->PackedBuf[0] = 
+            RDCAllocateMemory(pScrn,
+                              pRDCPortPriv->PackedBuf[0],
+                              (pScrn->bitsPerPixel == 16) ? size:(size >> 1));
+        pRDCPortPriv->PackedBufOffset[0] = 
+            pRDCPortPriv->PackedBuf[0]->offset * pRDC->VideoModeInfo.Bpp;
+        break;
+    }
+
+    for (i = 0; i < 3; i++)
+        pVPHwInfo->ulVP_SrcBuf[i] = pRDCPortPriv->PackedBufOffset[i];    
+}
+
+static int
+RDCPutImageVPOST(ScrnInfoPtr pScrn,
+	     short src_x, short src_y,
+	     short drw_x, short drw_y,
+	     short src_w, short src_h,
+	     short drw_w, short drw_h,
+	     int id, unsigned char *buf,
+	     short width, short height,
+	     Bool sync, RegionPtr clipBoxes, pointer data,
+	     DrawablePtr pDraw)
+{
+    RDCRecPtr       pRDC = RDCPTR(pScrn);
+    RDCPortPrivPtr  pRDCPortPriv = (RDCPortPrivPtr)data;
+    unsigned long   SrcPitch, DstPitch;
+    unsigned long   DstWidth, DstHeight, ScreenWidth, ScreenHeight, ViewWidth, ViewHeight;
+    OVERLAY_STATUS  *pOverlayStatus = &pRDC->OverlayStatus;
+    
+    xf86DrvMsgVerb(0, X_INFO, DefaultLevel, "==RDCPutImageVPOST()  Entry==\n");
+    xf86DrvMsgVerb(0, X_INFO, InfoLevel, "==FOURCC ID 0x%x, Width = 0x%x, Height = 0x%x==\n", id, width, height);
+    xf86DrvMsgVerb(0, X_INFO, InfoLevel, "==Src position X = %d, Y = %d==\n",src_x, src_y);
+    xf86DrvMsgVerb(0, X_INFO, InfoLevel, "==Src size width = %d, Height = %d==\n",src_w, src_h);
+    xf86DrvMsgVerb(0, X_INFO, InfoLevel, "==Dst position X = %d, Y = %d==\n",drw_x, drw_y);
+    xf86DrvMsgVerb(0, X_INFO, InfoLevel, "==Dst size width = %d, Height = %d==\n",drw_w, drw_h);
+
+    
+    pOverlayStatus->iDstLeft = (int)drw_x;
+    pOverlayStatus->iDstTop = (int)drw_y;
+    pOverlayStatus->iDstWidth = (int)drw_w;
+    pOverlayStatus->iDstHeight = (int)drw_h;
+    pOverlayStatus->iSrcWidth = (int)src_w;
+    pOverlayStatus->iSrcHeight = (int)src_h;
+    
+    pRDCPortPriv->YUVFormat = id;
+    
+    
+    RDCAllocateVPOSTMem(pScrn, pRDCPortPriv, src_w, src_h);
+
+    
+    RDCCopyFourCCVPOST(pRDC, pRDCPortPriv, buf, src_x, src_y, width, height);
+    
+    
+    if(!REGION_EQUAL(pScrn->pScreen, &pRDCPortPriv->clip, clipBoxes)) 
+    {
+	    REGION_COPY(pScrn->pScreen, &pRDCPortPriv->clip, clipBoxes);
+	    
+        xf86DrvMsgVerb(0, X_INFO, InfoLevel, "==Color Key 0x%x==\n",pRDCPortPriv->colorkey);
+        
+	    xf86XVFillKeyHelper(pScrn->pScreen, pRDCPortPriv->colorkey, clipBoxes);
+    }
+
+    
+    
+    ScreenWidth  = pRDC->ModePtr->HDisplay;
+    ScreenHeight = pRDC->ModePtr->VDisplay;
+    
+    if (pRDC->DeviceInfo.ucDeviceID == LCDINDEX) 
+    {
+        
+        ViewWidth    = pRDC->DeviceInfo.MonitorSize.ulHorMaxResolution;
+        ViewHeight   = pRDC->DeviceInfo.MonitorSize.ulVerMaxResolution;
+    }
+    else
+    {
+        
+        
+        ViewWidth    = ScreenWidth;
+        ViewHeight   = ScreenHeight;
+    }   
+
+    
+    if(0 == drw_w)
+        DstWidth = 1;
+    else 
+        DstWidth = drw_w;
+        
+        
+    if(0 == drw_h)
+        DstHeight = 1;
+    else 
+        DstHeight = drw_h;
+
+    pRDCPortPriv->rSrc.left = src_x;
+    pRDCPortPriv->rDst.left = drw_x;
+
+    
+    if (drw_x < 0)
+    {
+        pRDCPortPriv->rSrc.left  += (((-drw_x) * src_w) + (DstWidth >> 1)) / DstWidth;
+        pRDCPortPriv->rDst.left = 0;
+    }
+
+    pRDCPortPriv->rSrc.right = src_x + src_w; 
+    pRDCPortPriv->rDst.right = drw_x + drw_w;
+
+    
+    if ((drw_x + drw_w) > ScreenWidth)
+    {
+        pRDCPortPriv->rSrc.right -= (((drw_x + drw_w - ScreenWidth) * src_w) + (DstWidth >> 1)) / DstWidth;
+        pRDCPortPriv->rDst.right = ScreenWidth;
+    }
+    
+    
+    pRDCPortPriv->rDst.left = pRDCPortPriv->rDst.left * ViewWidth / ScreenWidth;
+    pRDCPortPriv->rDst.right = pRDCPortPriv->rDst.right * ViewWidth / ScreenWidth;
+
+    
+    pRDCPortPriv->rSrc.top = src_y;
+    pRDCPortPriv->rDst.top = drw_y;
+
+    
+    if (drw_y < 0)
+    {
+        pRDCPortPriv->rSrc.top +=  ((-drw_y) * height + (DstHeight >> 1)) / DstHeight;
+        pRDCPortPriv->rDst.top = 0;
+    }
+
+    pRDCPortPriv->rSrc.bottom = src_y + src_h;
+    pRDCPortPriv->rDst.bottom = drw_y + drw_h;
+    
+    if ((drw_y + drw_h) > ScreenHeight)
+    {
+        pRDCPortPriv->rSrc.bottom -= (((drw_y + drw_h - ScreenHeight) * src_h) + (DstHeight >> 1)) / DstHeight;
+        pRDCPortPriv->rDst.bottom = ScreenHeight;
+    }
+    pRDCPortPriv->rDst.top = pRDCPortPriv->rDst.top * ViewHeight/ ScreenHeight;
+    pRDCPortPriv->rDst.bottom= pRDCPortPriv->rDst.bottom* ViewHeight/ ScreenHeight;
+
+    RDCUpdateVideo(pRDC, pRDCPortPriv, 1);
+    
+    return Success;
 }

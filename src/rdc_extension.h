@@ -45,12 +45,18 @@ typedef unsigned long           DWORD;
 #define UT_NOT_IMPLEMENT                0xFFFF
 
 // Escape function define
-#define UT_QUERY_SUPPORT_DEVICE      0x1001
-#define UT_QUERY_CONNECT_DEVICE      0x1002
-#define UT_SET_DEVICE_ACT            0x1003
-#define UT_QUERY_PRIMARY_DEVICE      0x1004
-#define UT_SET_PRIMARY_DEVICE        0x1005
-#define UT_QUERY_ACT_DEVICE          0x1006
+#define UT_QUERY_SUPPORT_DEVICE         0x1001
+#define UT_QUERY_CONNECT_DEVICE         0x1002
+#define UT_SET_DEVICE_ACT               0x1003
+#define UT_QUERY_PRIMARY_DEVICE         0x1004
+#define UT_SET_PRIMARY_DEVICE           0x1005
+#define UT_QUERY_ACT_DEVICE             0x1006
+
+#define UT_SET_GAMMA                    0x1101
+#define UT_QUERY_GAMMA                  0x1102
+#define UT_SET_LCD_PWM                  0x1103
+#define UT_QUERY_LCD_PWM                0x1104
+#define UT_QUERY_LCD_SIZE               0X1105
 
 #define UT_QUERY_HW_INFO                0x1201
 #define UT_QUERY_BIOS_VERSION           0x1202
@@ -58,13 +64,19 @@ typedef unsigned long           DWORD;
 #define UT_QUERY_CLK_SPEED              0x1204
 #define UT_QUERY_SAMM                   0x1205
 
-#define UT_SET_GAMMA                    0x1101
-#define UT_QUERY_GAMMA                  0x1102
+#define UT_SET_TV_INFO					0x1401
+#define	UT_QUERY_TV_INFO				0x1402
+#define	UT_SET_TV_CCRS_LEVEL			0x1403
+#define	UT_QUERY_TV_CCRS_LEVEL			0x1404
 
-#define UT_SET_LCD_PWM                  0x1103
-#define UT_QUERY_LCD_PWM                0x1104
-#define UT_QUERY_LCD_SIZE               0X1105
-
+#define UT_QUERY_VIDEO_CONTRAST         0X1501
+#define UT_SET_VIDEO_CONTRAST           0X1502
+#define UT_QUERY_VIDEO_BRIGHT           0X1503
+#define UT_SET_VIDEO_BRIGHT             0X1504
+#define UT_QUERY_VIDEO_HUE              0X1505
+#define UT_SET_VIDEO_HUE                0X1506
+#define UT_QUERY_VIDEO_SATURATION       0X1507
+#define UT_SET_VIDEO_SATURATION         0X1508
 
 // Escape jpeg decoder function define
 #define UT_DECODER_JPEG_ENTRY           0x2001
@@ -191,8 +203,8 @@ typedef struct _LCDINFO
 
 int EC_SetLCDPWM(ScrnInfoPtr pScrn, char *level);
 int EC_QueryLCDPWM(ScrnInfoPtr pScrn, char *level);
-int BIOS_SetLCDPWM(CBIOS_Extension *CBIOSExtension, char *level);
-int BIOS_QueryLCDPWM(CBIOS_Extension *CBIOSExtension, char *level);
+extern void SetTV_CVBS_CCRSLevel(UCHAR *Level);
+extern UCHAR ucGetTV_CVBS_CCRSLevel(UCHAR *Level);
 
 //Limitation Define
 #define VIDEO_MAX_COLOR_REGISTER  0xFF
@@ -208,3 +220,8 @@ int VgaSetColorLookup(
     ULONG ClutBufferSize
     );
 
+typedef struct _TVINFO
+{
+    WORD wType;             
+    UCHAR bConnector;        
+} __attribute__((packed)) TVINFO, *PTVINFO;

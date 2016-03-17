@@ -314,8 +314,9 @@ typedef enum _bool
 #define TX_VT1636   0x01
 #define TX_SIL1162  0x02
 #define TX_HW       0x03        
-#define ENC_VT1625  0x04
+#define ENC_VT1625  0x04        
 #define DSTN        0x05        
+#define ENC_SAA7105 0x06        
 
 
 #define Dev_SUPPORT BIT0        
@@ -330,6 +331,12 @@ typedef enum _bool
 
 #define DISP1       1
 #define DISP2       2
+
+
+#define NTSC                 0
+#define PAL                  1
+#define CVBS                 1
+#define SVideo               2
 
 
 
