@@ -1185,7 +1185,7 @@ RDCScreenInit(int scrnIndex, ScreenPtr pScreen, int argc, char **argv)
     }
 #endif 
      
-    miInitializeBackingStore(pScreen);
+    //miInitializeBackingStore(pScreen);
     xf86SetBackingStore(pScreen);
     xf86SetSilkenMouse(pScreen);
 
