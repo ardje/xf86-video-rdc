@@ -260,7 +260,7 @@ Bool RDCUnmapVBIOS(ScrnInfoPtr pScrn)
     }
     else if (pRDC->ulROMType == 2)
     {
-        xfree(pRDC->BIOSVirtualAddr);
+        free(pRDC->BIOSVirtualAddr);
     }
     pRDC->BIOSVirtualAddr = 0;
    
