@@ -14,3 +14,6 @@ rdc_driver.c:1601:42: warning: passing argument 1 of ‘pScreen->CloseScreen’ 
 rdc_driver.c:1601:42: note: expected ‘ScreenPtr’ but argument is of type ‘int’
 
 
+2D acceleration:
+remove XAA part
+enable EXA part
