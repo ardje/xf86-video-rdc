@@ -184,7 +184,7 @@ int VgaSetColorLookup(ScrnInfoPtr pScrn, PVIDEO_CLUT ClutBuffer, ULONG ClutBuffe
         
 
         
-        SaveGammaTable(pRDC, ClutBuffer);
+        SaveGammaTable(pScrn, ClutBuffer);
     }
     
     return UT_SUCCESS;

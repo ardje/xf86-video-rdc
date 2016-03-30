@@ -28,6 +28,7 @@
  
 
 #include "xf86.h"
+#include "xf86fbman.h"
 
 // VIDEO Register definition VPOST
 #define MMIOBASE_VIDEO                  0x600
