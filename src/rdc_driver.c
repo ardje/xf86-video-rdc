@@ -101,8 +101,8 @@ static Bool RDCProbe(DriverPtr drv, int flags);
 static Bool RDCPreInit(ScrnInfoPtr pScrn, int flags);
 static Bool RDCScreenInit(ScreenPtr pScreen, int arc, char **argv);
 Bool RDCSwitchMode(ScrnInfoPtr pScrn, DisplayModePtr mode);
-void RDCAdjustFrame(int scrnIndex, int x, int y, int flags);
-static Bool RDCEnterVT(int scrnIndex, int flags);
+void RDCAdjustFrame(ScrnInfoPtr pScrn, int x, int y);
+static Bool RDCEnterVT(ScrnInfoPtr pScrn);
 static void RDCLeaveVT(int scrnIndex, int flags);
 static void RDCFreeScreen(int scrnIndex, int flags);
 static ModeStatus RDCValidMode(int scrnIndex, DisplayModePtr mode, Bool verbose, int flags);
@@ -1266,7 +1266,7 @@ RDCScreenInit(ScreenPtr pScreen, int argc, char **argv)
     }   
 
     RDCSaveScreen(pScreen, FALSE);
-    RDCAdjustFrame(pScrn, pScrn->frameX0, pScrn->frameY0, 0);
+    RDCAdjustFrame(pScrn, pScrn->frameX0, pScrn->frameY0);
 
     EC_DetectCaps(pScrn, &(pRDC->ECChipInfo));
 
@@ -1288,14 +1288,13 @@ Bool RDCSwitchMode(ScrnInfoPtr pScrn, DisplayModePtr mode)
 }
 
 void
-RDCAdjustFrame(int scrnIndex, int x, int y, int flags)
+RDCAdjustFrame(ScrnInfoPtr pScrn, int x, int y)
 {
-    ScrnInfoPtr pScrn = xf86Screens[scrnIndex];
     RDCRecPtr   pRDC  = RDCPTR(pScrn);
     ULONG base;
     int rot_x, rot_y;
 
-    xf86DrvMsgVerb(scrnIndex, X_INFO, DefaultLevel, "==Enter RDCAdjustFrame(x = %d, y = %d)== \n", x, y);
+    xf86DrvMsgVerb(pScrn->scrnIndex, X_INFO, DefaultLevel, "==Enter RDCAdjustFrame(x = %d, y = %d)== \n", x, y);
 
     xf86DrvMsgVerb(pScrn->scrnIndex, X_INFO, InternalLevel, "  pScrn->virtualX = %d\n", pScrn->virtualX);
     xf86DrvMsgVerb(pScrn->scrnIndex, X_INFO, InternalLevel, "  pScrn->virtualY = %d\n", pScrn->virtualY);
@@ -1344,14 +1343,13 @@ RDCAdjustFrame(int scrnIndex, int x, int y, int flags)
     xf86DrvMsgVerb(pScrn->scrnIndex, X_INFO, InternalLevel, "  base = %x\n", base);
     vSetStartAddressCRT1(pRDC, base);
 
-    xf86DrvMsgVerb(scrnIndex, X_INFO, DefaultLevel, "==Exit1 RDCAdjustFrame()== \n");
+    xf86DrvMsgVerb(pScrn->scrnIndex, X_INFO, DefaultLevel, "==Exit1 RDCAdjustFrame()== \n");
 }
 
         
 static Bool
-RDCEnterVT(int scrnIndex, int flags)
+RDCEnterVT(ScrnInfoPtr pScrn)
 {
-    ScrnInfoPtr pScrn = xf86Screens[scrnIndex];
     RDCRecPtr pRDC = RDCPTR(pScrn);
 
     xf86DrvMsgVerb(pScrn->scrnIndex, X_INFO, DefaultLevel, "==Enter RDCEnterVT()== \n");
@@ -1361,7 +1359,7 @@ RDCEnterVT(int scrnIndex, int flags)
         return FALSE;
     }
 
-    RDCAdjustFrame(scrnIndex, pScrn->frameX0, pScrn->frameY0, 0);
+    RDCAdjustFrame(pScrn, pScrn->frameX0, pScrn->frameY0);
 
     xf86DrvMsgVerb(pScrn->scrnIndex, X_INFO, DefaultLevel, "==Exit2 RDCEnterVT() Normal Exit== return TRUE\n");
     return TRUE;
@@ -1845,7 +1843,7 @@ RDCModeInit(ScrnInfoPtr pScrn, DisplayModePtr mode)
     
     pRDC->HWCInfo.iScreenOffset_x = 0;
     pRDC->HWCInfo.iScreenOffset_y = 0;
-    RDCAdjustFrame(pScrn->scrnIndex, 0, 0, 0);
+    RDCAdjustFrame(pScrn, 0, 0);
  
     vgaHWProtect(pScrn, FALSE);
 
