@@ -30,7 +30,7 @@
 #ifdef HAVE_CONFIG_H
 #include <config.h>
 #endif
-
+#include <stdlib.h>
 #include "xf86.h"
 #include "xf86_OSproc.h"
 #include "xf86cmap.h"
@@ -147,7 +147,7 @@ void RDCVideoInit(ScreenPtr pScreen)
     num_adaptors = xf86XVListGenericAdaptors(pScrn, &adaptors);
     xf86DrvMsgVerb(0,X_INFO,4,"==RDCVideoInit() Adaptor number %d==\n",num_adaptors);
     
-    newAdaptors = xalloc((num_adaptors + 1) * sizeof(XF86VideoAdaptorPtr *));
+    newAdaptors = calloc((num_adaptors + 1) , sizeof(XF86VideoAdaptorPtr *));
 
     if (newAdaptors == NULL)
 	    return;
@@ -177,7 +177,7 @@ void RDCVideoInit(ScreenPtr pScreen)
     pRDC->OverlayStatus.VidColorEnhance.ulScaleSaturation = SATURATION_DEFAULT;
 	    
     xf86DrvMsgVerb(0, X_INFO, DefaultLevel, "==RDCVideoInit()  Exit==\n");
-    xfree(adaptors);
+    free(adaptors);
 }
 
 
@@ -191,7 +191,7 @@ RDCSetupImageVideoOverlay(ScreenPtr pScreen)
     
     xf86DrvMsgVerb(0, X_INFO, DefaultLevel, "==RDCSetupImageVideoOverlay()  entry==\n");
     
-    if (!(adapt = xcalloc(1, sizeof(XF86VideoAdaptorRec) + 
+    if (!(adapt = calloc(1, sizeof(XF86VideoAdaptorRec) + 
                              sizeof(RDCPortPrivRec) + 
                              sizeof(DevUnion))))
     {
