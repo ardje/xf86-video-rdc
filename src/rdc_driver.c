@@ -103,15 +103,15 @@ static Bool RDCScreenInit(ScreenPtr pScreen, int arc, char **argv);
 Bool RDCSwitchMode(ScrnInfoPtr pScrn, DisplayModePtr mode);
 void RDCAdjustFrame(ScrnInfoPtr pScrn, int x, int y);
 static Bool RDCEnterVT(ScrnInfoPtr pScrn);
-static void RDCLeaveVT(int scrnIndex, int flags);
-static void RDCFreeScreen(int scrnIndex, int flags);
-static ModeStatus RDCValidMode(int scrnIndex, DisplayModePtr mode, Bool verbose, int flags);
+static void RDCLeaveVT(ScrnInfoPtr pScrn);
+static void RDCFreeScreen(ScrnInfoPtr pScrn);
+static ModeStatus RDCValidMode(ScrnInfoPtr pScrn, DisplayModePtr mode, Bool verbose, int flags);
 
 
 static Bool RDCGetRec(ScrnInfoPtr pScrn);
 static void RDCFreeRec(ScrnInfoPtr pScrn);
 static Bool RDCSaveScreen(ScreenPtr pScreen, Bool unblack);
-static Bool RDCCloseScreen(int scrnIndex, ScreenPtr pScreen);
+static Bool RDCCloseScreen(ScreenPtr pScreen);
 static void RDCSave(ScrnInfoPtr pScrn);
 static void RDCRestore(ScrnInfoPtr pScrn);
 static void RDCProbeDDC(ScrnInfoPtr pScrn, int index);
@@ -744,10 +744,8 @@ RDCPreInit(ScrnInfoPtr pScrn, int flags)
 #endif
      
 #if XSERVER_LIBPCIACCESS
-    VGAHWPTR(pScrn)->PIOOffset = pRDC->PIOOffset = pRDC->IODBase + pRDC->PciInfo->regions[2].base_addr - 0x380;
     pRDC->RelocateIO = (IOADDRESS)(pRDC->PciInfo->regions[2].base_addr + pRDC->IODBase);
 #else
-    VGAHWPTR(pScrn)->PIOOffset = pRDC->PIOOffset = pRDC->IODBase + pRDC->PciInfo->ioBase[2] - 0x380;
     
     pRDC->RelocateIO = (IOADDRESS)(pRDC->PciInfo->ioBase[2] + pRDC->IODBase);
 #endif
@@ -1367,9 +1365,8 @@ RDCEnterVT(ScrnInfoPtr pScrn)
 
 
 static void
-RDCLeaveVT(int scrnIndex, int flags)
+RDCLeaveVT(ScrnInfoPtr pScrn)
 {
-    ScrnInfoPtr pScrn = xf86Screens[scrnIndex];
     vgaHWPtr hwp = VGAHWPTR(pScrn);
     RDCRecPtr pRDC = RDCPTR(pScrn);
     
@@ -1393,32 +1390,31 @@ RDCLeaveVT(int scrnIndex, int flags)
 }
 
 static void
-RDCFreeScreen(int scrnIndex, int flags)
+RDCFreeScreen(ScrnInfoPtr pScrn)
 {
-    xf86DrvMsgVerb(scrnIndex, X_INFO, DefaultLevel, "==Enter RDCFreeScreen()== \n");
+    xf86DrvMsgVerb(pScrn->scrnIndex, X_INFO, DefaultLevel, "==Enter RDCFreeScreen()== \n");
     
-    RDCFreeRec(xf86Screens[scrnIndex]);
+    RDCFreeRec(pScrn);
     if (xf86LoaderCheckSymbol("vgaHWFreeHWRec"))
-        vgaHWFreeHWRec(xf86Screens[scrnIndex]);
+        vgaHWFreeHWRec(pScrn);
 
-    xf86DrvMsgVerb(scrnIndex, X_INFO, DefaultLevel, "==Exit1 RDCFreeScreen()== \n");
+    xf86DrvMsgVerb(pScrn->scrnIndex, X_INFO, DefaultLevel, "==Exit1 RDCFreeScreen()== \n");
 }
 
 static ModeStatus
-RDCValidMode(int scrnIndex, DisplayModePtr mode, Bool verbose, int flags)
+RDCValidMode(ScrnInfoPtr pScrn, DisplayModePtr mode, Bool verbose, int flags)
 {
     Bool Flags = MODE_NOMODE;
 
-    ScrnInfoPtr pScrn = xf86Screens[scrnIndex];
     RDCRecPtr pRDC = RDCPTR(pScrn);
     CBIOS_ARGUMENTS CBiosArguments;
     CBIOS_Extension CBiosExtension;
     USHORT wLCDHorSize, wLCDVerSize;
     USHORT wVESAModeHorSize, wVESAModeVerSize;
 
-    xf86DrvMsgVerb(scrnIndex, X_INFO, DefaultLevel, "==Enter RDCValidMode() Verbose = %d, Flags = 0x%x==\n", 
+    xf86DrvMsgVerb(pScrn->scrnIndex, X_INFO, DefaultLevel, "==Enter RDCValidMode() Verbose = %d, Flags = 0x%x==\n", 
                verbose, flags);
-    xf86DrvMsgVerb(scrnIndex, X_INFO, DefaultLevel, "==Mode name=%s, Width=%d, Height=%d, Refresh reate=%f==\n", 
+    xf86DrvMsgVerb(pScrn->scrnIndex, X_INFO, DefaultLevel, "==Mode name=%s, Width=%d, Height=%d, Refresh reate=%f==\n", 
                mode->name, mode->HDisplay, mode->VDisplay, mode->VRefresh);
 
     CBiosExtension.pCBiosArguments = &CBiosArguments;
@@ -1434,10 +1430,10 @@ RDCValidMode(int scrnIndex, DisplayModePtr mode, Bool verbose, int flags)
     {
         if (verbose)
         {
-            xf86DrvMsgVerb(scrnIndex, X_PROBED, InfoLevel,
+            xf86DrvMsgVerb(pScrn->scrnIndex, X_PROBED, InfoLevel,
                        "==Removing interlaced mode \"%s\"\n==", mode->name);
         }
-        xf86DrvMsgVerb(scrnIndex, X_INFO, ErrorLevel, "== RDCValidMode() Fail, Not Interlace Mode==\n");
+        xf86DrvMsgVerb(pScrn->scrnIndex, X_INFO, ErrorLevel, "== RDCValidMode() Fail, Not Interlace Mode==\n");
         return MODE_NO_INTERLACE;
     }
 
@@ -1542,14 +1538,14 @@ RDCSaveScreen(ScreenPtr pScreen, Bool unblack)
 }
 
 static Bool
-RDCCloseScreen(int scrnIndex, ScreenPtr pScreen)
+RDCCloseScreen( ScreenPtr pScreen)
 {
-    ScrnInfoPtr pScrn = xf86Screen[scrnIndex];
+    ScrnInfoPtr pScrn = xf86ScreenToScrn(pScreen);
     vgaHWPtr hwp = VGAHWPTR(pScrn);
     RDCRecPtr pRDC = RDCPTR(pScrn);
     Bool RetStatus;
     
-    xf86DrvMsgVerb(scrnIndex, X_INFO, DefaultLevel, "==Enter RDCCloseScreen(); Screen Index = 0x%x == \n",scrnIndex);
+    xf86DrvMsgVerb(pScrn->scrnIndex, X_INFO, DefaultLevel, "==Enter RDCCloseScreen(); Screen Index = 0x%x == \n",pScrn->scrnIndex);
     
     if (pScrn->vtSema == TRUE)
     {  
@@ -1593,9 +1589,9 @@ RDCCloseScreen(int scrnIndex, ScreenPtr pScreen)
  
     pScrn->vtSema = FALSE;
     pScreen->CloseScreen = pRDC->CloseScreen;
-    RetStatus = (*pScreen->CloseScreen) (scrnIndex, pScreen);
+    RetStatus = (*pScreen->CloseScreen) (pScreen);
     
-    xf86DrvMsgVerb(scrnIndex, X_INFO, DefaultLevel, "==Exit1 RDCCloseScreen()== return(RetStatus=%X\n", RetStatus);
+    xf86DrvMsgVerb(pScrn->scrnIndex, X_INFO, DefaultLevel, "==Exit1 RDCCloseScreen()== return(RetStatus=%X\n", RetStatus);
     return RetStatus;
 }
 
