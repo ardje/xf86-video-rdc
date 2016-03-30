@@ -1,7 +1,5 @@
 Some things to take care of:
 * warning: ‘IOADDRESS’ is deprecated [-Wdeprecated-declarations]
-* warning "xf86PciInfo.h is deprecated.  For greater compatibility, drivers should include necessary PCI IDs locally rather than relying on this file from xorg-server."
-
 * rdc_driver.c:690:5: warning: ‘Xalloc’ is deprecated (declared at /usr/include/xorg/os.h:224) [-Wdeprecated-declarations]
      if (!(pRDC->Options = xalloc(sizeof(RDCOptions))))
 
