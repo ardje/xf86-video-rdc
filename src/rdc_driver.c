@@ -465,7 +465,7 @@ RDCProbe(DriverPtr drv, int flags)
                                     devSections, numDevSections,
                                     drv, &usedChips);
     xf86DrvMsgVerb(0, X_INFO, 5, "numUsed = %d\n", numUsed);
-    xfree(devSections);
+    free(devSections);
 
     if (flags & PROBE_DETECT) 
     {
@@ -501,7 +501,7 @@ RDCProbe(DriverPtr drv, int flags)
         }  
     }        
 
-    xfree(usedChips);
+    free(usedChips);
 
     xf86DrvMsgVerb(0, X_INFO, DefaultLevel, "==Exit3 RDCProbe()== return(foundScreen=%X)\n", foundScreen);
     return foundScreen;
@@ -686,7 +686,7 @@ RDCPreInit(ScrnInfoPtr pScrn, int flags)
 
     
     xf86CollectOptions(pScrn, NULL);   
-    if (!(pRDC->Options = xalloc(sizeof(RDCOptions))))
+    if (!(pRDC->Options = malloc(sizeof(RDCOptions))))
     {      
         RDCFreeRec(pScrn);
         xf86DrvMsgVerb(pScrn->scrnIndex, X_INFO, ErrorLevel, "==Exit15 RDCPreInit()== return FALSE\n");
@@ -1092,7 +1092,8 @@ RDCScreenInit(int scrnIndex, ScreenPtr pScreen, int argc, char **argv)
 
     xf86DrvMsgVerb(scrnIndex, X_INFO, DefaultLevel, "==Enter RDCScreenInit()== \n");
     
-    pScrn = xf86Screens[pScreen->myNum];
+    //pScrn = xf86Screens[pScreen->myNum];
+    pScrn = xf86ScreenToScrn(pScreen);
     pRDC = RDCPTR(pScrn);
     hwp = VGAHWPTR(pScrn);
       
@@ -1527,7 +1528,7 @@ RDCFreeRec(ScrnInfoPtr pScrn)
         return;
     }
     
-    xfree(pScrn->driverPrivate);
+    free(pScrn->driverPrivate);
     pScrn->driverPrivate = 0;
     
     xf86DrvMsgVerb(pScrn->scrnIndex, X_INFO, DefaultLevel, "==Exit3 RDCFreeRec()== \n");
@@ -1548,7 +1549,7 @@ RDCSaveScreen(ScreenPtr pScreen, Bool unblack)
 static Bool
 RDCCloseScreen(int scrnIndex, ScreenPtr pScreen)
 {
-    ScrnInfoPtr pScrn = xf86Screens[scrnIndex];
+    ScrnInfoPtr pScrn = xf86Screen[scrnIndex];
     vgaHWPtr hwp = VGAHWPTR(pScrn);
     RDCRecPtr pRDC = RDCPTR(pScrn);
     Bool RetStatus;
