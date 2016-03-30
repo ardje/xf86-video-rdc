@@ -52,9 +52,10 @@
 
 #include "xf86fbman.h"
 
-
+#ifdef USE_XAA
 #include "xaa.h"
 #include "xaarop.h"
+#endif
 
 
 #include "exa.h"

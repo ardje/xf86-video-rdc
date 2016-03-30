@@ -42,7 +42,7 @@
 #endif
 #include "xf86cmap.h"
 #include "compiler.h"
-#include "mibstore.h"
+//#include "mibstore.h"
 #include "vgaHW.h"
 #include "mipointer.h"
 #include "micmap.h"
@@ -293,6 +293,7 @@ static const char *exaSymbols[] = {
   NULL
 };
 
+#ifdef USE_XAA
 const char *xaaSymbols[] = {
     "XAACreateInfoRec",
     "XAADestroyInfoRec",
@@ -301,6 +302,7 @@ const char *xaaSymbols[] = {
     "XAAPatternROP",
     NULL
 };
+#endif
 
 const char *ramdacSymbols[] = {
     "xf86CreateCursorInfoRec",
@@ -999,6 +1001,7 @@ RDCPreInit(ScrnInfoPtr pScrn, int flags)
         		return FALSE;
     		}
 	    }        
+#ifdef USE_XAA
 	    else
         {
             if (!xf86LoadSubModule(pScrn, "xaa"))
@@ -1008,6 +1011,7 @@ RDCPreInit(ScrnInfoPtr pScrn, int flags)
                 return FALSE;
             }       
         }
+#endif
         
         pRDC->noAccel = FALSE; 
        
@@ -1580,7 +1584,9 @@ RDCCloseScreen(int scrnIndex, ScreenPtr pScreen)
 
     if(pRDC->AccelInfoPtr)
     {
+#ifdef USE_XAA
         XAADestroyInfoRec(pRDC->AccelInfoPtr);
+#endif
         pRDC->AccelInfoPtr = NULL;
     }
  

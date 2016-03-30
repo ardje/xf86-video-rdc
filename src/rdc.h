@@ -37,8 +37,10 @@
 #include <pciaccess.h>
 #endif
 
+#ifdef USE_XAA
 #include "xaa.h"
 #include "xaarop.h"
+#endif
 #include "xf86.h"
 
 
@@ -67,8 +69,8 @@
 #endif
 
 
-#define     Accel_2D
-#define     Accel_2D_DEBUG          0
+//#define     Accel_2D
+//#define     Accel_2D_DEBUG          0
 
 
 #define     HWC
@@ -501,7 +503,11 @@ struct _RDCRec
 
     OptionInfoPtr       Options;
     DisplayModePtr      ModePtr;        
+#ifdef USE_XAA
     XAAInfoRecPtr       AccelInfoPtr;
+#else
+    void *	AccelInfoPtr; // Will be NULL
+#endif
     xf86CursorInfoPtr   HWCInfoPtr;
     
     VIDEOMODE           VideoModeInfo;  
