@@ -28,40 +28,15 @@
  
 
 
-#define NoneDevice                  0x0
-#define LCDINDEX                    0x1
-#define DVIINDEX                    0x2
-#define CRTINDEX                    0x3
-#define HDMIINDEX                   0x4
-#define HDTVINDEX                   0x5
-#define TVINDEX                     0x6
-#define LCD2INDEX                   0x7
-#define DVI2INDEX                   0x8
-#define CRT2INDEX                   0x9
-#define HDMI2INDEX                  0xA
-#define HDTV2INDEX                  0xB
-#define TV2INDEX                    0xC
 
-
-#define LCDBIT                      0x0001
-#define DVIBIT                      0x0002
-#define CRTBIT                      0x0004
-#define HDMIBIT                     0x0008
-#define HDTVBIT                     0x0010
-#define TVBIT                       0x0020
-#define LCD2BIT                     0x0040
-#define DVI2BIT                     0x0080
-#define CRT2BIT                     0x0100
-#define HDMI2BIT                    0x0200
-#define HDTV2BIT                    0x0400
-#define TV2BIT                      0x0800
-
-
+#define VIDEOMEM_SIZE_04M       0x00400000
 #define VIDEOMEM_SIZE_08M       0x00800000
 #define VIDEOMEM_SIZE_16M       0x01000000
 #define VIDEOMEM_SIZE_32M       0x02000000
 #define VIDEOMEM_SIZE_64M       0x04000000
 #define VIDEOMEM_SIZE_128M      0x08000000
+#define VIDEOMEM_SIZE_256M      0x10000000
+#define VIDEOMEM_SIZE_512M      0x20000000
 
 #define AR_PORT_WRITE           (pRDC->RelocateIO + 0x40)
 #define MISC_PORT_WRITE         (pRDC->RelocateIO + 0x42)

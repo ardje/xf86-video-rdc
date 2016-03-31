@@ -145,6 +145,7 @@ typedef enum {
     OPTION_DOWN_SCALE
 } RDCOpts;
 
+#ifdef _DRIVER_C_
 static const OptionInfoRec RDCOptions[] = {
     {OPTION_NOACCEL,       "NoAccel",       OPTV_BOOLEAN,  {0}, TRUE},
     {OPTION_MMIO2D,        "MMIO2D",        OPTV_BOOLEAN,  {0}, FALSE},   
@@ -184,7 +185,7 @@ static PciChipsets RDCPciChipsets[] = {
     {PCI_CHIP_M2200, PCI_CHIP_M2200, RES_SHARED_VGA},
     {-1,              -1,              RES_UNDEFINED }
 };
-
+#endif
 
 
 
@@ -206,11 +207,11 @@ typedef enum _CHIP_ID {
 } CHIP_ID;
 
 
-#define RDC_NAME                "RDC GFX R0.0.1"
-#define RDC_DRIVER_NAME         "rdcm15"
+#define RDC_NAME                "RDC GFX R0.10.0"
+#define RDC_DRIVER_NAME         "rdc"
 #define RDC_MAJOR_VERSION       0
-#define RDC_MINOR_VERSION       0
-#define RDC_PATCH_VERSION       1
+#define RDC_MINOR_VERSION       10
+#define RDC_PATCH_VERSION       0
 #define RDC_VERSION    \
         ((RDC_MAJOR_VERSION << 20) | (RDC_MINOR_VERSION << 10) | RDC_PATCH_VERSION)
 
@@ -824,6 +825,11 @@ typedef struct _RDCOutputPrivateRec {
 #include "rdc_cursor.h"
 #include "rdc_video.h"
 #include "rdc_rotation.h"
+
+ 
+#define STRINGIZE_DETAIL(x) #x
+#define STRINGIZE(x) STRINGIZE_DETAIL(x)
+#define rdcLog(msg) xf86DrvMsgVerb(0, X_INFO, 0,__FILE__ "(" STRINGIZE(__LINE__) "): " msg "\n")
 
 
 #endif
