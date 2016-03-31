@@ -1428,15 +1428,20 @@ RDCScreenInit(ScreenPtr pScreen, int argc, char **argv)
     miDCInitialize(pScreen, xf86GetPointerScreenFuncs());
 
     
+rdcLog("meeh");
     if (!pRDC->noHWC)
     {
+rdcLog("meeh");
         if (!RDCCursorInit(pScreen)) 
         {
+rdcLog("meeh");
             xf86DrvMsg(pScrn->scrnIndex, X_ERROR, "Hardware cursor initialization failed\n");
             pRDC->noHWC = TRUE;                      
         }
+rdcLog("meeh");
     }
 
+rdcLog("meeh");
     if (pRDC->bRandRRotation)
     {
         xf86DrvMsgVerb(0, X_INFO, DefaultLevel, "assign pScrn->DriverFunc\n");
