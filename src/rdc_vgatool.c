@@ -37,7 +37,6 @@
 #include <X11/extensions/Xv.h>
 #include "vbe.h"
 
-#include "xf86PciInfo.h"
 #include "xf86Pci.h"
 
 
