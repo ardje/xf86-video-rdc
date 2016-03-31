@@ -1912,7 +1912,7 @@ RDCCloseScreen(ScreenPtr pScreen)
     RDCRecPtr pRDC = RDCPTR(pScrn);
     Bool RetStatus;
     
-    xf86DrvMsgVerb(pScrn->scrnIndex, X_INFO, DefaultLevel, "==Enter RDCCloseScreen(); Screen Index = 0x%x == \n",scrnIndex);
+    xf86DrvMsgVerb(pScrn->scrnIndex, X_INFO, DefaultLevel, "==Enter RDCCloseScreen(); Screen Index = 0x%x == \n",pScrn->scrnIndex);
     
     
     if (pRDC->bRandRRotation)
