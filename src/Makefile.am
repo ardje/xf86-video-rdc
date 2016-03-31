@@ -25,11 +25,11 @@
 # TODO: -nostdlib/-Bstatic/-lgcc platform magic, not installing the .a, etc.
 AM_CFLAGS = @XORG_CFLAGS@
 
-rdcm15_drv_la_LTLIBRARIES = rdcm15_drv.la
-rdcm15_drv_la_LDFLAGS = -module -avoid-version 
-rdcm15_drv_ladir = @moduledir@/drivers
+rdc_drv_la_LTLIBRARIES = rdc_drv.la
+rdc_drv_la_LDFLAGS = -module -avoid-version 
+rdc_drv_ladir = @moduledir@/drivers
 
-rdcm15_drv_la_SOURCES = \
+rdc_drv_la_SOURCES = \
 	rdc_2dtool.c \
 	rdc_accel.c \
 	rdc_cursor.c \
