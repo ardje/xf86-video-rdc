@@ -908,7 +908,7 @@ RDCPreInit(ScrnInfoPtr pScrn, int flags)
     
     xf86CollectOptions(pScrn, NULL);
     
-    if (!(pRDC->pCBIOSExtension = xalloc(sizeof(CBIOS_Extension))))
+    if (!(pRDC->pCBIOSExtension = malloc(sizeof(CBIOS_Extension))))
     {      
         RDCFreeRec(pScrn);
         xf86DrvMsgVerb(pScrn->scrnIndex, X_INFO, ErrorLevel, "==Exit25 RDCPreInit()== return FALSE\n");
@@ -917,7 +917,7 @@ RDCPreInit(ScrnInfoPtr pScrn, int flags)
     memset(pRDC->pCBIOSExtension, 0, sizeof(CBIOS_Extension));
 
     
-    if (!(pRDC->pCBIOSExtension->pCBiosArguments = xalloc(sizeof(CBIOS_ARGUMENTS))))
+    if (!(pRDC->pCBIOSExtension->pCBiosArguments = malloc(sizeof(CBIOS_ARGUMENTS))))
     {      
         RDCFreeRec(pScrn);
         xf86DrvMsgVerb(pScrn->scrnIndex, X_INFO, ErrorLevel, "==Exit26 RDCPreInit()== return FALSE\n");
