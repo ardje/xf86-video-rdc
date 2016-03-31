@@ -1,31 +1,23 @@
-/*
+/* 
  * Copyright (C) 2009 RDC Semiconductor Co.,Ltd
- * All Rights Reserved.
  *
- * Permission is hereby granted, free of charge, to any person obtaining a
- * copy of this software and associated documentation files (the
- * "Software"), to deal in the Software without restriction, including
- * without limitation the rights to use, copy, modify, merge, publish,
- * distribute, sub license, and/or sell copies of the Software, and to
- * permit persons to whom the Software is furnished to do so, subject to
- * the following conditions:
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
- * The above copyright notice and this permission notice (including the
- * next paragraph) shall be included in all copies or substantial portions
- * of the Software.
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
  *
- * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS
- * OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
- * MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NON-INFRINGEMENT.
- * IN NO EVENT SHALL PRECISION INSIGHT AND/OR ITS SUPPLIERS BE LIABLE FOR
- * ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,
- * TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE
- * SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+ * You should have received a copy of the GNU General Public License
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  * For technical support : 
  *     <rdc_xorg@rdc.com.tw>
  */
- 
+
 
 
 #ifdef HAVE_CONFIG_H
@@ -57,7 +49,9 @@
 #include "xf86fbman.h"
 
 
+#ifdef HAVE_XAA
 #include "xaa.h"
+#endif
 #include "xaarop.h"
 
 
@@ -72,10 +66,18 @@
 
 #include "rdc_extension.h"
 
-//#include <sys/ipc.h>
-//#include <sys/shm.h>
 
-CARD32 *inBufPtr, *outBufPtr ; 
+
+
+#if GET_ABI_MAJOR(ABI_VIDEODRV_VERSION) < 12
+#define _swapl(x, n)	swapl(x, n)
+#define _swaps(x, n)	swaps(x, n)
+#else
+#define _swapl(x, n)	swapl(x)
+#define _swaps(x, n)	swaps(x)
+#endif
+
+ULONG *inBufPtr, *outBufPtr ; 
 
 
 int g_ScreenNumber;
@@ -95,10 +97,10 @@ static int ProcRDCGFXQueryVersion (ClientPtr client)
     
     if(client->swapped)
     {
-        swaps(&rep.sequenceNumber, n);
-        swapl(&rep.length, n);
-        swaps(&rep.majorVersion, n);
-        swaps(&rep.minorVersion, n);
+		_swaps(&rep.sequenceNumber, n);
+        _swapl(&rep.length, n);
+        _swaps(&rep.majorVersion, n);
+        _swaps(&rep.minorVersion, n);
     }
     
     WriteToClient(client, sizeof(xRDCGFXQueryVersionReply), (char *)&rep);
@@ -176,8 +178,8 @@ void RDCDisplayExtensionInit(ScrnInfoPtr pScrn)
     out_key = ftok(outBufName, 4) ;
     shm_in_id = shmget(in_key, 4096, IPC_CREAT) ;
     shm_out_id = shmget(out_key, 4096, IPC_CREAT) ;
-    inBufPtr = (CARD32 *) shmat(shm_in_id, NULL, 0) ;
-    outBufPtr = (CARD32 *) shmat(shm_out_id, NULL, 0) ;
+    inBufPtr = (ULONG *) shmat(shm_in_id, NULL, 0) ;
+    outBufPtr = (ULONG *) shmat(shm_out_id, NULL, 0) ;
     
     if(NULL == CheckExtension(RDC_GFX_UT_EXTENSION_NAME))
     {
@@ -205,13 +207,9 @@ int RDCGFXUtilityProc(xRDCGFXCommandReq* req)
 {
     ScrnInfoPtr pScrn = xf86Screens[g_ScreenNumber];
     RDCRecPtr pRDC = RDCPTR(pScrn);
+    CBIOS_ARGUMENTS *pCBiosArguments = pRDC->pCBIOSExtension->pCBiosArguments;
+    UCHAR ucNewDeviceID;
 
-    CBIOS_Extension CBIOSExtension;
-    CBIOS_ARGUMENTS CBiosArguments;
-
-    CBIOSExtension.pCBiosArguments = &CBiosArguments;
-    CBIOSExtension.IOAddress = (USHORT)(pRDC->RelocateIO) ;
-    CBIOSExtension.VideoVirtualAddress = (ULONG)(pRDC->FBVirtualAddr);
     
             
     ULONG   ulResult;
@@ -222,16 +220,21 @@ int RDCGFXUtilityProc(xRDCGFXCommandReq* req)
         
         
         case UT_QUERY_SUPPORT_DEVICE: 
-            xf86DrvMsgVerb(pScrn->scrnIndex, X_INFO, 4, "DrvEscape: Query Device Support");
+            xf86DrvMsgVerb(pScrn->scrnIndex, X_INFO, 4, "DrvEscape: Query Device Support\n");
             
             if (req->outBufferSize != sizeof(ULONG))
                 return UT_FAIL;
 
-            CBiosArguments.reg.x.AX = OEMFunction;
-            CBiosArguments.reg.x.BX = QueryBiosInfo;
-            if (CInt10(&CBIOSExtension))
+            
+            memset(pCBiosArguments, 0, sizeof(CBIOS_ARGUMENTS));
+            pCBiosArguments->AX = OEMFunction;
+            pCBiosArguments->BX = QueryBiosInfo;
+            
+            
+            CInt10(pRDC->pCBIOSExtension);
+            if(pCBiosArguments->AX == VBEFunctionCallSuccessful)
             {
-                ((UTDEVICELIST *) outBufPtr)->MERGE = (USHORT)CBiosArguments.reg.x.SI;
+                ((UTDEVICELIST *) outBufPtr)->MERGE = (USHORT)pCBiosArguments->SI;
                 return (UT_SUCCESS);
             }
             else
@@ -241,16 +244,20 @@ int RDCGFXUtilityProc(xRDCGFXCommandReq* req)
             break;
 
         case UT_QUERY_CONNECT_DEVICE: 
-            xf86DrvMsgVerb(pScrn->scrnIndex, X_INFO, 4, "DrvEscape: Query Device Connect");
+            xf86DrvMsgVerb(pScrn->scrnIndex, X_INFO, 4, "DrvEscape: Query Device Connect\n");
             
             if (req->outBufferSize != sizeof(ULONG))
                 return UT_FAIL;
-                
-            CBiosArguments.reg.x.AX = OEMFunction;
-            CBiosArguments.reg.x.BX = QueryDeviceConnectStatus;
-            if (CInt10(&CBIOSExtension))
+            
+            memset(pCBiosArguments, 0, sizeof(CBIOS_ARGUMENTS));
+            pCBiosArguments->AX = OEMFunction;
+            pCBiosArguments->BX = QueryDeviceConnectStatus;
+            
+            
+            CInt10(pRDC->pCBIOSExtension);
+            if(pCBiosArguments->AX == VBEFunctionCallSuccessful)
             {
-                ((UTDEVICELIST *) outBufPtr)->MERGE = (USHORT)CBiosArguments.reg.x.BX;
+                ((UTDEVICELIST *) outBufPtr)->MERGE = (USHORT)pCBiosArguments->BX;
                 return (UT_SUCCESS);
             }
             else
@@ -260,35 +267,44 @@ int RDCGFXUtilityProc(xRDCGFXCommandReq* req)
             break;
 
         case UT_SET_DEVICE_ACT:
-            xf86DrvMsgVerb(pScrn->scrnIndex, X_INFO, 4, "DrvEscape: Set Active Device");
+            xf86DrvMsgVerb(pScrn->scrnIndex, X_INFO, 4, "DrvEscape: Set Active Device\n");
             
             if (req->inBufferSize != sizeof(UTDEVICELIST))
                 return UT_FAIL;
 
-            CBiosArguments.reg.x.AX = OEMFunction;
-            CBiosArguments.reg.x.BX = SetActiveDisplayDevice;
+             
+            memset(pCBiosArguments, 0, sizeof(CBIOS_ARGUMENTS));
+            pCBiosArguments->AX = OEMFunction;
+            pCBiosArguments->BX = SetActiveDisplayDevice;
          
             switch (inBufPtr[0] & 0xFFFF)
             {
                 case 0x04: 
-                    CBiosArguments.reg.lh.CL = 3; 
+                    pCBiosArguments->CL = 3; 
                     break;
                 case 0x01: 
-                    CBiosArguments.reg.lh.CL = 1; 
+                    pCBiosArguments->CL = 1; 
                     break;
                 case 0x02: 
-                    CBiosArguments.reg.lh.CL = 2; 
+                    pCBiosArguments->CL = 2; 
+                    break;
+                case 0x08: 
+                    pCBiosArguments->CL = 4; 
                     break;
                 case 0x20: 
-                    CBiosArguments.reg.lh.CL = 6; 
+                    pCBiosArguments->CL = 6; 
                     break;
                 default:
-                    CBiosArguments.reg.lh.CL = 0;
+                    pCBiosArguments->CL = 0;
                     break;
             }
-
-            if (CInt10(&CBIOSExtension))
+            
+            ucNewDeviceID = pCBiosArguments->CL;
+            
+            CInt10(pRDC->pCBIOSExtension);
+            if(pCBiosArguments->AX == VBEFunctionCallSuccessful)
             {
+                pRDC->DeviceInfo.ucNewDeviceID = ucNewDeviceID;
                 return(UT_SUCCESS | UT_MODESET);
             }
             else
@@ -298,17 +314,21 @@ int RDCGFXUtilityProc(xRDCGFXCommandReq* req)
             break;
 
         case UT_QUERY_ACT_DEVICE:
-            xf86DrvMsgVerb(pScrn->scrnIndex, X_INFO, 4, "DrvEscape: Query active device");
+            xf86DrvMsgVerb(pScrn->scrnIndex, X_INFO, 4, "DrvEscape: Query active device\n");
             
             if (req->outBufferSize != sizeof(UCHAR) * 2)
                 return UT_FAIL;
 
-            CBiosArguments.reg.x.AX = OEMFunction;
-            CBiosArguments.reg.x.BX = QueryDisplayPathInfo;
-            if (CInt10(&CBIOSExtension))
+             
+            memset(pCBiosArguments, 0, sizeof(CBIOS_ARGUMENTS));
+            pCBiosArguments->AX = OEMFunction;
+            pCBiosArguments->BX = QueryDisplayPathInfo;
+            
+            CInt10(pRDC->pCBIOSExtension);
+            if(pCBiosArguments->AX == VBEFunctionCallSuccessful)
             {
                 outBufPtr[0] = 0;
-                switch ((CBiosArguments.reg.ex.EBX & 0x000F0000) >> 16)
+                switch ((pCBiosArguments->Ebx & 0x000F0000) >> 16)
                 {
                     case 3: 
                         outBufPtr[0] |= 0x0004; 
@@ -318,6 +338,9 @@ int RDCGFXUtilityProc(xRDCGFXCommandReq* req)
                         break;
                     case 2: 
                         outBufPtr[0] |= 0x0002; 
+                        break;
+                    case 4: 
+                        outBufPtr[0] |= 0x0008; 
                         break;
                     case 6: 
                         outBufPtr[0] |= 0x0020; 
@@ -325,7 +348,7 @@ int RDCGFXUtilityProc(xRDCGFXCommandReq* req)
                     default:
                         break;
                 }
-                switch ((CBiosArguments.reg.ex.ECX & 0x000F0000) >> 16)
+                switch ((pCBiosArguments->Ecx & 0x000F0000) >> 16)
                 {
                     case 3: 
                         outBufPtr[0] |= 0x0004; 
@@ -335,6 +358,9 @@ int RDCGFXUtilityProc(xRDCGFXCommandReq* req)
                         break;
                     case 2: 
                         outBufPtr[0] |= 0x0002; 
+                        break;
+                    case 4: 
+                        outBufPtr[0] |= 0x0008; 
                         break;
                     case 6: 
                         outBufPtr[0] |= 0x0020; 
@@ -369,11 +395,15 @@ int RDCGFXUtilityProc(xRDCGFXCommandReq* req)
             if (req->outBufferSize != sizeof(ULONG))
                 return UT_FAIL;
 
-            CBiosArguments.reg.x.AX = OEMFunction;
-            CBiosArguments.reg.x.BX = QueryBiosInfo;
-            if (CInt10(&CBIOSExtension))
+            
+            memset(pCBiosArguments, 0, sizeof(CBIOS_ARGUMENTS));
+            pCBiosArguments->AX = OEMFunction;
+            pCBiosArguments->BX = QueryBiosInfo;
+            
+            CInt10(pRDC->pCBIOSExtension);
+            if(pCBiosArguments->AX == VBEFunctionCallSuccessful)
             {
-                outBufPtr[0] = CBiosArguments.reg.ex.EBX;
+                outBufPtr[0] = pCBiosArguments->Ebx;
                 return(UT_SUCCESS);
             }
             else
@@ -395,12 +425,16 @@ int RDCGFXUtilityProc(xRDCGFXCommandReq* req)
                 return UT_FAIL;
             {
                 CLKINFO *pCLKInfo = (CLKINFO*)outBufPtr;
-                CBiosArguments.reg.x.AX = OEMFunction;
-                CBiosArguments.reg.x.BX = QueryBiosInfo;
-                if (CInt10(&CBIOSExtension))
+                
+                memset(pCBiosArguments, 0, sizeof(CBIOS_ARGUMENTS));
+                pCBiosArguments->AX = OEMFunction;
+                pCBiosArguments->BX = QueryBiosInfo;
+                
+                CInt10(pRDC->pCBIOSExtension);
+                if(pCBiosArguments->AX == VBEFunctionCallSuccessful)
                 {
                     ULONG ulMCLK;
-                    switch (CBiosArguments.reg.x.CX & 0x000F)
+                    switch (pCBiosArguments->CX & 0x000F)
                     {
                         case 0:
                             ulMCLK = 266;
@@ -464,7 +498,7 @@ int RDCGFXUtilityProc(xRDCGFXCommandReq* req)
             break;
 
         case UT_QUERY_LCD_SIZE:
-            xf86DrvMsgVerb(pScrn->scrnIndex, X_INFO, 4, "DrvEscape: Query LCD Size");
+            xf86DrvMsgVerb(pScrn->scrnIndex, X_INFO, 4, "DrvEscape: Query LCD Size\n");
 
             if (req->outBufferSize != sizeof(LCDINFO))
                 return UT_FAIL;
@@ -474,16 +508,21 @@ int RDCGFXUtilityProc(xRDCGFXCommandReq* req)
             if (iDepth == 32) 
                 iDepth = 24;
                 
-            CBiosArguments.reg.x.AX = OEMFunction;
-            CBiosArguments.reg.x.BX = QueryLCDPanelSizeMode;
-            CBiosArguments.reg.lh.CL = (iDepth/8) - 1; 
-            xf86DrvMsgVerb(pScrn->scrnIndex, X_INFO, 4, "Color depth is %d\n", CBiosArguments.reg.lh.CL);
-            if (CInt10(&CBIOSExtension))
+            
+            memset(pCBiosArguments, 0, sizeof(CBIOS_ARGUMENTS));
+            pCBiosArguments->AX = OEMFunction;
+            pCBiosArguments->BX =QueryLCDPanelSizeMode;
+            pCBiosArguments->CL = (iDepth/8) - 1; 
+            xf86DrvMsgVerb(pScrn->scrnIndex, X_INFO, 4, "Color depth is %d\n", pCBiosArguments->CL);
+            
+            
+            CInt10(pRDC->pCBIOSExtension);
+            if(pCBiosArguments->AX == VBEFunctionCallSuccessful)
             {
                 PLCDINFO pLcdPanelSize;
                 pLcdPanelSize = (PLCDINFO) outBufPtr;
-                pLcdPanelSize->wLCDWidth = CBiosArguments.reg.ex.EDX & 0x0000FFFF;
-                pLcdPanelSize->wLCDHeight = CBiosArguments.reg.ex.EDX >> 16;
+                pLcdPanelSize->wLCDWidth  = pCBiosArguments->Edx & 0x0000FFFF;
+                pLcdPanelSize->wLCDHeight = pCBiosArguments->Edx >> 16;
                 return(UT_SUCCESS);
             }
             break;
@@ -497,18 +536,25 @@ int RDCGFXUtilityProc(xRDCGFXCommandReq* req)
                 xf86DrvMsgVerb(pScrn->scrnIndex, X_INFO, 4, "DrvEscape: Set TV info ,type =%x , Connector = %x\n",TVConfig->wType,TVConfig->bConnector);
                 if(!TVConfig->bConnector) 
                 {
-                    CBiosArguments.reg.x.AX = OEMFunction;
-                    CBiosArguments.reg.x.BX = QueryTVConfiguration;
-                    CInt10(&CBIOSExtension);
-                    TVConfig->bConnector = CBiosArguments.reg.lh.BH;
-                    TVConfig->wType      = (CBiosArguments.reg.x.BX)&0xFF;
+                    
+                    memset(pCBiosArguments, 0, sizeof(CBIOS_ARGUMENTS));
+                    pCBiosArguments->AX = OEMFunction;
+                    pCBiosArguments->BX = QueryTVConfiguration;
+                    
+                    CInt10(pRDC->pCBIOSExtension);
+                    TVConfig->bConnector = (pCBiosArguments->BL >> 4);
+                    TVConfig->wType      = (WORD)(pCBiosArguments->BL & (0x0f));
                 }
-                CBiosArguments.reg.x.AX = OEMFunction;
-                CBiosArguments.reg.x.BX = SetTVConfiguration;
-                CBiosArguments.reg.lh.CL= (TVConfig->bConnector<<4) | (UCHAR)(TVConfig->wType);
+                
+                memset(pCBiosArguments, 0, sizeof(CBIOS_ARGUMENTS));
+                pCBiosArguments->AX = OEMFunction;
+                pCBiosArguments->BX = SetTVConfiguration;
+                pCBiosArguments->CL= (TVConfig->bConnector<<4) | (UCHAR)(TVConfig->wType);
                 
                 
-                if (CInt10(&CBIOSExtension))
+                
+                CInt10(pRDC->pCBIOSExtension);
+                if(pCBiosArguments->AX == VBEFunctionCallSuccessful)
                 {
                     return(UT_SUCCESS);
                 }
@@ -521,14 +567,18 @@ int RDCGFXUtilityProc(xRDCGFXCommandReq* req)
         case UT_QUERY_TV_INFO:
             if (req->outBufferSize != sizeof(TVINFO))
                 return UT_FAIL;
-            CBiosArguments.reg.x.AX = OEMFunction;
-            CBiosArguments.reg.x.BX = QueryTVConfiguration;
-            if (CInt10(&CBIOSExtension))
+            
+            memset(pCBiosArguments, 0, sizeof(CBIOS_ARGUMENTS));
+            pCBiosArguments->AX = OEMFunction;
+            pCBiosArguments->BX = QueryTVConfiguration;
+            
+            CInt10(pRDC->pCBIOSExtension);
+            if(pCBiosArguments->AX == VBEFunctionCallSuccessful)
             {
                 PTVINFO TVConfig;
                 TVConfig = (PTVINFO)outBufPtr;
-                TVConfig->wType      = (WORD)CBiosArguments.reg.lh.BL;
-                TVConfig->bConnector = CBiosArguments.reg.lh.BH;
+                TVConfig->wType      = (WORD)(pCBiosArguments->BL & (0x0f));
+                TVConfig->bConnector = (pCBiosArguments->BL >> 4);
                 xf86DrvMsgVerb(pScrn->scrnIndex, X_INFO, 4, "DrvEscape: Query TV info Type=%x, Connector =%x\n",TVConfig->wType,TVConfig->bConnector);
                 return(UT_SUCCESS);
             }else
@@ -538,17 +588,74 @@ int RDCGFXUtilityProc(xRDCGFXCommandReq* req)
             break;
             
         case UT_SET_TV_CCRS_LEVEL:
-            if (req->inBufferSize != sizeof(UCHAR))
-                return UT_FAIL;
-            SetTV_CVBS_CCRSLevel((UCHAR *)(inBufPtr));
-            xf86DrvMsgVerb(pScrn->scrnIndex, X_INFO, 4, "DrvEscape: Set TV CCRS Done\n");
+            {
+                TV_Disp_Info TVDispInfo;
+                if (req->inBufferSize != sizeof(UCHAR))
+                    return UT_FAIL;
+                TVDispInfo.ucCCRSLevel = *(UCHAR *)(inBufPtr);
+                CBIOS_SetTVEncDispRegModify(pRDC, &TVDispInfo, DiffCCRS);
+                return UT_SUCCESS;
+            }
             break;
                 
         case UT_QUERY_TV_CCRS_LEVEL:            
             if (req->outBufferSize != sizeof(UCHAR))
                 return UT_FAIL;
-            return ucGetTV_CVBS_CCRSLevel((UCHAR *)(outBufPtr));
+            ucGetTV_CVBS_CCRSLevel((UCHAR *)(outBufPtr));
+            return UT_SUCCESS;
             break;
+
+        case UT_SET_TV_H_POS:
+            {
+                TV_Disp_Info TVDispInfo;
+                if (req->inBufferSize != sizeof(UCHAR))
+                    return UT_INVALID;
+                TVDispInfo.ucHPosition = *((UCHAR *)inBufPtr);
+                CBIOS_SetTVEncDispRegModify(pRDC, &TVDispInfo, DiffHPos);
+            }
+            return UT_SUCCESS;
+
+        case UT_SET_TV_V_POS:
+            {
+                TV_Disp_Info TVDispInfo;
+                if (req->inBufferSize != sizeof(UCHAR))
+                    return UT_INVALID;
+                TVDispInfo.ucVPosition = *((UCHAR *)inBufPtr);
+                CBIOS_SetTVEncDispRegModify(pRDC, &TVDispInfo, DiffVPos);
+            }
+            return UT_SUCCESS;
+
+        case UT_SET_TV_H_SCALER:
+            {
+                TV_Disp_Info TVDispInfo;
+                
+                int iScaler = *((int *)inBufPtr);
+                if (req->inBufferSize != sizeof(int))
+                    return UT_INVALID;
+                if(iScaler>10)
+                {
+                    iScaler = 10;
+                    xf86DrvMsgVerb(0, X_INFO, DefaultLevel, "RDC: IOCTL TV H Scaler level is out of range\n");
+                }
+                else if((iScaler<-10))
+                {
+                    iScaler = -10;
+                    xf86DrvMsgVerb(0, X_INFO, DefaultLevel, "RDC: IOCTL TV H Scaler level is out of range\n");
+                }
+                TVDispInfo.iHScaler = iScaler;
+                CBIOS_SetTVEncDispRegModify(pRDC, &TVDispInfo, DiffHScaler);
+            }
+            return UT_SUCCESS;
+
+        case UT_SET_TV_V_SCALER:
+            {
+                TV_Disp_Info TVDispInfo;
+                if (req->inBufferSize != sizeof(UCHAR))
+                    return UT_INVALID;
+                TVDispInfo.ucVScaler = *((UCHAR *)inBufPtr);
+                CBIOS_SetTVEncDispRegModify(pRDC, &TVDispInfo, DiffVScaler);
+            }
+            return UT_SUCCESS;
 
         case UT_QUERY_VIDEO_CONTRAST:            
             if (req->outBufferSize != sizeof(ULONG))
@@ -560,7 +667,7 @@ int RDCGFXUtilityProc(xRDCGFXCommandReq* req)
         case UT_SET_VIDEO_CONTRAST:            
             if (req->inBufferSize != sizeof(ULONG))
                 return UT_INVALID;
-                
+
             pRDC->OverlayStatus.VidColorEnhance.ulScaleContrast = *(ULONG*)inBufPtr;
             SetVIDColor(pRDC);
             return UT_SUCCESS;
@@ -611,6 +718,69 @@ int RDCGFXUtilityProc(xRDCGFXCommandReq* req)
             pRDC->OverlayStatus.VidColorEnhance.ulScaleSaturation = *(ULONG*)inBufPtr;
             SetVIDColor(pRDC);
             return UT_SUCCESS;
+
+      
+
+        case UT_QUERY_ROTATION_CAP:
+            if (req->outBufferSize != sizeof(BOOL))
+                return UT_FAIL;
+
+            BOOL *bStatus;
+            bStatus = (BOOL *) outBufPtr;
+            *bStatus = pRDC->bRandRRotation;
+            
+            return UT_SUCCESS;
+
+        case UT_SET_HDMI_UNDERSCAN_PERSENT:
+            if (req->inBufferSize != sizeof(WORD))
+                return UT_FAIL;
+
+            pRDC->bHRatio = *((WORD *)inBufPtr) & 0x00FF;
+            pRDC->bVRatio = (*((WORD *)inBufPtr)>>8) & 0xFF;
+            return UT_SUCCESS;
+
+        case UT_QUERY_HDMI_UNDERSCAN_PERSENT:
+            if (req->outBufferSize != sizeof(WORD))
+                return UT_FAIL;
+
+            *(WORD *) outBufPtr = (pRDC->bVRatio<<8) | pRDC->bHRatio;
+            return UT_SUCCESS;
+
+        case UT_QUERY_TV_ENC_ID:
+            if (req->outBufferSize != sizeof(BYTE))
+                return UT_FAIL;
+
+            *((BYTE *) outBufPtr) = Get_TVEnc_TX_ID();
+            return UT_SUCCESS;
+
+        case UT_SET_TV_PANNING_ENABLE:
+            if (req->inBufferSize != sizeof(BOOL))
+                return UT_FAIL;
+
+            pRDC->bEnableTVPanning = *((BOOL *)inBufPtr);
+            return UT_SUCCESS;
+
+        case UT_QUERY_TV_PANNING_ENABLE:
+            if (req->outBufferSize != sizeof(BOOL))
+                return UT_FAIL;
+
+            *(BOOL *) outBufPtr = pRDC->bEnableTVPanning;
+            return UT_SUCCESS;
+
+        case UT_QUERY_TV_DEFAULT_VALUE:
+            {
+                PTV_Disp_Info pTVDispInfo;
+                if (req->outBufferSize != sizeof(TV_Disp_Info))
+                    return UT_FAIL;
+                GetFS473PositionFromVBIOS(pRDC);
+                pTVDispInfo              = (PTV_Disp_Info) outBufPtr;
+                pTVDispInfo->ucCCRSLevel = 0;
+                pTVDispInfo->ucHPosition = pRDC->TVEncoderInfo[0].ucHPosition;
+                pTVDispInfo->ucVPosition = pRDC->TVEncoderInfo[0].ucVPosition;
+                pTVDispInfo->iHScaler    = 0;
+                pTVDispInfo->ucVScaler   = 0;
+                return UT_SUCCESS;
+            }
 #if 0
 
 #endif
@@ -623,12 +793,9 @@ int RDCGFXUtilityProc(xRDCGFXCommandReq* req)
 }
 
 
-int EC_SetLCDPWM(ScrnInfoPtr pScrn, char *level)
+int EC_SetLCDPWM(RDCRecPtr pRDC, char *level)
 {
-    RDCRecPtr pRDC = RDCPTR(pScrn);
-    int iLevel;
-
-    xf86DrvMsgVerb(pScrn->scrnIndex, X_INFO, 5, "==Enter EC_SetLCDPWM()== \n");
+    xf86DrvMsgVerb(0, X_INFO, 5, "==Enter EC_SetLCDPWM() level == \n");
 
     
     
@@ -637,24 +804,21 @@ int EC_SetLCDPWM(ScrnInfoPtr pScrn, char *level)
     if (!pRDC->ECChipInfo.bECExist)
         return FALSE;
 
-    iLevel = *level;
+    
+    if (*level == 0)
+        *level = 1;
 
-    
-    if (iLevel == 0)
-        iLevel = 1;
-    
     EC_WritePortUchar((BYTE*)0x66, 0x40);
-    EC_WritePortUchar((BYTE*)0x62, (BYTE)iLevel);
+    EC_WritePortUchar((BYTE*)0x62, (BYTE)*level);
         
     return UT_SUCCESS;
 }
 
 
-int EC_QueryLCDPWM(ScrnInfoPtr pScrn, char *level)
+int EC_QueryLCDPWM(RDCRecPtr pRDC, char *level)
 {
-    xf86DrvMsgVerb(pScrn->scrnIndex, X_INFO, 5, "==Enter EC_QueryLCDPWM()== \n");
+    xf86DrvMsgVerb(0, X_INFO, 5, "==Enter EC_QueryLCDPWM()== \n");
 
-    RDCRecPtr pRDC = RDCPTR(pScrn);
     int bSuccess = EC_ACCESS_FAIL;
     BYTE bLevel;
 
@@ -681,6 +845,143 @@ int EC_QueryLCDPWM(ScrnInfoPtr pScrn, char *level)
     else
     {
         *level = bLevel;
+        xf86DrvMsgVerb(0, X_INFO, 5, "==EC PWM Level=%d == \n", bLevel);
         return UT_SUCCESS;
     }
 }
+
+void GetSAA7105CCRSLevel(UCHAR ucI2Cport, UCHAR ucDevAddress, UCHAR *Level)
+{
+    UCHAR bTmpData;
+    
+    *Level = (bTmpData & 0x3F)>>6;
+    xf86DrvMsgVerb(0, 0, 4, "==CCRS Level Get Data =%x==\n",*Level);
+}
+
+UCHAR ucGetTV_CVBS_CCRSLevel(UCHAR *Level)
+{
+    ScrnInfoPtr pScrn = xf86Screens[g_ScreenNumber];
+    RDCRecPtr pRDC = RDCPTR(pScrn);
+    BYTE bI2CPort;
+    CBIOS_ARGUMENTS *pCBiosArguments = pRDC->pCBIOSExtension->pCBiosArguments;
+
+    
+    pCBiosArguments = pRDC->pCBIOSExtension->pCBiosArguments;
+    
+    
+    xf86DrvMsgVerb(pScrn->scrnIndex, X_INFO, ErrorLevel, " Query External Device Info \n");
+
+    
+    memset(pCBiosArguments, 0, sizeof(CBIOS_ARGUMENTS));
+    pCBiosArguments->AX = OEMFunction;
+    pCBiosArguments->BX = QueryExternalDeviceInfo;
+    
+    CInt10(pRDC->pCBIOSExtension);
+    if(pCBiosArguments->AX == VBEFunctionCallSuccessful)
+    {
+        bI2CPort = (BYTE)(pCBiosArguments->Edx >> 16);
+        if((pCBiosArguments->BL>>4) == TVEnc_SAA7105)
+            GetSAA7105CCRSLevel(bI2CPort,0x88, Level);
+    }
+    xf86DrvMsgVerb(0, X_INFO, InfoLevel, "CCRSLevel Get = %x\n",*Level);
+    return TRUE;
+}
+
+void GetFS473PositionFromVBIOS(RDCRecPtr pRDC)
+{
+    
+    USHORT   wHres;
+    VIDEOMODE *pVidMode = &(pRDC->VideoModeInfo);
+    
+    if(pRDC->bEnableTVPanning)
+        wHres = pRDC->TVEncoderInfo[0].TVOut_HSize;
+    else
+        wHres = pVidMode->ScreenWidth;
+        
+    switch(wHres)    
+    {
+        case 640:
+            if(pRDC->TVEncoderInfo[0].TVType) 
+            {
+                pRDC->TVEncoderInfo[0].ucHPosition = 0x1a;
+                pRDC->TVEncoderInfo[0].ucVPosition = 0x2c;
+            }else 
+            {
+                pRDC->TVEncoderInfo[0].ucHPosition = 0x5b;
+                pRDC->TVEncoderInfo[0].ucVPosition = 0x18;
+            }
+        break;
+        case 720:
+            if(pRDC->TVEncoderInfo[0].TVType) 
+            {
+                pRDC->TVEncoderInfo[0].ucHPosition = 0x30;
+                pRDC->TVEncoderInfo[0].ucVPosition = 0x20;
+            }else 
+            {
+                pRDC->TVEncoderInfo[0].ucHPosition = 0x20;
+                pRDC->TVEncoderInfo[0].ucVPosition = 0x16;
+            }
+        break;
+        case 800:        
+            if(pRDC->TVEncoderInfo[0].TVType) 
+            {
+                pRDC->TVEncoderInfo[0].ucHPosition = 0x41;
+                pRDC->TVEncoderInfo[0].ucVPosition = 0x43;
+            }else 
+            {
+                pRDC->TVEncoderInfo[0].ucHPosition = 0x8b;
+                pRDC->TVEncoderInfo[0].ucVPosition = 0x1b;
+            }
+        break;
+        case 1024:        
+            if(pRDC->TVEncoderInfo[0].TVType) 
+            {
+                pRDC->TVEncoderInfo[0].ucHPosition = 0x42;
+                pRDC->TVEncoderInfo[0].ucVPosition = 0x57;
+            }else 
+            {
+                pRDC->TVEncoderInfo[0].ucHPosition = 0x32;
+                pRDC->TVEncoderInfo[0].ucVPosition = 0x26;
+            }
+        break;
+        default:
+            pRDC->TVEncoderInfo[0].ucHPosition = 0xa0;
+            pRDC->TVEncoderInfo[0].ucVPosition = 0x2a;
+        break;
+    }
+    pRDC->TVEncoderInfo[0].iHScaler = 0;
+}
+
+void CBIOS_SetTVEncDispRegModify(RDCRecPtr pRDC, PTV_Disp_Info pTVDispInfo, BYTE bChange)
+{
+    CBIOS_ARGUMENTS *pCBiosArguments = pRDC->pCBIOSExtension->pCBiosArguments;
+    CBTV_Disp_Info   CBTVDispInfo;
+
+    memcpy(&CBTVDispInfo,pTVDispInfo,sizeof(TV_Disp_Info));
+    CBTVDispInfo.bTVType           = pRDC->TVEncoderInfo[TV_1].TVType;
+    CBTVDispInfo.bChange           = bChange;
+    CBTVDispInfo.bEnableHPanning   = pRDC->TVEncoderInfo[TV_1].bEnableHPanning;
+    CBTVDispInfo.wTVOut_HSize      = pRDC->TVEncoderInfo[TV_1].TVOut_HSize;
+    CBTVDispInfo.wModeHres         = pRDC->TVEncoderInfo[TV_1].ModeHSize;    
+
+    
+    memset(pCBiosArguments, 0, sizeof(CBIOS_ARGUMENTS));
+    pCBiosArguments->AX  = OEMFunction;
+    pCBiosArguments->BX  = SetTVFunction;
+    pCBiosArguments->Ecx = (DWORD)(&CBTVDispInfo);
+    
+    
+    CInt10(pRDC->pCBIOSExtension);
+    
+    if(bChange & DiffCCRS)
+        xf86DrvMsgVerb(0, X_INFO, DefaultLevel, "TV CCRS Level =%x\n", CBTVDispInfo.ucCCRSLevel);
+    if(bChange & DiffVScaler)
+        xf86DrvMsgVerb(0, X_INFO, DefaultLevel, "TV  V Scaler  =%x\n", CBTVDispInfo.ucVScaler);
+    if(bChange & DiffHPos)
+        xf86DrvMsgVerb(0, X_INFO, DefaultLevel, "TV H Position =%x\n", CBTVDispInfo.ucHPosition);
+    if(bChange & DiffVPos)
+        xf86DrvMsgVerb(0, X_INFO, DefaultLevel, "TV V Position =%x\n", CBTVDispInfo.ucVPosition);
+    if(bChange & DiffHScaler)
+        xf86DrvMsgVerb(0, X_INFO, DefaultLevel, "TV  H Scaler  =%d\n", CBTVDispInfo.iHScaler);
+}
+

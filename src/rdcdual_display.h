@@ -17,14 +17,23 @@
  * For technical support : 
  *     <rdc_xorg@rdc.com.tw>
  */
+#ifndef _RDCDUAL_DISPLAY_H_
+#define _RDCDUAL_DISPLAY_H_
+
+#include "xorgVersion.h"
 
 
+void rdcPipeSetBase(xf86CrtcPtr crtc, int x, int y);
+void rdcWaitForVblank(ScrnInfoPtr pScrn);
+void rdc0DescribeOutputConfiguration(ScrnInfoPtr pScrn);
+void rdc_set_new_crtc_bo(ScrnInfoPtr pScrn);
+void rdc_crtc_disable(xf86CrtcPtr crtc, Bool disable_pipe);
 
-#define VIDEOMEM_SIZE_04M       0x00400000
-#define VIDEOMEM_SIZE_08M       0x00800000
-#define VIDEOMEM_SIZE_16M       0x01000000
-#define VIDEOMEM_SIZE_32M       0x02000000
-#define VIDEOMEM_SIZE_64M       0x04000000
-#define VIDEOMEM_SIZE_128M      0x08000000
-#define VIDEOMEM_SIZE_256M      0x10000000
-#define VIDEOMEM_SIZE_512M      0x20000000
+xf86CrtcPtr rdcGetLoadDetectPipe(xf86OutputPtr output, DisplayModePtr mode, int *dpms_mode);
+void rdcReleaseLoadDetectPipe(xf86OutputPtr output, int dpms_mode);
+void rdc_crtc_init(ScrnInfoPtr pScrn, int pipe);
+DisplayModePtr i830_crtc_mode_get(ScrnInfoPtr pScrn, xf86CrtcPtr crtc);
+void rdc_output_prepare (xf86OutputPtr output);
+void rdc_output_commit (xf86OutputPtr output);
+
+#endif

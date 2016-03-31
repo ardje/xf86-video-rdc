@@ -18,13 +18,22 @@
  *     <rdc_xorg@rdc.com.tw>
  */
 
+#define     XPCBIOS             0
+#define     XORGCBIOS           1
 
+#if XPCBIOS
+#include "Minidrv.h"
+    #if WDDM_DRV
+    
+        #define CBIOSDebugPrint(x)
+    #else
+    
+        #define CBIOSDebugPrint(x) VideoPortDebugPrint x 
+    #endif
+#endif
 
-#define VIDEOMEM_SIZE_04M       0x00400000
-#define VIDEOMEM_SIZE_08M       0x00800000
-#define VIDEOMEM_SIZE_16M       0x01000000
-#define VIDEOMEM_SIZE_32M       0x02000000
-#define VIDEOMEM_SIZE_64M       0x04000000
-#define VIDEOMEM_SIZE_128M      0x08000000
-#define VIDEOMEM_SIZE_256M      0x10000000
-#define VIDEOMEM_SIZE_512M      0x20000000
+#if XORGCBIOS
+#include "xf86.h"
+#define CBIOSDebugPrint(x) xf86ErrorFVerb x
+#endif
+

@@ -1,35 +1,27 @@
-/*
+/* 
  * Copyright (C) 2009 RDC Semiconductor Co.,Ltd
- * All Rights Reserved.
  *
- * Permission is hereby granted, free of charge, to any person obtaining a
- * copy of this software and associated documentation files (the
- * "Software"), to deal in the Software without restriction, including
- * without limitation the rights to use, copy, modify, merge, publish,
- * distribute, sub license, and/or sell copies of the Software, and to
- * permit persons to whom the Software is furnished to do so, subject to
- * the following conditions:
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
- * The above copyright notice and this permission notice (including the
- * next paragraph) shall be included in all copies or substantial portions
- * of the Software.
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
  *
- * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS
- * OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
- * MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NON-INFRINGEMENT.
- * IN NO EVENT SHALL PRECISION INSIGHT AND/OR ITS SUPPLIERS BE LIABLE FOR
- * ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,
- * TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE
- * SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+ * You should have received a copy of the GNU General Public License
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  * For technical support : 
  *     <rdc_xorg@rdc.com.tw>
  */
- 
+
 
 #include "xf86.h"
 
-// VIDEO Register definition VPOST
+
 #define MMIOBASE_VIDEO                  0x600
 #define VP_VIDEO_SIZE                   0x620
 #define VP_RO_REG                       0x624
@@ -58,7 +50,7 @@
 #define VP_YV12_V_Base                  0x680
 #define VP_ROTATION_CTL                 0x684
 
-// VIDEO Register definition VPOST FROM CMDQ
+
 #define VP_VIDEO_SIZE_I                 0x08000000
 #define VP_RO_REG_I                     0x09000000
 #define VP_PARAMETERS_QUALITY_I         0x0A000000
@@ -84,7 +76,7 @@
 #define VP_YV12_V_BASE_I                0x20000000
 #define VP_ROTATION_CTL_I               0x21000000
 
-// vieo post states
+
 #define VPS_STREAM_YUY2                 0
 #define VPS_STREAM_NV12                 0x10000000
 #define VPS_STREAM_YV12                 0x20000000
@@ -118,8 +110,9 @@
 #define VPS_RGB32_OUTPUT                BIT31
 #define VPS_ROTATION_ENABLE             BIT31
 #define VPS_IDEL_RO_REG                 BIT0
+#define VPS_COLOR_HNHANCE               BIT28
 
-// VIDEO Register definition VDISP
+
 #define VDP_CTL                         0x700
 #define VDP_REG_UPDATE_MOD_SELECT       0x704
 #define VDP_FIFO_THRESHOLD              0x708
@@ -145,7 +138,7 @@
 #define VID_Enable                      1
 #define VID_Disable                     0
 
-// VIDEO Register FROM CMDQ definition VDISP 
+
 #define VDP_CTL_I                    0x40000000
 #define VDP_REG_UPDATE_MOD_SELECT_I  0x41000000
 #define VDP_FIFO_THRESHOLD_I         0x42000000
@@ -168,7 +161,7 @@
 #define VDP_COLOR_ENHANCE_CTL4_I     0x53000000
 #define VDP_SECOND_COLORKEY_I        0x54000000
 
-// VIDEO states
+
 #define VDPS_ENABLE                     BIT0
 #define VDPS_SW_FLIP                    0x00010000
 #define VDPS_HW_FLIP                    0
@@ -184,6 +177,9 @@
 #define VDPS_H_INTERP                   BIT30
 #define VDPS_V_ZOOM_ENABLE              BIT15
 #define VDPS_V_INTERP                   BIT14
+#define VDPS_STREAM_RGB16               0x00000004
+#define VDPS_CSC_DISENABLE              BIT1
+#define VDPS_COLOR_HNHANCE              BIT17
 
 typedef struct {
      
@@ -238,7 +234,7 @@ typedef struct {
     long            contrast;
     long            hue;
     RegionRec       clip;
-    CARD32          colorkey;
+    ULONG          colorkey;
 
     
     
@@ -251,11 +247,31 @@ typedef struct {
     
 	FBLinearPtr     PackedBuf[3];     
 	unsigned long   PackedBufOffset[3];
-	unsigned long   PackedBufStride[3];
+	unsigned long   PackedBufStride[3]; 
 
+    
+    unsigned long   ulVPOSTVideoSrcHorSize;
+    unsigned long   ulVPOSTVideoSrcVerSize;
+    unsigned long   ulVPOSTVideoDstHorSize;
+    unsigned long   ulVPOSTVideoDstVerSize;
+
+    
 	int             YUVFormat;
+    unsigned long   ulOverlaySrcHorSize;
+    unsigned long   ulOverlaySrcVerSize;
+    unsigned long   ulOverlayDstHorSize;
+    unsigned long   ulOverlayDstVerSize;
     OV_RECTL        rDst;
     OV_RECTL        rSrc;
-    unsigned long   SrcPitch;
+    
+    
+    unsigned long   SrcPitch; 
 } RDCPortPrivRec, *RDCPortPrivPtr;
+
+
+#define VP_SRC_MAX_WIDTH            1920
+
+
+
+#define PATCH_YV12_WIDTH            784  
 
