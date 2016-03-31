@@ -51,7 +51,6 @@
 #include <X11/extensions/Xv.h>
 #include "vbe.h"
 
-#include "xf86PciInfo.h"
 #include "xf86Pci.h"
 
 
@@ -123,12 +122,12 @@ static Bool rdc_pci_probe (DriverPtr drv, int entity_num, struct pci_device *dev
 static Bool RDCProbe(DriverPtr drv, int flags);
 #endif
 static Bool RDCPreInit(ScrnInfoPtr pScrn, int flags);
-static Bool RDCScreenInit(ScreenPtr pScreen, ScreenPtr pScreen, int argc, char **argv);
-Bool RDCSwitchMode(ScreenPtr pScreen, DisplayModePtr mode);
-void RDCAdjustFrame(ScreenPtr pScreen, int x, int y);
-static Bool RDCEnterVT(ScreenPtr pScreen);
-static void RDCLeaveVT(ScreenPtr pScreen);
-static void RDCFreeScreen(ScreenPtr pScreen);
+static Bool RDCScreenInit(ScreenPtr pScreen, int argc, char **argv);
+Bool RDCSwitchMode(ScrnInfoPtr pScrn, DisplayModePtr mode);
+void RDCAdjustFrame(ScrnInfoPtr pScrn, int x, int y);
+static Bool RDCEnterVT(ScrnInfoPtr pScrn);
+static void RDCLeaveVT(ScrnInfoPtr pScrn);
+static void RDCFreeScreen(ScrnInfoPtr pScrn);
 static ModeStatus RDCValidMode(ScrnInfoPtr pScrn, DisplayModePtr mode, Bool verbose, int flags);
 
 
@@ -1410,7 +1409,7 @@ RDCScreenInit(ScreenPtr pScreen, int argc, char **argv)
     {
         if (!RDCAccelInit(pScreen))
         {
-            xf86DrvMsg(scrnIndex, X_ERROR, "Hardware acceleration initialization failed\n");
+            xf86DrvMsg(pScrn->scrnIndex, X_ERROR, "Hardware acceleration initialization failed\n");
             pRDC->noAccel = TRUE;           
         }
     }
@@ -1522,7 +1521,7 @@ RDCScreenInit(ScreenPtr pScreen, int argc, char **argv)
     return TRUE;
 } 
 
-Bool RDCSwitchMode(ScrnInfoPtr pScrn, DisplayModePtr mode, int flags)
+Bool RDCSwitchMode(ScrnInfoPtr pScrn, DisplayModePtr mode)
 {
     RDCRecPtr pRDC = RDCPTR(pScrn);
     Bool RetStatus = FALSE;
@@ -2452,7 +2451,7 @@ RDCModeInit(ScrnInfoPtr pScrn, DisplayModePtr mode)
     
     pRDC->HWCInfo.iScreenOffset_x = 0;
     pRDC->HWCInfo.iScreenOffset_y = 0;
-    RDCAdjustFrame(pScrn->scrnIndex, 0, 0);
+    RDCAdjustFrame(pScrn, 0, 0);
  
     vgaHWProtect(pScrn, FALSE);
 
@@ -2681,7 +2680,7 @@ RDCRandRSetConfig(ScrnInfoPtr pScrn, xorgRRConfig *config)
     
     *ROTAP_CTL0 = ulROTAP_CTL0;
     
-    RDCAdjustFrame(pScrn->scrnIndex, 0, 0);
+    RDCAdjustFrame(pScrn, 0, 0);
     
     return TRUE;
 }
