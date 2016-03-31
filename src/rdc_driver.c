@@ -148,7 +148,7 @@ Bool RDCRandRSetConfig(ScrnInfoPtr pScrn, xorgRRConfig *config);
 Bool RDCDriverFunc(ScrnInfoPtr pScrn, xorgDriverFuncOp op, pointer data);
 void RDCApertureInit(ScrnInfoPtr pScrn);
 void TurnDirectAccessFBON(ScrnInfoPtr pScrn, Bool bTurnOn);
-void RDCPointerMoved(int index, int x, int y);
+void RDCPointerMoved(ScrnInfoPtr pScrn, int x, int y);
 void vUpdateHDMIFakeMode(ScrnInfoPtr pScrn);
 
 
@@ -2768,7 +2768,7 @@ void TurnDirectAccessFBON(ScrnInfoPtr pScrn, Bool bTurnOn)
 
 
 void
-RDCPointerMoved(int index, int x, int y)
+RDCPointerMoved(ScrnInfoPtr pScrn, int x, int y)
 {
 
 }
