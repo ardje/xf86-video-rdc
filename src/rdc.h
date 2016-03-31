@@ -85,8 +85,8 @@
 #endif
 
 
-#define     Accel_2D_DEBUG          0
-#define     HWC_DEBUG               0
+#define     Accel_2D_DEBUG          1
+#define     HWC_DEBUG               1
 #define     CR_FENCE_ID             0
 
 
