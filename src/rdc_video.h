@@ -119,6 +119,7 @@
 #define VPS_RGB32_OUTPUT                BIT31
 #define VPS_ROTATION_ENABLE             BIT31
 #define VPS_IDEL_RO_REG                 BIT0
+#define VPS_COLOR_HNHANCE               BIT28
 
 // VIDEO Register definition VDISP
 #define VDP_CTL                         0x700
@@ -185,6 +186,9 @@
 #define VDPS_H_INTERP                   BIT30
 #define VDPS_V_ZOOM_ENABLE              BIT15
 #define VDPS_V_INTERP                   BIT14
+#define VDPS_STREAM_RGB16               0x00000004
+#define VDPS_CSC_DISENABLE              BIT1
+#define VDPS_COLOR_HNHANCE              BIT17
 
 typedef struct {
      
@@ -239,7 +243,7 @@ typedef struct {
     long            contrast;
     long            hue;
     RegionRec       clip;
-    CARD32          colorkey;
+    ULONG           colorkey;
 
     
     
@@ -254,9 +258,23 @@ typedef struct {
 	unsigned long   PackedBufOffset[3];
 	unsigned long   PackedBufStride[3];
 
+    unsigned long   ulVPOSTVideoSrcHorSize;
+    unsigned long   ulVPOSTVideoSrcVerSize;
+    unsigned long   ulVPOSTVideoDstHorSize;
+    unsigned long   ulVPOSTVideoDstVerSize;
+
+
 	int             YUVFormat;
+    unsigned long   ulOverlaySrcHorSize;
+    unsigned long   ulOverlaySrcVerSize;
+    unsigned long   ulOverlayDstHorSize;
+    unsigned long   ulOverlayDstVerSize;
+
     OV_RECTL        rDst;
     OV_RECTL        rSrc;
     unsigned long   SrcPitch;
 } RDCPortPrivRec, *RDCPortPrivPtr;
 
+#define VP_SRC_MAX_WIDTH            1920
+
+#define PATCH_YV12_WIDTH            784
