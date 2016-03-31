@@ -592,6 +592,7 @@ RDCPreInit(ScrnInfoPtr pScrn, int flags)
         xf86DrvMsgVerb(pScrn->scrnIndex, X_INFO, ErrorLevel, "==Exit7 RDCPreInit()== return FALSE\n");
         return FALSE;
     }
+    vgaHWSetStdFuncs(VGAHWPTR(pScrn));
     hwp = VGAHWPTR(pScrn);
  
     
@@ -935,7 +936,9 @@ RDCPreInit(ScrnInfoPtr pScrn, int flags)
         return FALSE;
     }
 
+    rdcLog("Prune");
     xf86PruneDriverModes(pScrn);
+    rdcLog("Prune");
 
     if (!i || !pScrn->modes)
     {
@@ -945,10 +948,12 @@ RDCPreInit(ScrnInfoPtr pScrn, int flags)
         return FALSE;
     }
 
+    rdcLog("crtc");
     xf86SetCrtcForModes(pScrn, INTERLACE_HALVE_V);
  
     pScrn->currentMode = pScrn->modes;
  
+    rdcLog("Printmodes");
     xf86PrintModes(pScrn);
  
     xf86SetDpi(pScrn, 0, 0);
@@ -1011,6 +1016,7 @@ RDCPreInit(ScrnInfoPtr pScrn, int flags)
 #endif
         
         pRDC->noAccel = FALSE; 
+    rdcLog("Meeh");
        
         pRDC->MMIO2D = TRUE;
 #ifndef    MMIO_2D                   
@@ -1031,21 +1037,26 @@ RDCPreInit(ScrnInfoPtr pScrn, int flags)
    }
 #endif   
 
+    rdcLog("Meeh");
     
     RDCSetHWCaps(pRDC);
+    rdcLog("Meeh");
     
     
     pRDC->noHWC = TRUE; 
     pRDC->HWCInfoPtr = NULL;
 #ifdef HWC   
+    rdcLog("Meeh");
     if (!xf86ReturnOptValBool(pRDC->Options, OPTION_SW_CURSOR, FALSE))
     {
+    rdcLog("Meeh");
         if (!xf86LoadSubModule(pScrn, "ramdac"))
         {
             RDCFreeRec(pScrn);
             xf86DrvMsgVerb(0, X_INFO, ErrorLevel, "==Exit23 RDCPreInit()== return FALSE\n");
             return FALSE;
         }
+    rdcLog("Meeh");
       
         pRDC->noHWC = FALSE;  
         pRDC->HWCInfo.HWC_NUM = DEFAULT_HWC_NUM;
@@ -1054,6 +1065,7 @@ RDCPreInit(ScrnInfoPtr pScrn, int flags)
         {
             xf86DrvMsgVerb(pScrn->scrnIndex, X_INFO, InfoLevel, "No HWC_NUM options found\n");          
         }    
+    rdcLog("Meeh");
 
         if (pRDC->ENGCaps & ENG_CAP_HWC_MMIO)
             pRDC->AvailableFBsize = 
@@ -1061,17 +1073,23 @@ RDCPreInit(ScrnInfoPtr pScrn, int flags)
         else
             pRDC->AvailableFBsize = 
                 pRDC->AvailableFBsize - (HWC_SIZE+HWC_SIGNATURE_SIZE)*pRDC->HWCInfo.HWC_NUM;
+    rdcLog("Meeh");
                 
         pRDC->HWCInfo.ulHWCOffsetAddr = pRDC->AvailableFBsize;
     }    
 #endif
+    rdcLog("Meeh");
 
     
 #ifndef XSERVER_LIBPCIACCESS
+    rdcLog("Meeh");
     xf86SetOperatingState(resVgaIo, pRDC->pEnt->index, ResUnusedOpr);
+    rdcLog("Meeh");
     xf86SetOperatingState(resVgaMem, pRDC->pEnt->index, ResDisableOpr);
 #endif
+    rdcLog("Meeh");
     xf86DrvMsgVerb(pScrn->scrnIndex, X_INFO, DefaultLevel, "==Exit24 RDCPreInit()== return TRUE\n");
+    rdcLog("Meeh");
     return TRUE;
 }
 
@@ -1088,11 +1106,14 @@ RDCScreenInit(ScreenPtr pScreen, int argc, char **argv)
     BoxRec FBMemBox;   
     int    AvailFBSize;     
 
+    rdcLog("Meeh");
     xf86DrvMsgVerb(pScrn->scrnIndex, X_INFO, DefaultLevel, "==Enter RDCScreenInit()== \n");
     
+    rdcLog("Meeh");
     pRDC = RDCPTR(pScrn);
     hwp = VGAHWPTR(pScrn);
       
+    rdcLog("Meeh");
     
     AvailFBSize = pRDC->AvailableFBsize;
 
@@ -1106,13 +1127,16 @@ RDCScreenInit(ScreenPtr pScreen, int argc, char **argv)
     xf86DrvMsgVerb(pScrn->scrnIndex, X_INFO, InfoLevel, "AvailFBSize = %d\n", AvailFBSize);
     xf86DrvMsgVerb(pScrn->scrnIndex, X_INFO, InfoLevel, "FBMemBox: x1 = %d, y1 = %d, x2 = %d, y2 = %d\n",FBMemBox.x1, FBMemBox.y1, FBMemBox.x2, FBMemBox.y2);
 
+    rdcLog("Meeh");
     if (!xf86InitFBManager(pScreen, &FBMemBox))
     {
         xf86DrvMsg(pScrn->scrnIndex, X_ERROR, "Failed to init memory manager\n");
         return FALSE;
     }      
+    rdcLog("Meeh");
        
     vgaHWGetIOBase(hwp);
+    rdcLog("Meeh");
  
     vFillRDCModeInfo (pScrn);      
  
