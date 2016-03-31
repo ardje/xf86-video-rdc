@@ -725,27 +725,35 @@ RDCPreInit(ScrnInfoPtr pScrn, int flags)
  
     
     pRDC->bHRatio = pRDC->bVRatio = 100;
-    if (!xf86GetOptValULong(pRDC->Options, OPTION_HRATIO, &pRDC->bHRatio)) 
     {
-        xf86DrvMsgVerb(pScrn->scrnIndex, X_INFO, InfoLevel, "No HDMI underscan horizotal ratio options found\n");          
-    }
-    else
-    {
-        if(pRDC->bHRatio > 100)
-            pRDC->bHRatio = 100;
-        xf86DrvMsgVerb(pScrn->scrnIndex, X_INFO, InfoLevel, "HDMI underscan horizotal ratio %d\n",pRDC->bHRatio); 
-    }
+        long unsigned int value;
+        if (!xf86GetOptValULong(pRDC->Options, OPTION_HRATIO, &value)) 
+        {
+            xf86DrvMsgVerb(pScrn->scrnIndex, X_INFO, InfoLevel, "No HDMI underscan horizotal ratio options found\n");          
+        }
+        else
+        {
+	    
+            if(value > 100)
+                pRDC->bHRatio = 100;
+            else
+                pRDC->bHRatio=(BYTE) value;
+            xf86DrvMsgVerb(pScrn->scrnIndex, X_INFO, InfoLevel, "HDMI underscan horizotal ratio %d\n",pRDC->bHRatio); 
+        }
 
-    
-    if (!xf86GetOptValULong(pRDC->Options, OPTION_VRATIO, &pRDC->bVRatio)) 
-    {
-        xf86DrvMsgVerb(pScrn->scrnIndex, X_INFO, InfoLevel, "No HDMI underscan vertical ratio options found\n");          
-    }
-    else
-    {      
-        if(pRDC->bVRatio > 100)
-            pRDC->bVRatio = 100;
-        xf86DrvMsgVerb(pScrn->scrnIndex, X_INFO, InfoLevel, "HDMI underscan vertical ratio %d\n",pRDC->bVRatio);    
+        
+        if (!xf86GetOptValULong(pRDC->Options, OPTION_VRATIO, &value)) 
+        {
+            xf86DrvMsgVerb(pScrn->scrnIndex, X_INFO, InfoLevel, "No HDMI underscan vertical ratio options found\n");          
+        }
+        else
+        {      
+            if(value > 100)
+                pRDC->bVRatio = 100;
+            else
+                pRDC->bVRatio = (BYTE) value; 
+            xf86DrvMsgVerb(pScrn->scrnIndex, X_INFO, InfoLevel, "HDMI underscan vertical ratio %d\n",pRDC->bVRatio);    
+        }
     }
 
     
