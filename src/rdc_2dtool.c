@@ -1,31 +1,23 @@
-/*
+/* 
  * Copyright (C) 2009 RDC Semiconductor Co.,Ltd
- * All Rights Reserved.
  *
- * Permission is hereby granted, free of charge, to any person obtaining a
- * copy of this software and associated documentation files (the
- * "Software"), to deal in the Software without restriction, including
- * without limitation the rights to use, copy, modify, merge, publish,
- * distribute, sub license, and/or sell copies of the Software, and to
- * permit persons to whom the Software is furnished to do so, subject to
- * the following conditions:
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
- * The above copyright notice and this permission notice (including the
- * next paragraph) shall be included in all copies or substantial portions
- * of the Software.
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
  *
- * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS
- * OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
- * MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NON-INFRINGEMENT.
- * IN NO EVENT SHALL PRECISION INSIGHT AND/OR ITS SUPPLIERS BE LIABLE FOR
- * ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,
- * TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE
- * SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+ * You should have received a copy of the GNU General Public License
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  * For technical support : 
  *     <rdc_xorg@rdc.com.tw>
  */
- 
+
 
 #ifdef HAVE_CONFIG_H
 #include <config.h>
@@ -35,7 +27,7 @@
 #include "xf86_OSproc.h"
 #include "xf86cmap.h"
 #include "compiler.h"
-//#include "mibstore.h"
+#include "mibstore.h"
 #include "vgaHW.h"
 #include "mipointer.h"
 #include "micmap.h"
@@ -46,15 +38,17 @@
 #include <X11/extensions/Xv.h>
 #include "vbe.h"
 
+#include "xf86PciInfo.h"
 #include "xf86Pci.h"
 
 
 #include "xf86fbman.h"
 
-#ifdef USE_XAA
+
+#ifdef HAVE_XAA
 #include "xaa.h"
-#include "xaarop.h"
 #endif
+#include "xaarop.h"
 
 
 #include "exa.h"
@@ -64,22 +58,22 @@
 
 
 #include "rdc.h"
-
-#ifdef Accel_2D
+#include <sys/ioctl.h>
+#include <errno.h>
 
 
 Bool    bInitCMDQInfo(ScrnInfoPtr pScrn, RDCRecPtr pRDC);
-Bool    bEnableCMDQ(ScrnInfoPtr pScrn, RDCRecPtr pRDC);
-Bool    bEnable2D(ScrnInfoPtr pScrn, RDCRecPtr pRDC);
-void    vDisable2D(ScrnInfoPtr pScrn, RDCRecPtr pRDC);
-void    vWaitEngIdle(ScrnInfoPtr pScrn, RDCRecPtr pRDC);    
+Bool    bEnableCMDQ(RDCRecPtr pRDC);
+Bool    bEnable2D(RDCRecPtr pRDC);
+void    vDisable2D(RDCRecPtr pRDC);
+void    vWaitEngIdle(RDCRecPtr pRDC);    
 UCHAR   *pjRequestCMDQ(RDCRecPtr pRDC, ULONG   ulDataLen);
 
 Bool    bCRInitCMDQInfo(ScrnInfoPtr pScrn, RDCRecPtr pRDC);
-Bool    bCREnableCMDQ(ScrnInfoPtr pScrn, RDCRecPtr pRDC);
-Bool    bCREnable2D(ScrnInfoPtr pScrn, RDCRecPtr pRDC);
-void    vCRDisable2D(ScrnInfoPtr pScrn, RDCRecPtr pRDC);
-void    vCRWaitEngIdle(ScrnInfoPtr pScrn, RDCRecPtr pRDC);    
+Bool    bCREnableCMDQ(RDCRecPtr pRDC);
+Bool    bCREnable2D(RDCRecPtr pRDC);
+void    vCRDisable2D(RDCRecPtr pRDC);
+void    vCRWaitEngIdle(RDCRecPtr pRDC);    
 
 Bool
 bInitCMDQInfo(ScrnInfoPtr pScrn, RDCRecPtr pRDC)
@@ -113,112 +107,105 @@ bInitCMDQInfo(ScrnInfoPtr pScrn, RDCRecPtr pRDC)
     {        
         pRDC->CMDQInfo.ulCMDQType = VM_CMD_MMIO;        
     }
-       
+
+    pRDC->CMDQInfo.bInitialized = TRUE;
+    
     return (TRUE);    
 }
 
 Bool
-bEnableCMDQ(ScrnInfoPtr pScrn, RDCRecPtr pRDC)
+bEnableCMDQ(RDCRecPtr pRDC)
 {
     ULONG ulVMCmdQBasePort = 0;
     
     xf86DrvMsgVerb(0, X_INFO, InternalLevel, "==Entry Enable CMDQ== \n");
 
-    vWaitEngIdle(pScrn, pRDC);  
-
-    
-    switch (pRDC->CMDQInfo.ulCMDQType)
+    if (!pRDC->IoctlCR)
     {
-    case VM_CMD_QUEUE:
-        ulVMCmdQBasePort  = pRDC->CMDQInfo.ulCMDQOffsetAddr >> 3;
- 
-        
-        ulVMCmdQBasePort |= 0xF0000000;               
+        vWaitEngIdle(pRDC);  
 
         
-        switch (pRDC->CMDQInfo.ulCMDQSize)
+        switch (pRDC->CMDQInfo.ulCMDQType)
         {
-        case CMD_QUEUE_SIZE_256K:
-            ulVMCmdQBasePort |= 0x00000000;   
-            break;
+            case VM_CMD_QUEUE:
+                ulVMCmdQBasePort  = pRDC->CMDQInfo.ulCMDQOffsetAddr >> 3;
+         
+                
+                ulVMCmdQBasePort |= 0xF0000000;               
 
-        case CMD_QUEUE_SIZE_512K:
-            ulVMCmdQBasePort |= 0x04000000;   
-            break;
-      
-        case CMD_QUEUE_SIZE_1M:
-            ulVMCmdQBasePort |= 0x08000000;       
-            break;
-            
-        case CMD_QUEUE_SIZE_2M:
-            ulVMCmdQBasePort |= 0x0C000000;       
-            break;        
-            
-        default:
-            return(FALSE);
-            break;
-        }     
-                                 
-        *(ULONG *) (pRDC->CMDQInfo.pjCmdQBasePort) = ulVMCmdQBasePort;         
-        pRDC->CMDQInfo.ulWritePointer = *(ULONG *) (pRDC->CMDQInfo.pjWritePort) << 3;                 
-        break;
-        
-    case VM_CMD_MMIO:
-        
-        ulVMCmdQBasePort |= 0xF0000000;               
-        ulVMCmdQBasePort |= 0x02000000;            
-        *(ULONG *) (pRDC->CMDQInfo.pjCmdQBasePort) = ulVMCmdQBasePort;                                
-        break;
-        
-    default:
-        return (FALSE);
-        break;
-    }
+                
+                switch (pRDC->CMDQInfo.ulCMDQSize)
+                {
+                    case CMD_QUEUE_SIZE_256K:
+                        ulVMCmdQBasePort |= 0x00000000;   
+                        break;
+
+                    case CMD_QUEUE_SIZE_512K:
+                        ulVMCmdQBasePort |= 0x04000000;   
+                        break;
+                  
+                    case CMD_QUEUE_SIZE_1M:
+                        ulVMCmdQBasePort |= 0x08000000;       
+                        break;
+                        
+                    case CMD_QUEUE_SIZE_2M:
+                        ulVMCmdQBasePort |= 0x0C000000;       
+                        break;        
+                        
+                    default:
+                        return(FALSE);
+                        break;
+                }     
+                                         
+                *(ULONG *) (pRDC->CMDQInfo.pjCmdQBasePort) = ulVMCmdQBasePort;         
+                pRDC->CMDQInfo.ulWritePointer = *(ULONG *) (pRDC->CMDQInfo.pjWritePort) << 3;                 
+                break;
+                
+            case VM_CMD_MMIO:
+                
+                ulVMCmdQBasePort |= 0xF0000000;               
+                ulVMCmdQBasePort |= 0x02000000; 
+                *(ULONG *) (pRDC->CMDQInfo.pjCmdQBasePort) = ulVMCmdQBasePort;                                
+                break;
+                
+            default:
+                return (FALSE);
+                break;
+        }
+    };
 
     return (TRUE);    
 }
 
 Bool
-bEnable2D(ScrnInfoPtr pScrn, RDCRecPtr pRDC)
+bEnable2D(RDCRecPtr pRDC)
 {
 
     xf86DrvMsgVerb(0, X_INFO, InternalLevel, "==Enable 2D== \n");
     
-    SetIndexRegMask(CRTC_PORT, 0xA4, 0xFE, 0x01);        
+    SetIndexRegMask(COLOR_CRTC_INDEX, 0xA4, 0xFE, 0x01);        
 
-    SetIndexRegMask(CRTC_PORT, 0xA3, ~0x20, 0x20);           
+    SetIndexRegMask(COLOR_CRTC_INDEX, 0xA3, ~0x20, 0x20);           
     *(ULONG *)MMIOREG_1ST_FLIP |=  0x80000000;
 
-    if (!bInitCMDQInfo(pScrn, pRDC))
-    {
-        vDisable2D(pScrn, pRDC);      
-        return (FALSE);
-    }
-        
-    if (!bEnableCMDQ(pScrn, pRDC))
-    {
-        vDisable2D(pScrn, pRDC);      
-        return (FALSE);
-    }
-            
     return (TRUE);    
 }
 
 void
-vDisable2D(ScrnInfoPtr pScrn, RDCRecPtr pRDC)
+vDisable2D(RDCRecPtr pRDC)
 {
    xf86DrvMsgVerb(0, X_INFO, InternalLevel, "==Engine Disable 2D== \n");
 
-    vWaitEngIdle(pScrn, pRDC);
-    SetIndexRegMask(CRTC_PORT, 0xA4, 0xFE, 0x00);
+    vWaitEngIdle(pRDC);
+    SetIndexRegMask(COLOR_CRTC_INDEX, 0xA4, 0xFE, 0x00);
 
-    SetIndexRegMask(CRTC_PORT, 0xA3, ~0x20, 0x00);       
+    SetIndexRegMask(COLOR_CRTC_INDEX, 0xA3, ~0x20, 0x00);       
     *(ULONG *)MMIOREG_1ST_FLIP &=  ~0x80000000;
 }
 
 
 void
-vWaitEngIdle(ScrnInfoPtr pScrn, RDCRecPtr pRDC)
+vWaitEngIdle(RDCRecPtr pRDC)
 {
     ULONG  ulEngState, ulEngState2;
 
@@ -241,12 +228,15 @@ __inline ULONG ulGetCMDQLength(RDCRecPtr pRDC, ULONG ulWritePointer, ULONG ulCMD
 
     ulReadPointer  = *((volatile ULONG *)(pRDC->CMDQInfo.pjReadPort)) & pRDC->CMDQInfo.ulReadPointerMask;        
 
-    return ((ulReadPointer << 3) - ulWritePointer - CMD_QUEUE_GUARD_BAND) & ulCMDQMask;
+    
+    return ((ulReadPointer << 3) + pRDC->CMDQInfo.ulCMDQSize - ulWritePointer - CMD_QUEUE_GUARD_BAND) & ulCMDQMask;
 }
 
 UCHAR *pjRequestCMDQ(
 RDCRecPtr pRDC, ULONG   ulDataLen)
 {
+    xf86DrvMsgVerb(0, X_INFO, DefaultLevel, "== pjRequestCMDQ()  Entry==\n");
+    
     UCHAR   *pjBuffer;
     ULONG   i, ulWritePointer, ulCMDQMask, ulCurCMDQLen, ulContinueCMDQLen;
 
@@ -270,6 +260,7 @@ RDCRecPtr pRDC, ULONG   ulDataLen)
         pjBuffer = pRDC->CMDQInfo.pjCMDQVirtualAddr + ulWritePointer;
         pRDC->CMDQInfo.ulCurCMDQueueLen -= ulDataLen;            
         pRDC->CMDQInfo.ulWritePointer = (ulWritePointer + ulDataLen) & ulCMDQMask;
+        xf86DrvMsgVerb(0, X_INFO, DefaultLevel, "pjBuffer() : %X\n", pjBuffer);
         return pjBuffer;            
     }
     else
@@ -285,7 +276,7 @@ RDCRecPtr pRDC, ULONG   ulDataLen)
             
             pRDC->CMDQInfo.ulCurCMDQueueLen = ulCurCMDQLen;
         }
-    
+
         pjBuffer = pRDC->CMDQInfo.pjCMDQVirtualAddr + ulWritePointer;
         
         for (i = 0; i<ulContinueCMDQLen/8; i++, pjBuffer+=8)
@@ -311,9 +302,11 @@ RDCRecPtr pRDC, ULONG   ulDataLen)
         pRDC->CMDQInfo.ulCurCMDQueueLen -= ulDataLen;
         pjBuffer = pRDC->CMDQInfo.pjCMDQVirtualAddr + ulWritePointer;
         pRDC->CMDQInfo.ulWritePointer = (ulWritePointer + ulDataLen) & ulCMDQMask;
+        xf86DrvMsgVerb(0, X_INFO, DefaultLevel, "pjBuffer() : %X\n", pjBuffer);
         return pjBuffer;            
     }
-   
+
+    xf86DrvMsgVerb(0, X_INFO, DefaultLevel, "== pjRequestCMDQ()  Exit==\n");
 } 
 
 Bool bCRInitCMDQInfo(ScrnInfoPtr pScrn, RDCRecPtr pRDC)
@@ -323,128 +316,154 @@ Bool bCRInitCMDQInfo(ScrnInfoPtr pScrn, RDCRecPtr pRDC)
     
     xf86DrvMsgVerb(0, X_INFO, InternalLevel, "==bCRInitCMDQInfo()== \n");
     
-    pRDC->CMDQInfo.pjCmdQCtrlPort    = pRDC->MMIOVirtualAddr+ 0x0400; 
-    pRDC->CMDQInfo.pjCmdQBasePort    = pRDC->MMIOVirtualAddr+ 0x0404; 
-    pRDC->CMDQInfo.pjWritePort       = pRDC->MMIOVirtualAddr+ 0x0408;
-    pRDC->CMDQInfo.pjReadPort        = pRDC->MMIOVirtualAddr+ 0x040C;
-    pRDC->CMDQInfo.pjCmdQEndPort     = pRDC->MMIOVirtualAddr+ 0x0410; 
-    pRDC->CMDQInfo.pjEngStatePort    = pRDC->MMIOVirtualAddr+ 0x0414;
+    pRDC->CMDQInfo.pjCmdQCtrlPort    = pRDC->MMIOVirtualAddr+ CR_CTRL; 
+    pRDC->CMDQInfo.pjCmdQBasePort    = pRDC->MMIOVirtualAddr+ CR_BUFFER_START; 
+    pRDC->CMDQInfo.pjWritePort       = pRDC->MMIOVirtualAddr+ CR_BUFFER_WRITEPORT;
+    pRDC->CMDQInfo.pjReadPort        = pRDC->MMIOVirtualAddr+ CR_BUFFER_READPORT;
+    pRDC->CMDQInfo.pjCmdQEndPort     = pRDC->MMIOVirtualAddr+ CR_BUFFER_END; 
+    pRDC->CMDQInfo.pjEngStatePort    = pRDC->MMIOVirtualAddr+ CR_ENG_STATUS;
 
     pRDC->CMDQInfo.ulReadPointerMask = 0x000FFFFF;
 
+    pScreen = screenInfo.screens[pScrn->scrnIndex];
     
-    if (!pRDC->MMIO2D) 
-    {
-        pRDC->CMDQInfo.ulCMDQType = VM_CMD_QUEUE;    
-       
-        pScreen = screenInfo.screens[pScrn->scrnIndex];
-        
-        pRDC->CMDQInfo.pjCMDQVirtualAddr = pRDC->FBVirtualAddr + pRDC->CMDQInfo.ulCMDQOffsetAddr;
-        pRDC->CMDQInfo.ulCurCMDQueueLen = pRDC->CMDQInfo.ulCMDQSize - CMD_QUEUE_GUARD_BAND;
-        pRDC->CMDQInfo.ulCMDQMask = pRDC->CMDQInfo.ulCMDQSize - 1 ; 
-    }
+    pRDC->CMDQInfo.pjCMDQVirtualAddr = pRDC->FBVirtualAddr + pRDC->CMDQInfo.ulCMDQOffsetAddr;
+    pRDC->CMDQInfo.ulCurCMDQueueLen = pRDC->CMDQInfo.ulCMDQSize - CMD_QUEUE_GUARD_BAND;
+    pRDC->CMDQInfo.ulCMDQMask = pRDC->CMDQInfo.ulCMDQSize - 1 ; 
     
-      
-    if (pRDC->MMIO2D)
-    {        
-        pRDC->CMDQInfo.ulCMDQType = VM_CMD_MMIO;        
-    }
+    pRDC->CMDQInfo.bInitialized = TRUE;
+#if Accel_2D_DEBUG
+    pRDC->CMDQInfo.bFenceID = 0;
+#endif
+    
     xf86DrvMsgVerb(0, X_INFO, InternalLevel, "<<== bCRInitCMDQInfo()\n");
     return (TRUE);    
 }
 
-Bool bCREnableCMDQ(ScrnInfoPtr pScrn, RDCRecPtr pRDC)
+Bool bCREnableCMDQ(RDCRecPtr pRDC)
 {
     ULONG ulVMCmdQCtrlPort = 0;
     
     xf86DrvMsgVerb(0, X_INFO, InternalLevel, "==bCREnableCMDQ()== \n");
 
-    vCRWaitEngIdle(pScrn, pRDC);  
-
-    
-    switch (pRDC->CMDQInfo.ulCMDQType)
+    if (!pRDC->IoctlCR)
     {
-        case VM_CMD_QUEUE:
-            
-            ulVMCmdQCtrlPort = *(ULONG *) (pRDC->CMDQInfo.pjCmdQCtrlPort);
-            ulVMCmdQCtrlPort |= 0x00000F01;
+        vCRWaitEngIdle(pRDC);  
 
-            *(ULONG *) (pRDC->CMDQInfo.pjCmdQBasePort) = pRDC->CMDQInfo.ulCMDQOffsetAddr;
-            *(ULONG *) (pRDC->CMDQInfo.pjCmdQEndPort) = pRDC->CMDQInfo.ulCMDQOffsetAddr + DEFAULT_CMDQ_SIZE - 8;
-            *(ULONG *) (pRDC->CMDQInfo.pjCmdQCtrlPort) = ulVMCmdQCtrlPort;
+        
+        ulVMCmdQCtrlPort = CRCTRL_ENABLE | (CRCTRL_THRESHOLD << 8) | CRCTRL_DMAMMIO;
 
-            pRDC->CMDQInfo.ulWritePointer = *(ULONG *) (pRDC->CMDQInfo.pjWritePort) << 3;                 
-            break;
-            
-        case VM_CMD_MMIO:
-            
-            ulVMCmdQCtrlPort &= ~(0x00000001);
+        if (pRDC->MMIOVPost)
+            ulVMCmdQCtrlPort |= CRCTRL_VPOSTMMIO | CRCTRL_VDISPMMIO | CRCTRL_DMAMMIO;
 
-            *(ULONG *) (pRDC->CMDQInfo.pjCmdQCtrlPort) = ulVMCmdQCtrlPort;
-            break;
+        if (pRDC->MMIO2D)
+            *(ULONG *)MMIOREG_CMDQ_SET = 0x02000000;
+        else
+            *(ULONG *)MMIOREG_CMDQ_SET = 0;
             
-        default:
-            return (FALSE);
-            break;
-    }
+        *(ULONG *) (pRDC->CMDQInfo.pjCmdQBasePort) = pRDC->CMDQInfo.ulCMDQOffsetAddr;
+        *(ULONG *) (pRDC->CMDQInfo.pjCmdQEndPort) = pRDC->CMDQInfo.ulCMDQOffsetAddr + DEFAULT_CMDQ_SIZE - 8;
+        *(ULONG *) (pRDC->CMDQInfo.pjCmdQCtrlPort) = ulVMCmdQCtrlPort;
+
+        pRDC->CMDQInfo.ulWritePointer = *(ULONG *) (pRDC->CMDQInfo.pjWritePort) << 3;
+    };
+
     xf86DrvMsgVerb(0, X_INFO, InternalLevel, "<<== bCREnableCMDQ()\n");
     return (TRUE);    
 }
 
-Bool bCREnable2D(ScrnInfoPtr pScrn, RDCRecPtr pRDC)
+Bool bCREnable2D(RDCRecPtr pRDC)
 {
 
     xf86DrvMsgVerb(0, X_INFO, InternalLevel, "==bCREnable2D()== \n");
     
-    SetIndexRegMask(CRTC_PORT, 0xA4, 0xFE, 0x01);        
+    SetIndexRegMask(COLOR_CRTC_INDEX, 0xA4, 0xFE, 0x01);        
 
-    SetIndexRegMask(CRTC_PORT, 0xA3, ~0x20, 0x20);           
+    SetIndexRegMask(COLOR_CRTC_INDEX, 0xA3, ~0x20, 0x20);           
     *(ULONG *)MMIOREG_1ST_FLIP |=  0x80000000;
 
-    if (!bCRInitCMDQInfo(pScrn, pRDC))
-    {
-        vCRDisable2D(pScrn, pRDC);      
-        return (FALSE);
-    }
-        
-    if (!bCREnableCMDQ(pScrn, pRDC))
-    {
-        vCRDisable2D(pScrn, pRDC);      
-        return (FALSE);
-    }
     xf86DrvMsgVerb(0, X_INFO, InternalLevel, "<<== bCREnable2D()\n");
     return (TRUE);    
 }
 
-void vCRDisable2D(ScrnInfoPtr pScrn, RDCRecPtr pRDC)
+void vCRDisable2D(RDCRecPtr pRDC)
 {
    xf86DrvMsgVerb(0, X_INFO, InternalLevel, "==vCRDisable2D()== \n");
 
-    vCRWaitEngIdle(pScrn, pRDC);
-    SetIndexRegMask(CRTC_PORT, 0xA4, 0xFE, 0x00);
+    vCRWaitEngIdle(pRDC);
+    SetIndexRegMask(COLOR_CRTC_INDEX, 0xA4, 0xFE, 0x00);
 
-    SetIndexRegMask(CRTC_PORT, 0xA3, ~0x20, 0x00);       
+    SetIndexRegMask(COLOR_CRTC_INDEX, 0xA3, ~0x20, 0x00);       
     *(ULONG *)MMIOREG_1ST_FLIP &=  ~0x80000000;
 
     xf86DrvMsgVerb(0, X_INFO, InternalLevel, "<<== vCRDisable2D()\n");
 }
 
 void
-vCRWaitEngIdle(ScrnInfoPtr pScrn, RDCRecPtr pRDC)
+vCRWaitEngIdle(RDCRecPtr pRDC)
 {
-    ULONG  ulReadPointor, ulWritePointor, ulEngState;
-
     xf86DrvMsgVerb(0, X_INFO, 10, "==vCRWaitEngIdle()== \n");
 
-    ulWritePointor = *((volatile ULONG*)(pRDC->CMDQInfo.pjWritePort));
-    ulWritePointor &= 0x3ffff;
-    do  
+    if (pRDC->IoctlCR)
     {
-        ulReadPointor = *((volatile ULONG*)(pRDC->CMDQInfo.pjReadPort));
-        ulEngState = *((volatile ULONG*)(pRDC->CMDQInfo.pjEngStatePort));
+        int ioctlPara[2];
+        int ret_val;
+        int status = 0;
+
+        while (!status)
+        {
+            xf86DrvMsgVerb(0, X_INFO, 10, "==ioctl vCRWaitEngIdle()== \n");
+            ioctlPara[0] = CR_2D_IDLE | CR_CR_IDLE;
+            ret_val = ioctl(pRDC->iFBDev, IOCTL_CR_IDLE_STATUS, ioctlPara);
+            if (ret_val < 0)
+                xf86DrvMsgVerb(0, X_INFO, 8, "IOCTL_CR_IDLE_STATUS fail (%s)\n", strerror(errno));
+            else
+                status = ioctlPara[0];
+        };
     }
-    while ((ulEngState & BIT12) || (ulWritePointor != ulReadPointor));
+    else
+    {
+        volatile ULONG  ulReadPointor, ulWritePointor, ulEngState;
+        
+        do
+        {
+            ulWritePointor = *((volatile ULONG*)(pRDC->CMDQInfo.pjWritePort));
+            ulReadPointor = *((volatile ULONG*)(pRDC->CMDQInfo.pjReadPort));
+            ulEngState = *((volatile ULONG*)(pRDC->CMDQInfo.pjEngStatePort));
+        }
+        while ((ulWritePointor != ulReadPointor) ||
+               (ulEngState & (CR_2D_IDLE|CR_DMA_IDLE|CR_VIDEO_IDLE|CR_CR_IDLE)));
+    };
             
     xf86DrvMsgVerb(0, X_INFO, 10, "<<== vCRWaitEngIdle()\n");
 }
-#endif    
+
+int FireCRCMDQ(int iDev, unsigned int *pCmd, unsigned int size)
+{
+    int iRet;
+    unsigned int ioctlPara[3];
+
+    ioctlPara[0] = size;
+    ioctlPara[1] = 0;
+    ioctlPara[2] = (unsigned int) pCmd;
+    
+    iRet = ioctl(iDev, IOCTL_CR_CMDQ, ioctlPara);
+    if (iRet < 0)
+        xf86DrvMsgVerb(0, X_INFO, 8, "FireCRCMDQ() fail (%s)\n", strerror(errno));
+
+    free(pCmd);
+
+    return iRet;
+};
+
+unsigned int GetFBIFCaps(int iDev)
+{
+    int iRet = 0;
+    unsigned int ioctlPara = 0;
+    
+    iRet = ioctl(iDev, IOCTL_IF_CAPS, &ioctlPara);
+    if (iRet < 0)
+        xf86DrvMsgVerb(0, X_INFO, 8, "GetFBIFCaps() fail (%s)\n", strerror(errno));
+
+    return ioctlPara;
+};
