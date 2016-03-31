@@ -579,3 +579,6 @@ struct _RDCRec
 #include "rdc_video.h"
 #include "rdc_rotation.h"
 
+#define STRINGIZE_DETAIL(x) #x
+#define STRINGIZE(x) STRINGIZE_DETAIL(x)
+#define rdcLog(msg) xf86DrvMsgVerb(0, X_INFO, 0,__FILE__ "(" STRINGIZE(__LINE__) "): " msg "\n")
