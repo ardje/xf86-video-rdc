@@ -1,23 +1,30 @@
 /* 
  * Copyright (C) 2009 RDC Semiconductor Co.,Ltd
+ * All Rights Reserved.
  *
- * This program is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
+ * Permission is hereby granted, free of charge, to any person obtaining a
+ * copy of this software and associated documentation files (the
+ * "Software"), to deal in the Software without restriction, including
+ * without limitation the rights to use, copy, modify, merge, publish,
+ * distribute, sub license, and/or sell copies of the Software, and to
+ * permit persons to whom the Software is furnished to do so, subject to
+ * the following conditions:
  *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
+ * The above copyright notice and this permission notice (including the
+ * next paragraph) shall be included in all copies or substantial portions
+ * of the Software.
  *
- * You should have received a copy of the GNU General Public License
- * along with this program.  If not, see <http://www.gnu.org/licenses/>.
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS
+ * OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+ * MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NON-INFRINGEMENT.
+ * IN NO EVENT SHALL PRECISION INSIGHT AND/OR ITS SUPPLIERS BE LIABLE FOR
+ * ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,
+ * TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE
+ * SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
  *
  * For technical support : 
  *     <rdc_xorg@rdc.com.tw>
  */
-
 
 #ifdef HAVE_CONFIG_H
 #include <config.h>
@@ -116,19 +123,19 @@ static Bool rdc_pci_probe (DriverPtr drv, int entity_num, struct pci_device *dev
 static Bool RDCProbe(DriverPtr drv, int flags);
 #endif
 static Bool RDCPreInit(ScrnInfoPtr pScrn, int flags);
-static Bool RDCScreenInit(int Index, ScreenPtr pScreen, int argc, char **argv);
-Bool RDCSwitchMode(int scrnIndex, DisplayModePtr mode, int flags);
-void RDCAdjustFrame(int scrnIndex, int x, int y, int flags);
-static Bool RDCEnterVT(int scrnIndex, int flags);
-static void RDCLeaveVT(int scrnIndex, int flags);
-static void RDCFreeScreen(int scrnIndex, int flags);
+static Bool RDCScreenInit(ScreenPtr pScreen, ScreenPtr pScreen, int argc, char **argv);
+Bool RDCSwitchMode(ScreenPtr pScreen, DisplayModePtr mode);
+void RDCAdjustFrame(ScreenPtr pScreen, int x, int y);
+static Bool RDCEnterVT(ScreenPtr pScreen);
+static void RDCLeaveVT(ScreenPtr pScreen);
+static void RDCFreeScreen(ScreenPtr pScreen);
 static ModeStatus RDCValidMode(ScrnInfoPtr pScrn, DisplayModePtr mode, Bool verbose, int flags);
 
 
 Bool RDCGetRec(ScrnInfoPtr pScrn);
 void RDCFreeRec(ScrnInfoPtr pScrn);
 Bool RDCSaveScreen(ScreenPtr pScreen, Bool unblack);
-Bool RDCCloseScreen(int scrnIndex, ScreenPtr pScreen);
+Bool RDCCloseScreen(ScreenPtr pScreen);
 void RDCSave(ScrnInfoPtr pScrn);
 void RDCRestore(ScrnInfoPtr pScrn);
 void RDCProbeDDC(ScrnInfoPtr pScrn, int index);
@@ -304,7 +311,7 @@ static XF86ModuleVersionInfo RDCVersRec = {
     {0, 0, 0, 0}
 };
 
-_X_EXPORT XF86ModuleData rdcm15ModuleData = { &RDCVersRec, RDCSetup, NULL };
+_X_EXPORT XF86ModuleData rdcModuleData = { &RDCVersRec, RDCSetup, NULL };
 
 static pointer
 RDCSetup(pointer module, pointer opts, int *errmaj, int *errmin)
@@ -444,7 +451,7 @@ RDCProbe(DriverPtr drv, int flags)
                                     devSections, numDevSections,
                                     drv, &usedChips);
     xf86DrvMsgVerb(0, X_INFO, 5, "numUsed = %d\n", numUsed);
-    xfree(devSections);
+    free(devSections);
 
     if (flags & PROBE_DETECT) 
     {
@@ -480,7 +487,7 @@ RDCProbe(DriverPtr drv, int flags)
         }  
     }        
 
-    xfree(usedChips);
+    free(usedChips);
 
     xf86DrvMsgVerb(0, X_INFO, DefaultLevel, "==Exit3 RDCProbe()== return(foundScreen=%X)\n", foundScreen);
     return foundScreen;
@@ -686,7 +693,7 @@ RDCPreInit(ScrnInfoPtr pScrn, int flags)
 
     
     xf86CollectOptions(pScrn, NULL);   
-    if (!(pRDC->Options = xalloc(sizeof(RDCOptions))))
+    if (!(pRDC->Options = malloc(sizeof(RDCOptions))))
     {      
         RDCFreeRec(pScrn);
         xf86DrvMsgVerb(pScrn->scrnIndex, X_INFO, ErrorLevel, "==Exit15 RDCPreInit()== return FALSE\n");
@@ -1281,9 +1288,9 @@ RDCPreInit(ScrnInfoPtr pScrn, int flags)
 
 
 static Bool
-RDCScreenInit(int scrnIndex, ScreenPtr pScreen, int argc, char **argv)
+RDCScreenInit(ScreenPtr pScreen, int argc, char **argv)
 {
-    ScrnInfoPtr pScrn;
+    ScrnInfoPtr pScrn=xf86ScreenToScrn(pScreen);
     RDCRecPtr pRDC;
     vgaHWPtr hwp;   
     VisualPtr visual;
@@ -1293,17 +1300,16 @@ RDCScreenInit(int scrnIndex, ScreenPtr pScreen, int argc, char **argv)
     BoxRec FBMemBox;   
     int    AvailFBSize;     
 
-    xf86DrvMsgVerb(scrnIndex, X_INFO, DefaultLevel, "==Enter RDCScreenInit()== \n");
+    xf86DrvMsgVerb(pScrn->scrnIndex, X_INFO, DefaultLevel, "==Enter RDCScreenInit()== \n");
     
-    pScrn = xf86Screens[pScreen->myNum];
     pRDC = RDCPTR(pScrn);
     hwp = VGAHWPTR(pScrn);
       
     
     AvailFBSize = pRDC->AvailableFBsize;
     
-    xf86DrvMsgVerb(scrnIndex, X_INFO, ErrorLevel, "virtual X = %d\n", pScrn->virtualX);
-    xf86DrvMsgVerb(scrnIndex, X_INFO, ErrorLevel, "virtual Y = %d\n", pScrn->virtualY);
+    xf86DrvMsgVerb(pScrn->scrnIndex, X_INFO, ErrorLevel, "virtual X = %d\n", pScrn->virtualX);
+    xf86DrvMsgVerb(pScrn->scrnIndex, X_INFO, ErrorLevel, "virtual Y = %d\n", pScrn->virtualY);
     
     FBMemBox.x1 = 0;
     FBMemBox.y1 = 0;
@@ -1312,8 +1318,8 @@ RDCScreenInit(int scrnIndex, ScreenPtr pScreen, int argc, char **argv)
     if (FBMemBox.y2 <= 0)
         FBMemBox.y2 = 32767; 
     
-    xf86DrvMsgVerb(scrnIndex, X_INFO, InfoLevel, "AvailFBSize = %d\n", AvailFBSize);
-    xf86DrvMsgVerb(scrnIndex, X_INFO, InfoLevel, "FBMemBox: x1 = %d, y1 = %d, x2 = %d, y2 = %d\n",FBMemBox.x1, FBMemBox.y1, FBMemBox.x2, FBMemBox.y2);
+    xf86DrvMsgVerb(pScrn->scrnIndex, X_INFO, InfoLevel, "AvailFBSize = %d\n", AvailFBSize);
+    xf86DrvMsgVerb(pScrn->scrnIndex, X_INFO, InfoLevel, "FBMemBox: x1 = %d, y1 = %d, x2 = %d, y2 = %d\n",FBMemBox.x1, FBMemBox.y1, FBMemBox.x2, FBMemBox.y2);
 
     if (xf86InitFBManager(pScreen, &FBMemBox))
     {
@@ -1323,17 +1329,17 @@ RDCScreenInit(int scrnIndex, ScreenPtr pScreen, int argc, char **argv)
 
         if (xf86InitFBManagerLinear(pScreen, areaoffset, size))
         {
-            xf86DrvMsg(scrnIndex, X_INFO, "Using %ld bytes of offscreen memory for linear (offset=0x%x)\n", (AvailFBSize - areaoffset), areaoffset);
+            xf86DrvMsg(pScrn->scrnIndex, X_INFO, "Using %ld bytes of offscreen memory for linear (offset=0x%x)\n", (AvailFBSize - areaoffset), areaoffset);
         }
         else
         {
-            xf86DrvMsg(scrnIndex, X_ERROR, "xf86InitFBManagerLinear() failed \n");
+            xf86DrvMsg(pScrn->scrnIndex, X_ERROR, "xf86InitFBManagerLinear() failed \n");
             return FALSE;
         }
     }
     else
     {
-        xf86DrvMsg(scrnIndex, X_ERROR, "xf86InitFBManager() failed \n");
+        xf86DrvMsg(pScrn->scrnIndex, X_ERROR, "xf86InitFBManager() failed \n");
         return FALSE;
     }      
 
@@ -1347,14 +1353,14 @@ RDCScreenInit(int scrnIndex, ScreenPtr pScreen, int argc, char **argv)
     
     if (!miSetVisualTypes(pScrn->depth, miGetDefaultVisualMask(pScrn->depth), pScrn->rgbBits, pScrn->defaultVisual))
     {
-        xf86DrvMsgVerb(scrnIndex, X_INFO, ErrorLevel, "==RDCScreenInit() Set Visual Type Fail== return FALSE\n");
+        xf86DrvMsgVerb(pScrn->scrnIndex, X_INFO, ErrorLevel, "==RDCScreenInit() Set Visual Type Fail== return FALSE\n");
         return FALSE;
     }
  
     if (!miSetPixmapDepths())
     {
         RDCSaveScreen(pScreen, SCREEN_SAVER_OFF);
-        xf86DrvMsgVerb(scrnIndex, X_INFO, ErrorLevel, "==RDCScreenInit() SetPixmapDepth fail== return FALSE\n");
+        xf86DrvMsgVerb(pScrn->scrnIndex, X_INFO, ErrorLevel, "==RDCScreenInit() SetPixmapDepth fail== return FALSE\n");
         return FALSE;
     }
 
@@ -1368,13 +1374,13 @@ RDCScreenInit(int scrnIndex, ScreenPtr pScreen, int argc, char **argv)
                               pScrn->xDpi, pScrn->yDpi,
                               pScrn->displayWidth, pScrn->bitsPerPixel))
             {
-                xf86DrvMsgVerb(scrnIndex, X_INFO, ErrorLevel, "==RDCScreenInit() fbScreenInit fail== return FALSE\n");
+                xf86DrvMsgVerb(pScrn->scrnIndex, X_INFO, ErrorLevel, "==RDCScreenInit() fbScreenInit fail== return FALSE\n");
                 return FALSE;
             }
             break;
 
         default:
-            xf86DrvMsgVerb(scrnIndex, X_INFO, ErrorLevel, "==RDCScreenInit() Color Depth not supprt== return FALSE\n");
+            xf86DrvMsgVerb(pScrn->scrnIndex, X_INFO, ErrorLevel, "==RDCScreenInit() Color Depth not supprt== return FALSE\n");
             return FALSE;                  
     }
 
@@ -1409,7 +1415,6 @@ RDCScreenInit(int scrnIndex, ScreenPtr pScreen, int argc, char **argv)
         }
     }
      
-    miInitializeBackingStore(pScreen);
     xf86SetBackingStore(pScreen);
     xf86SetSilkenMouse(pScreen);
 
@@ -1420,7 +1425,7 @@ RDCScreenInit(int scrnIndex, ScreenPtr pScreen, int argc, char **argv)
     {
         if (!RDCCursorInit(pScreen)) 
         {
-            xf86DrvMsg(scrnIndex, X_ERROR, "Hardware cursor initialization failed\n");
+            xf86DrvMsg(pScrn->scrnIndex, X_ERROR, "Hardware cursor initialization failed\n");
             pRDC->noHWC = TRUE;                      
         }
     }
@@ -1434,7 +1439,7 @@ RDCScreenInit(int scrnIndex, ScreenPtr pScreen, int argc, char **argv)
     
     if (!miCreateDefColormap(pScreen))
     {
-        xf86DrvMsgVerb(scrnIndex, X_INFO, ErrorLevel, "==Exit7 RDCScreenInit()== return FALSE\n");
+        xf86DrvMsgVerb(pScrn->scrnIndex, X_INFO, ErrorLevel, "==Exit7 RDCScreenInit()== return FALSE\n");
         return FALSE;
     }
 
@@ -1442,7 +1447,7 @@ RDCScreenInit(int scrnIndex, ScreenPtr pScreen, int argc, char **argv)
                             vRDCLoadPalette, NULL,
                             CMAP_PALETTED_TRUECOLOR | CMAP_RELOAD_ON_MODE_SWITCH))
     {
-        xf86DrvMsgVerb(scrnIndex, X_INFO, ErrorLevel, "==RDCScreenInit() xf86HandleColormaps fail== return FALSE\n");
+        xf86DrvMsgVerb(pScrn->scrnIndex, X_INFO, ErrorLevel, "==RDCScreenInit() xf86HandleColormaps fail== return FALSE\n");
         return FALSE;
     }
 
@@ -1504,22 +1509,21 @@ RDCScreenInit(int scrnIndex, ScreenPtr pScreen, int argc, char **argv)
     
     if (!RDCModeInit(pScrn, pScrn->currentMode))
     {
-        xf86DrvMsg(scrnIndex, X_ERROR, "Mode Init Failed \n");
+        xf86DrvMsg(pScrn->scrnIndex, X_ERROR, "Mode Init Failed \n");
         return FALSE;
     }   
 
     RDCSaveScreen(pScreen, FALSE);
-    RDCAdjustFrame(scrnIndex, pScrn->frameX0, pScrn->frameY0, 0);
+    RDCAdjustFrame(pScrn, pScrn->frameX0, pScrn->frameY0);
 
     EC_DetectCaps(pScrn, &(pRDC->ECChipInfo));
 
-    xf86DrvMsgVerb(scrnIndex, X_INFO, DefaultLevel, "==RDCScreenInit() Normal Exit==\n");
+    xf86DrvMsgVerb(pScrn->scrnIndex, X_INFO, DefaultLevel, "==RDCScreenInit() Normal Exit==\n");
     return TRUE;
 } 
 
-Bool RDCSwitchMode(int scrnIndex, DisplayModePtr mode, int flags)
+Bool RDCSwitchMode(ScrnInfoPtr pScrn, DisplayModePtr mode, int flags)
 {
-    ScrnInfoPtr pScrn = xf86Screens[scrnIndex];
     RDCRecPtr pRDC = RDCPTR(pScrn);
     Bool RetStatus = FALSE;
     
@@ -1527,21 +1531,20 @@ Bool RDCSwitchMode(int scrnIndex, DisplayModePtr mode, int flags)
    
     RetStatus = RDCModeInit(pScrn, mode);
 
-    xf86DrvMsgVerb(scrnIndex, X_INFO, DefaultLevel, "== RDCSwitchMode() Exit== return %X\n", RetStatus);
+    xf86DrvMsgVerb(pScrn->scrnIndex, X_INFO, DefaultLevel, "== RDCSwitchMode() Exit== return %X\n", RetStatus);
     return RetStatus;
 }
 
 void
-RDCAdjustFrame(int scrnIndex, int x, int y, int flags)
+RDCAdjustFrame(ScrnInfoPtr pScrn, int x, int y)
 {
-    ScrnInfoPtr pScrn = xf86Screens[scrnIndex];
     RDCRecPtr   pRDC  = RDCPTR(pScrn);
     ULONG base;
     int rot_x, rot_y;
     int iMaxHorCoor, iMaxVerCoor;
     DisplayModePtr mode = pRDC->ModePtr;
 
-    xf86DrvMsgVerb(scrnIndex, X_INFO, DefaultLevel, "==Enter RDCAdjustFrame(x = %d, y = %d)== \n", x, y);
+    xf86DrvMsgVerb(pScrn->scrnIndex, X_INFO, DefaultLevel, "==Enter RDCAdjustFrame(x = %d, y = %d)== \n", x, y);
 
     xf86DrvMsgVerb(pScrn->scrnIndex, X_INFO, InternalLevel, "  pScrn->virtualX = %d\n", pScrn->virtualX);
     xf86DrvMsgVerb(pScrn->scrnIndex, X_INFO, InternalLevel, "  pScrn->virtualY = %d\n", pScrn->virtualY);
@@ -1634,14 +1637,13 @@ RDCAdjustFrame(int scrnIndex, int x, int y, int flags)
     xf86DrvMsgVerb(pScrn->scrnIndex, X_INFO, InternalLevel, "  base = %x\n", base);
     vSetStartAddressCRT1(pRDC, base);
 
-    xf86DrvMsgVerb(scrnIndex, X_INFO, DefaultLevel, "==Exit1 RDCAdjustFrame()== \n");
+    xf86DrvMsgVerb(pScrn->scrnIndex, X_INFO, DefaultLevel, "==Exit1 RDCAdjustFrame()== \n");
 }
 
         
 static Bool
-RDCEnterVT(int scrnIndex, int flags)
+RDCEnterVT(ScrnInfoPtr pScrn)
 {
-    ScrnInfoPtr pScrn = xf86Screens[scrnIndex];
     RDCRecPtr pRDC = RDCPTR(pScrn);
 
     xf86DrvMsgVerb(pScrn->scrnIndex, X_INFO, DefaultLevel, "==Enter RDCEnterVT()== \n");
@@ -1651,7 +1653,7 @@ RDCEnterVT(int scrnIndex, int flags)
         return FALSE;
     }
 
-    RDCAdjustFrame(scrnIndex, pScrn->frameX0, pScrn->frameY0, 0);
+    RDCAdjustFrame(pScrn, pScrn->frameX0, pScrn->frameY0);
 
     
     if (pRDC->bRandRRotation)
@@ -1694,9 +1696,8 @@ RDCEnterVT(int scrnIndex, int flags)
 
 
 static void
-RDCLeaveVT(int scrnIndex, int flags)
+RDCLeaveVT(ScrnInfoPtr pScrn)
 {
-    ScrnInfoPtr pScrn = xf86Screens[scrnIndex];
     vgaHWPtr hwp = VGAHWPTR(pScrn);
     RDCRecPtr pRDC = RDCPTR(pScrn);
     
@@ -1724,29 +1725,28 @@ RDCLeaveVT(int scrnIndex, int flags)
 }
 
 static void
-RDCFreeScreen(int scrnIndex, int flags)
+RDCFreeScreen(ScrnInfoPtr pScrn)
 {
-    xf86DrvMsgVerb(scrnIndex, X_INFO, DefaultLevel, "==Enter RDCFreeScreen()== \n");
+    xf86DrvMsgVerb(pScrn->scrnIndex, X_INFO, DefaultLevel, "==Enter RDCFreeScreen()== \n");
     
-    RDCFreeRec(xf86Screens[scrnIndex]);
+    RDCFreeRec(pScrn);
     if (xf86LoaderCheckSymbol("vgaHWFreeHWRec"))
-        vgaHWFreeHWRec(xf86Screens[scrnIndex]);
+        vgaHWFreeHWRec(pScrn);
 
-    xf86DrvMsgVerb(scrnIndex, X_INFO, DefaultLevel, "==Exit1 RDCFreeScreen()== \n");
+    xf86DrvMsgVerb(pScrn->scrnIndex, X_INFO, DefaultLevel, "==Exit1 RDCFreeScreen()== \n");
 }
 
 static ModeStatus
-RDCValidMode(int scrnIndex, DisplayModePtr mode, Bool verbose, int flags)
+RDCValidMode(ScrnInfoPtr pScrn, DisplayModePtr mode, Bool verbose, int flags)
 {
-    ScrnInfoPtr pScrn = xf86Screens[scrnIndex];
     RDCRecPtr pRDC = RDCPTR(pScrn);
     CBIOS_ARGUMENTS *pCBiosArguments = pRDC->pCBIOSExtension->pCBiosArguments;
     USHORT wLCDHorSize, wLCDVerSize;
     USHORT wVESAModeHorSize, wVESAModeVerSize;
 
-    xf86DrvMsgVerb(scrnIndex, X_INFO, DefaultLevel, "==Enter RDCValidMode() Verbose = %d, Flags = 0x%x==\n", 
+    xf86DrvMsgVerb(pScrn->scrnIndex, X_INFO, DefaultLevel, "==Enter RDCValidMode() Verbose = %d, Flags = 0x%x==\n", 
                verbose, flags);
-    xf86DrvMsgVerb(scrnIndex, X_INFO, DefaultLevel, "==Mode name=%s, Width=%d, Height=%d, Refresh reate=%f==\n", 
+    xf86DrvMsgVerb(pScrn->scrnIndex, X_INFO, DefaultLevel, "==Mode name=%s, Width=%d, Height=%d, Refresh reate=%f==\n", 
                mode->name, mode->HDisplay, mode->VDisplay, mode->VRefresh);
     
     
@@ -1767,10 +1767,10 @@ RDCValidMode(int scrnIndex, DisplayModePtr mode, Bool verbose, int flags)
     {
         if (verbose)
         {
-            xf86DrvMsgVerb(scrnIndex, X_PROBED, InfoLevel,
+            xf86DrvMsgVerb(pScrn->scrnIndex, X_PROBED, InfoLevel,
                        "==Removing interlaced mode \"%s\"\n==", mode->name);
         }
-        xf86DrvMsgVerb(scrnIndex, X_INFO, ErrorLevel, "== RDCValidMode() Fail, Not Interlace Mode==\n");
+        xf86DrvMsgVerb(pScrn->scrnIndex, X_INFO, ErrorLevel, "== RDCValidMode() Fail, Not Interlace Mode==\n");
         return MODE_NO_INTERLACE;
     }
 
@@ -1879,7 +1879,7 @@ RDCFreeRec(ScrnInfoPtr pScrn)
         return;
     }
     
-    xfree(pScrn->driverPrivate);
+    free(pScrn->driverPrivate);
     pScrn->driverPrivate = 0;
     
     xf86DrvMsgVerb(pScrn->scrnIndex, X_INFO, DefaultLevel, "==Exit3 RDCFreeRec()== \n");
@@ -1898,14 +1898,14 @@ RDCSaveScreen(ScreenPtr pScreen, Bool unblack)
 }
 
 Bool
-RDCCloseScreen(int scrnIndex, ScreenPtr pScreen)
+RDCCloseScreen(ScreenPtr pScreen)
 {
-    ScrnInfoPtr pScrn = xf86Screens[scrnIndex];
+    ScrnInfoPtr pScrn = xf86ScreenToScrn(pScreen);
     vgaHWPtr hwp = VGAHWPTR(pScrn);
     RDCRecPtr pRDC = RDCPTR(pScrn);
     Bool RetStatus;
     
-    xf86DrvMsgVerb(scrnIndex, X_INFO, DefaultLevel, "==Enter RDCCloseScreen(); Screen Index = 0x%x == \n",scrnIndex);
+    xf86DrvMsgVerb(pScrn->scrnIndex, X_INFO, DefaultLevel, "==Enter RDCCloseScreen(); Screen Index = 0x%x == \n",scrnIndex);
     
     
     if (pRDC->bRandRRotation)
@@ -1959,7 +1959,7 @@ RDCCloseScreen(int scrnIndex, ScreenPtr pScreen)
     RetStatus = (*pScreen->CloseScreen) (pScreen);
 #endif
     
-    xf86DrvMsgVerb(scrnIndex, X_INFO, DefaultLevel, "==Exit1 RDCCloseScreen()== return(RetStatus=%X)\n", RetStatus);
+    xf86DrvMsgVerb(pScrn->scrnIndex, X_INFO, DefaultLevel, "==Exit1 RDCCloseScreen()== return(RetStatus=%X)\n", RetStatus);
     return RetStatus;
 }
 
@@ -2452,7 +2452,7 @@ RDCModeInit(ScrnInfoPtr pScrn, DisplayModePtr mode)
     
     pRDC->HWCInfo.iScreenOffset_x = 0;
     pRDC->HWCInfo.iScreenOffset_y = 0;
-    RDCAdjustFrame(pScrn->scrnIndex, 0, 0, 0);
+    RDCAdjustFrame(pScrn->scrnIndex, 0, 0);
  
     vgaHWProtect(pScrn, FALSE);
 
@@ -2681,7 +2681,7 @@ RDCRandRSetConfig(ScrnInfoPtr pScrn, xorgRRConfig *config)
     
     *ROTAP_CTL0 = ulROTAP_CTL0;
     
-    RDCAdjustFrame(pScrn->scrnIndex, 0, 0, 0);
+    RDCAdjustFrame(pScrn->scrnIndex, 0, 0);
     
     return TRUE;
 }
