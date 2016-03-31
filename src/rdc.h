@@ -1,52 +1,68 @@
-/*
+/* 
  * Copyright (C) 2009 RDC Semiconductor Co.,Ltd
- * All Rights Reserved.
  *
- * Permission is hereby granted, free of charge, to any person obtaining a
- * copy of this software and associated documentation files (the
- * "Software"), to deal in the Software without restriction, including
- * without limitation the rights to use, copy, modify, merge, publish,
- * distribute, sub license, and/or sell copies of the Software, and to
- * permit persons to whom the Software is furnished to do so, subject to
- * the following conditions:
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
- * The above copyright notice and this permission notice (including the
- * next paragraph) shall be included in all copies or substantial portions
- * of the Software.
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
  *
- * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS
- * OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
- * MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NON-INFRINGEMENT.
- * IN NO EVENT SHALL PRECISION INSIGHT AND/OR ITS SUPPLIERS BE LIABLE FOR
- * ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,
- * TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE
- * SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+ * You should have received a copy of the GNU General Public License
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  * For technical support : 
  *     <rdc_xorg@rdc.com.tw>
  */
- 
+
+#ifndef _RDC_H_
+#define _RDC_H_
+
 #ifdef HAVE_CONFIG_H
 #include <config.h>
 #endif
 
+#include "xf86.h"
+#include "xf86fbman.h"
+#include "vgaHW.h"
+#include "xf86Crtc.h"
+#include "xf86RandR12.h"
 
-#include "xf86Cursor.h"
+
+#if GET_ABI_MAJOR(ABI_VIDEODRV_VERSION) < 13
+#define HAVE_XAA
+#endif
+
+#if GET_ABI_MAJOR(ABI_VIDEODRV_VERSION) < 10
+#define HAVE_DUAL
+#endif
+
  
 #if XSERVER_LIBPCIACCESS
 #include <pciaccess.h>
 #endif
 
-#ifdef USE_XAA
+
+#ifdef HAVE_XAA
 #include "xaa.h"
-#include "xaarop.h"
 #endif
+#include "xaarop.h"
 #include "xf86.h"
 
 
 #include "exa.h"
-
 #include "vbe.h"
+#include "BiosDef.h"
+
+
+
+#include "xf86Cursor.h"
+
+
+#include "CInt10.h"
 
 #define PCI_DEV_MAP_FLAG_WRITABLE       (1U<<0)
 #define PCI_DEV_MAP_FLAG_WRITE_COMBINE  (1U<<1)
@@ -69,16 +85,9 @@
 #endif
 
 
-//#define     Accel_2D
-//#define     Accel_2D_DEBUG          0
-
-
-#define     HWC
+#define     Accel_2D_DEBUG          0
 #define     HWC_DEBUG               0
-
-
-#define NTSC                 0
-#define PAL                  1
+#define     CR_FENCE_ID             0
 
 
 #ifndef PCI_VENDOR_RDC
@@ -105,19 +114,103 @@
 #define     PCI_CHIP_M2012          0x2012
 #endif
 
+#ifndef PCI_CHIP_M2013
+#define     PCI_CHIP_M2013          0x2013
+#endif
+
+#ifndef PCI_CHIP_M2014
+#define     PCI_CHIP_M2014          0x2014
+#endif
+
+#ifndef PCI_CHIP_M2015
+#define     PCI_CHIP_M2015          0x2015
+#endif
+
+#ifndef PCI_CHIP_M2200
+#define     PCI_CHIP_M2200          0x2200
+#endif
+
+typedef enum {
+    OPTION_NOACCEL,
+    OPTION_MMIO2D,   
+    OPTION_SW_CURSOR,
+    OPTION_HWC_NUM,
+    OPTION_ENG_CAPS,   
+    OPTION_DBG_SELECT,
+    OPTION_NO_DDC,
+    OPTION_ACCELMETHOD,
+    OPTION_HRATIO,
+    OPTION_VRATIO,
+    OPTION_RANDRROTATION,    
+    OPTION_DOWN_SCALE
+} RDCOpts;
+
+static const OptionInfoRec RDCOptions[] = {
+    {OPTION_NOACCEL,       "NoAccel",       OPTV_BOOLEAN,  {0}, TRUE},
+    {OPTION_MMIO2D,        "MMIO2D",        OPTV_BOOLEAN,  {0}, FALSE},   
+    {OPTION_SW_CURSOR,     "SWCursor",      OPTV_BOOLEAN,  {0}, TRUE},    
+    {OPTION_HWC_NUM,       "HWCNumber",     OPTV_INTEGER,  {0}, FALSE},
+    {OPTION_ENG_CAPS,      "ENGCaps",       OPTV_INTEGER,  {0}, FALSE},                    
+    {OPTION_NO_DDC,        "NoDDC",         OPTV_BOOLEAN,  {0}, FALSE},
+    {OPTION_ACCELMETHOD,   "AccelMethod",   OPTV_STRING,   {0}, FALSE},
+    {OPTION_HRATIO,         "HRatio",         OPTV_INTEGER,    {0},    FALSE},
+    {OPTION_VRATIO,         "VRatio",         OPTV_INTEGER,    {0},    FALSE},    
+    {OPTION_RANDRROTATION, "RandRRotation", OPTV_BOOLEAN,  {0}, FALSE},
+    {OPTION_DOWN_SCALE,    "DownScale",     OPTV_BOOLEAN,  {0}, FALSE},
+    {-1,                   NULL,            OPTV_NONE,     {0}, FALSE}
+};
+
+
+static SymTabRec RDCChipsets[] = {
+    {PCI_CHIP_M2010_A0, "M2010_A0"},
+    {PCI_CHIP_M2010, "M2010"},
+    {PCI_CHIP_M2011, "M2011"},
+    {PCI_CHIP_M2012, "M2012"},
+    {PCI_CHIP_M2013, "M2013"},
+    {PCI_CHIP_M2014, "M2014"},
+    {PCI_CHIP_M2015, "M2015"},
+    {PCI_CHIP_M2200, "M2200"},
+    {-1,              NULL}
+};
+
+static PciChipsets RDCPciChipsets[] = {
+    {PCI_CHIP_M2010, PCI_CHIP_M2010, RES_SHARED_VGA},
+    {PCI_CHIP_M2010_A0, PCI_CHIP_M2010_A0, RES_SHARED_VGA},
+    {PCI_CHIP_M2011, PCI_CHIP_M2011, RES_SHARED_VGA},
+    {PCI_CHIP_M2012, PCI_CHIP_M2012, RES_SHARED_VGA},
+    {PCI_CHIP_M2013, PCI_CHIP_M2013, RES_SHARED_VGA},
+    {PCI_CHIP_M2014, PCI_CHIP_M2014, RES_SHARED_VGA},
+    {PCI_CHIP_M2015, PCI_CHIP_M2015, RES_SHARED_VGA},
+    {PCI_CHIP_M2200, PCI_CHIP_M2200, RES_SHARED_VGA},
+    {-1,              -1,              RES_UNDEFINED }
+};
+
+
+
+
+#define DMPDX2                      0x34504D44
+#define CIDOffset                   0x90
+
+
+#define R3308NBID                   0x602217f3
+#define DirectAccessFB              BIT24
+
 typedef enum _CHIP_ID {
     VGALegacy,
     M2010,
     M2011,
-    M2012
+    M2012,
+    M2013,
+    M2014,
+    R2200
 } CHIP_ID;
 
 
-#define RDC_NAME                "RDC"
-#define RDC_DRIVER_NAME         "rdc"
+#define RDC_NAME                "RDC GFX R0.0.1"
+#define RDC_DRIVER_NAME         "rdcm15"
 #define RDC_MAJOR_VERSION       0
 #define RDC_MINOR_VERSION       0
-#define RDC_PATCH_VERSION       9
+#define RDC_PATCH_VERSION       1
 #define RDC_VERSION    \
         ((RDC_MAJOR_VERSION << 20) | (RDC_MINOR_VERSION << 10) | RDC_PATCH_VERSION)
 
@@ -128,75 +221,53 @@ typedef enum _CHIP_ID {
 #define MIN_CMDQ_SIZE           0x00040000
 #define CMD_QUEUE_GUARD_BAND    0x00000020
 #define DEFAULT_HWC_NUM         0x00000002
-#define CAPTURE_BUFFER_SIZE     0x00300000
-
-
-typedef INT32       LONG;
-typedef CARD8       UCHAR;
-typedef CARD16      USHORT;
-typedef CARD32      ULONG;
+#define CAPTURE_BUFFER_SIZE     0x00700000
 
 
 #define ErrorLevel             0    
 #define DefaultLevel           4    
-#define InfoLevel              5    
-#define InternalLevel          6    
+#define InfoVideo              5    
+#define InfoLevel              6    
+#define InternalLevel          7    
 
 
-#define BIT0                    0x00000001
-#define BIT1                    0x00000002
-#define BIT2                    0x00000004
-#define BIT3                    0x00000008
-#define BIT4                    0x00000010
-#define BIT5                    0x00000020
-#define BIT6                    0x00000040
-#define BIT7                    0x00000080
-#define BIT8                    0x00000100
-#define BIT9                    0x00000200
-#define BIT10                   0x00000400
-#define BIT11                   0x00000800
-#define BIT12                   0x00001000
-#define BIT13                   0x00002000
-#define BIT14                   0x00004000
-#define BIT15                   0x00008000
-#define BIT16                   0x00010000
-#define BIT17                   0x00020000
-#define BIT18                   0x00040000
-#define BIT19                   0x00080000
-#define BIT20                   0x00100000
-#define BIT21                   0x00200000
-#define BIT22                   0x00400000
-#define BIT23                   0x00800000
-#define BIT24                   0x01000000
-#define BIT25                   0x02000000
-#define BIT26                   0x04000000
-#define BIT27                   0x08000000
-#define BIT28                   0x10000000
-#define BIT29                   0x20000000
-#define BIT30                   0x40000000
-#define BIT31                   0x80000000
+#define LCD_TIMING          0x00010000
 
-#define BIOS_ROM_PATH_FILE      "//root//RDCVBIOS.ROM"
+
+#define  CR_HEADER_ERROR             BIT10
+#define  CR_2D_IDLE                  BIT12
+#define  CR_DMA_IDLE                 BIT13
+#define  CR_VIDEO_IDLE               BIT14
+#define  CR_CR_IDLE                  BIT15
+
+#define BIOS_ROM_PATH_FILE      "//usr//lib//xorg//modules//drivers//RDCVBIOS.ROM"
 #define BIOS_ROM_SIZE           32*1024
 #define BIOS_ROM_PHY_BASE       0xC0000
 
 
  
 #define ALIGN_TO_2(f)             (((f) + 1) & ~1)
+#define ALIGN_TO_UB_2(f)           (((f) + 1) & ~1)
+#define ALIGN_TO_LB_2(f)           ((f) & ~1)
 #define ALIGN_TO_4(f)             (((f) + 3) & ~3)
+#define ALIGN_TO_UB_4(f)           (((f) + 3) & ~3)
+#define ALIGN_TO_LB_4(f)           ((f) & ~3)
 #define ALIGN_TO_8(f)             (((f) + 7) & ~7)
-#define ALIGN_TO_16(f)            (((f) + 15) & ~15)
-#define ALIGN_TO_32(f)            (((f) + 31) & ~31)
-#define ALIGN_TO_64(f)            (((f) + 63) & ~63)
+#define ALIGN_TO_UB_16(f)           (((f) + 15) & ~15)
+#define ALIGN_TO_LB_16(f)           ((f) & ~15)
+#define ALIGN_TO_UB_32(f)           (((f) + 31) & ~31)
+#define ALIGN_TO_LB_32(f)           ((f) & ~31)
+#define ALIGN_TO_UB_64(f)           (((f) + 63) & ~63)
+#define ALIGN_TO_LB_64(f)           ((f) & ~63)
 #define ALIGN_TO_128(f)           (((f) + 127) & ~127)
 #define ALIGN_TO_256(f)           (((f) + 255) & ~255)
 
 
-//CR Lock Control Header
+
 #define CR_LOCK_ID                  0x00009570
 #define CR_JUMP_ID                  0x00009571
 #define CR_LOCK_2DDMA_ID            BIT31
-//CR Lock Control Engine
+
 #define CR_LOCK_2D                  BIT24
 #define CR_LOCK_DMA                 BIT25
 #define CR_LOCK_VIDEO               BIT26
@@ -227,7 +298,7 @@ typedef struct _VIDEOMODE {
 } VIDEOMODE, *PVIDEOMODE;
 
 typedef struct {
-
+    Bool    bInitialized;
     ULONG   ulCMDQSize;
     ULONG   ulCMDQType;
     
@@ -251,9 +322,15 @@ typedef struct {
     
     ULONG   ulReadPointer_OK;       
 
-    void (*Disable2D)(ScrnInfoPtr pScrn, RDCRecPtr pRDC);
-    Bool (*Enable2D)(ScrnInfoPtr pScrn, RDCRecPtr pRDC);
-    void (*WaitEngIdle)(ScrnInfoPtr pScrn, RDCRecPtr pRDC);
+    
+    UCHAR   bFenceID;
+    UCHAR   bFuncType;
+
+    void (*Disable2D)(RDCRecPtr pRDC);
+    Bool (*Enable2D)(RDCRecPtr pRDC);
+    void (*WaitEngIdle)(RDCRecPtr pRDC);
+    Bool (*InitCMDQInfo)(ScrnInfoPtr pScrn, RDCRecPtr pRDC);
+    Bool (*EnableCMDQ)(RDCRecPtr pRDC);
 } CMDQINFO, *PCMDQINFO;
 
 typedef struct {
@@ -280,8 +357,8 @@ typedef struct {
     USHORT  yhot;
     USHORT  offset_x;
     USHORT  offset_y;
-    int     iScreenOffset_x;
-    int     iScreenOffset_y;
+    int     iScreenOffset_x;    
+    int     iScreenOffset_y;    
     MONOHWC MonoHWC;
 
 } HWCINFO, *PHWCINFO;
@@ -292,8 +369,13 @@ typedef struct {
 } MONITORSIZE;
 
 typedef struct {
+    Bool    EnableDownScaling;
     Bool    EnableHorScaler;
     Bool    EnableVerScaler;
+    Bool    EnableHorUpScaler;
+    Bool    EnableVerUpScaler;
+    Bool    EnableHorDownScaler;
+    Bool    EnableVerDownScaler;
     int     ulHorScalingFactor;
     int     ulVerScalingFactor;
 } SCALER;
@@ -308,7 +390,7 @@ typedef struct {
 } DEVICEINFO;
 
 
-//Structure defination for Video function
+
 
 #define     PI                      3.1415926535897932
 #define     BRIGHTNESS_DEFAULT      10000
@@ -316,7 +398,7 @@ typedef struct {
 #define     HUE_DEFAULT             0
 #define     SATURATION_DEFAULT      10000
 
-// OVERLAYRECORD define
+
 #define VIDEO_SHOW              0x80000000  
 #define VIDEO_HIDE              0x00000000  
 #define VIDEO_POST_INUSE        0x08000000  
@@ -337,31 +419,31 @@ typedef struct _Cofe
 	float D2;
 	float D3;
 
-	CARD32 dwIA1;
-	CARD32 dwIB1;
-	CARD32 dwIC1;
-	CARD32 dwID1;
-	CARD32 dwIA2;
-	CARD32 dwIB2;
-	CARD32 dwIC2;
-	CARD32 dwID2;
-	CARD32 dwIA3;
-	CARD32 dwIB3;
-	CARD32 dwIC3;
-	CARD32 dwID3;
+	ULONG dwIA1;
+	ULONG dwIB1;
+	ULONG dwIC1;
+	ULONG dwID1;
+	ULONG dwIA2;
+	ULONG dwIB2;
+	ULONG dwIC2;
+	ULONG dwID2;
+	ULONG dwIA3;
+	ULONG dwIB3;
+	ULONG dwIC3;
+	ULONG dwID3;
 
-	CARD32 dwPA1;
-	CARD32 dwPB1;
-	CARD32 dwPC1;
-	CARD32 dwPD1;
-	CARD32 dwPA2;
-	CARD32 dwPB2;
-	CARD32 dwPC2;
-	CARD32 dwPD2;
-	CARD32 dwPA3;
-	CARD32 dwPB3;
-	CARD32 dwPC3;
-	CARD32 dwPD3;
+	ULONG dwPA1;
+	ULONG dwPB1;
+	ULONG dwPC1;
+	ULONG dwPD1;
+	ULONG dwPA2;
+	ULONG dwPB2;
+	ULONG dwPC2;
+	ULONG dwPD2;
+	ULONG dwPA3;
+	ULONG dwPB3;
+	ULONG dwPC3;
+	ULONG dwPD3;
 }Cofe;
 
 typedef struct _VIDCOLORENHANCE
@@ -370,16 +452,21 @@ typedef struct _VIDCOLORENHANCE
     ULONG    ulScaleContrast;           
     ULONG    ulScaleHue;                
     ULONG    ulScaleSaturation;         
+
+    ULONG    ulFact1;
+    ULONG    ulFact2;
+    ULONG    ulFact3;
+    ULONG    ulFact4;
 } VIDCOLORENHANCE, *LPVIDCOLORENHANCE;
 
 typedef struct _COLORKEY    
 {
-    CARD32 dwColorKeyOn;
-    CARD32 dwChromaKeyOn;
-    CARD32 dwKeyLow;
-    CARD32 dwKeyHigh;
-    CARD32 dwChromaLow;
-    CARD32 dwChromaHigh;
+    ULONG dwColorKeyOn;
+    ULONG dwChromaKeyOn;
+    ULONG dwKeyLow;
+    ULONG dwKeyHigh;
+    ULONG dwChromaLow;
+    ULONG dwChromaHigh;
 }COLORKEY, *LPCOLORKEY;
 
 typedef struct {
@@ -480,11 +567,65 @@ typedef struct{
 }HW2DINFO;
 
 
+
+typedef struct _TVENCODERINFO
+{
+    unsigned char    bTV_HDTV;           
+    unsigned char    bSupportHDTV;       
+    unsigned char    EnCoder;            
+    unsigned char    I2CPort;            
+    unsigned char    SlaveAddr;          
+    unsigned char    DisplayPath;        
+    unsigned char    TVType;             
+    unsigned char    TVConnect;          
+    unsigned char    HDTVType;           
+    unsigned char    HDTVConnect;
+    unsigned char    CCRSLevel;          
+    unsigned char    ucHPosition;        
+    unsigned char    ucVPosition;        
+    int              iHScaler;           
+    unsigned char    ucVScaler;          
+    unsigned short   TVOut_HSize;        
+    unsigned short   TVOut_VSize;        
+    unsigned char    bEnableHPanning;     
+    unsigned char    bEnableVPanning;    
+    unsigned short   wPreX;              
+    unsigned short   wPreY;              
+    unsigned short   wPanningViewX;      
+    unsigned short   wPanningViewY;      
+    unsigned long    dwPanningDispAddr;
+    unsigned short   ModeHSize;          
+    unsigned short   ModeVSize;          
+    unsigned char    bTVModeSupport;     
+} TVENCODERINFO, *PTVENCODERINFO;
+
+
 typedef struct _ECINFO
 {
     BOOL bECExist;
     BOOL bNewEC;
 } ECINFO;
+
+
+typedef struct _EDID_DETAILED_TIMING {
+    UCHAR   bValid;                         
+    USHORT  usPixelClock;                   
+
+    USHORT  usHorDispEnd;                   
+    USHORT  usHorBlankingTime;              
+    USHORT  usHorSyncStart;                 
+    USHORT  usHorSyncTime;                  
+    UCHAR   ucHorBorder;                    
+    
+    USHORT  usVerDispEnd;                   
+    USHORT  usVerBlankingTime;              
+    USHORT  usVerSyncStart;                 
+    USHORT  usVerSyncTime;                  
+    UCHAR   ucVerBorder;                    
+
+    UCHAR   ucFlags;                        
+    
+} EDID_DETAILED_TIMING, *PEDID_DETAILED_TIMING;
 
 #define EC_ACCESS_SUCCESS   0x0
 #define EC_ACCESS_FAIL      0xFFFFFFFF
@@ -503,10 +644,8 @@ struct _RDCRec
 
     OptionInfoPtr       Options;
     DisplayModePtr      ModePtr;        
-#ifdef USE_XAA
+#ifdef HAVE_XAA
     XAAInfoRecPtr       AccelInfoPtr;
-#else
-    void *	AccelInfoPtr; // Will be NULL
 #endif
     xf86CursorInfoPtr   HWCInfoPtr;
     
@@ -519,13 +658,17 @@ struct _RDCRec
     ULONG               ulCMDReg;
     HW2DINFO            Hw2Dinfo;
     Bool                EnableClip;
+    BOOL                bEnableTVPanning;       
+    TVENCODERINFO       TVEncoderInfo[2];       
 
     
     ULONG               ENGCaps;
     ULONG               FBPhysAddr;             
     UCHAR               *FBVirtualAddr;         
     unsigned long       FbMapSize;
-    unsigned long       AvailableFBsize;
+    unsigned long       AvailableFBsize;   
+    unsigned long       ulMaxPitch;
+    unsigned long       ulMaxHeight;
     
     ULONG               MMIOPhysAddr;           
     UCHAR               *MMIOVirtualAddr;       
@@ -546,11 +689,17 @@ struct _RDCRec
     Bool                useEXA;
     Bool                noHWC;
     Bool                MMIO2D;
+    Bool                MMIOVPost;
+    Bool                IoctlCR;
+    Bool                SupportDualPath;
     
     ExaDriverPtr        exaDriverPtr;
     unsigned int        curMaker;
     unsigned int        lastMaker;
     CloseScreenProcPtr  CloseScreen;
+
+    
+    PCBIOS_Extension     pCBIOSExtension;
 
     
     ECINFO ECChipInfo;
@@ -564,6 +713,30 @@ struct _RDCRec
     
     Bool                bRandRRotation;
     Rotation            rotate; 
+
+    
+    
+    Bool                bDirectAccessFB;
+
+    ULONG               ulVirtualDesktopOffset;
+
+    Bool                bColorEnhanceOn;
+    Bool                bVPColorEnhance;
+
+    
+    BYTE                bHRatio;
+    BYTE                bVRatio;
+
+    int                 iFBDev;
+    
+    
+    DWORD               dwMaxVPOSTWidth;
+    unsigned long       bufindex;
+    DisplayModePtr	    modePool;		
+    CreateScreenResourcesProcPtr    CreateScreenResources;
+    ScreenBlockHandlerProcPtr       BlockHandler;
+    unsigned int SaveGeneration;
+    DWORD              SetVideoDisplay;
 };
 
 
@@ -571,14 +744,86 @@ struct _RDCRec
 #define MODE_PRIVATE_PTR(p) ((MODE_PRIVATE*)(p->Private))
 
 
-#include "rdc_mode.h"
+#define RDC_OUTPUT_UNUSED 0
+#define RDC_OUTPUT_ANALOG 1
+#define RDC_OUTPUT_DVO_TMDS 2
+#define RDC_OUTPUT_DVO_LVDS 3
+#define RDC_OUTPUT_DVO_TVOUT 4
+#define RDC_OUTPUT_SDVO 5
+#define RDC_OUTPUT_LVDS 6
+#define RDC_OUTPUT_TVOUT 7
+#define RDC_OUTPUT_HDMI 8
+
+typedef struct _RDCCrtcPrivateRec {
+    int			    pipe;
+    int			    plane;
+
+    Bool    		enabled;
+    
+    int			    dpms_mode;
+    
+    int			    x, y;
+
+    
+    unsigned long cursor_offset;
+    unsigned long cursor_argb_offset;
+    
+    uint64_t cursor_addr;
+    unsigned long cursor_argb_addr;
+    Bool	cursor_is_argb;
+} RDCCrtcPrivateRec, *RDCCrtcPrivatePtr;
+
+#define RDCCrtcPrivate(c) ((RDCCrtcPrivatePtr) (c)->driver_private)
+
+typedef struct _RDCOutputPrivateRec {
+   int			    type;
+   int              pipe_mask;
+   int			    clone_mask;
+   int              dpms_mode;
+   void			    *dev_priv;
+} RDCOutputPrivateRec, *RDCOutputPrivatePtr;
+
+
+
+#define IOCTL_DSP_INIT                  _IOWR('R', 0x30, unsigned int)
+#define IOCTL_DSP_CLOSE                 _IOWR('R', 0x31, unsigned int)
+#define IOCTL_DSP_CMDQ                  _IOWR('R', 0x32, unsigned int)
+#define IOCTL_DSP_IDLE_STATUS           _IOWR('R', 0x33, unsigned int)
+#define IOCTL_HW_ASIC_INFO              _IOWR('R', 0x34, unsigned int)
+#define IOCTL_QUERY_BUF_INDEX           _IOWR('R', 0x35, unsigned int)
+#define IOCTL_QUERY_SHARED_BUFF_OFFSET  _IOWR('R', 0x36, unsigned int)
+#define IOCTL_QUERY_RGB_BUF_INDEX       _IOWR('R', 0x37, unsigned int)
+    
+#define IOCTL_MM_INIT                   _IOWR('R', 0x50, unsigned int)
+#define IOCTL_MM_CLOSE                  _IOWR('R', 0x51, unsigned int)
+#define IOCTL_MM_MALLOC                 _IOWR('R', 0x52, unsigned int)
+#define IOCTL_MM_REALLOC                _IOWR('R', 0x53, unsigned int)
+#define IOCTL_MM_ZALLOC                 _IOWR('R', 0x54, unsigned int)
+#define IOCTL_MM_FREE                   _IOWR('R', 0x55, unsigned int)
+    
+#define IOCTL_CR_IDLE_STATUS            _IOWR('R', 0x70, unsigned int)
+#define IOCTL_ASIC_CR_IDLE_STATUS       _IOWR('R', 0x71, unsigned int)
+#define IOCTL_CR_CMDQ                   _IOWR('R', 0x72, unsigned int)
+#define IOCTL_IF_CAPS                   _IOWR('R', 0x73, unsigned int)
+    
+#define IOCTL_FOR_TEST          _IOWR('R', 0xFF, unsigned int)
+
+
+#define IF_CAP_DSP_CR   0x00000001
+#define IF_CAP_DSP      0x00000002
+#define IF_CAP_MM       0x00000004
+#define IF_CAP_CR       0x00000008
+
+#define RDC_DEV         "/dev/fb0"
+
+#include <fcntl.h>
+
+
 #include "rdc_vgatool.h"
 #include "rdc_2dtool.h"
 #include "rdc_cursor.h"
-#include "CInt10.h"
 #include "rdc_video.h"
 #include "rdc_rotation.h"
 
-#define STRINGIZE_DETAIL(x) #x
-#define STRINGIZE(x) STRINGIZE_DETAIL(x)
-#define rdcLog(msg) xf86DrvMsgVerb(0, X_INFO, 0,__FILE__ "(" STRINGIZE(__LINE__) "): " msg "\n")
+
+#endif
