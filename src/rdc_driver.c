@@ -110,7 +110,7 @@ extern void vDisable2D(RDCRecPtr pRDC);
 extern void vWaitEngIdle(RDCRecPtr pRDC);
 extern void CreateEDIDDetailedTimingList(UCHAR *ucEdidBuffer, ULONG ulEdidBufferSize, EDID_DETAILED_TIMING *pEDIDDetailedTiming);
 extern CBStatus CBIOS_SetEDIDToModeTable(ScrnInfoPtr pScrn, EDID_DETAILED_TIMING *pEDIDDetailedTiming);
-extern void RDCInitpScrnDual(pScrn);
+extern void RDCInitpScrnDual(ScrnInfoPtr pScrn);
 
 
 
