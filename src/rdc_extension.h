@@ -32,10 +32,7 @@
 
 
 
-
-// user defined type.
-typedef unsigned short          WORD;
-typedef unsigned long           DWORD;
+#include "BiosDef.h"
 
 // Escape return value
 #define UT_FAIL                         0x0000
@@ -68,6 +65,22 @@ typedef unsigned long           DWORD;
 #define	UT_QUERY_TV_INFO				0x1402
 #define	UT_SET_TV_CCRS_LEVEL			0x1403
 #define	UT_QUERY_TV_CCRS_LEVEL			0x1404
+#define UT_QUERY_TV_ENC_ID              0x1405
+#define UT_QUERY_TV_H_POS               0x1406
+#define UT_SET_TV_H_POS                 0x1407
+#define UT_QUERY_TV_V_POS               0x1408
+#define UT_SET_TV_V_POS                 0x1409
+#define UT_QUERY_TV_H_SCALER            0x140A
+#define UT_SET_TV_H_SCALER              0x140B
+#define UT_SET_TV_REGISTRY              0x140C
+#define UT_SET_TV_PANNING_ENABLE        0x140D
+#define UT_QUERY_TV_PANNING_ENABLE      0x140E
+#define UT_QUERY_TV_V_SCALER            0x140F
+#define UT_SET_TV_V_SCALER              0x1410
+#define UT_QUERY_TV_DEFAULT_VALUE       0x1411
+#define UT_SET_TV_PANNING_RES           0x1412
+#define UT_QUERY_TV_PANNING_RES         0x1413
+
 
 #define UT_QUERY_VIDEO_CONTRAST         0X1501
 #define UT_SET_VIDEO_CONTRAST           0X1502
@@ -77,6 +90,15 @@ typedef unsigned long           DWORD;
 #define UT_SET_VIDEO_HUE                0X1506
 #define UT_QUERY_VIDEO_SATURATION       0X1507
 #define UT_SET_VIDEO_SATURATION         0X1508
+
+#define UT_SET_HDMI_ACT_RANGE             0x1601
+#define UT_QUERY_HDMI_ACT_RANGE           0x1602
+#define UT_SET_HDMI_UNDERSCAN_PERSENT     0X1603
+#define UT_QUERY_HDMI_UNDERSCAN_PERSENT   0x1604
+#define UT_QUERY_HDMI_TYPE                0x1605
+
+#define UT_QUERY_ROTATION_CAP             0x1F16
+
 
 // Escape jpeg decoder function define
 #define UT_DECODER_JPEG_ENTRY           0x2001
@@ -94,31 +116,36 @@ typedef unsigned long           DWORD;
 #define X_RDCGFXQueryVersion   0
 #define X_RDCGFXCommand        1
 
+#define VIDEO_MAX_COLOR_REGISTER  0xFF
+
+#define SAA7105DACPower      0x2D
+#define SAA7105DACCCRSLevel  0x5F
+
 typedef struct {
     BYTE    type;           
     BOOL    pad1;
-    CARD16  sequenceNumber B16;
-    CARD32  length B32;
-    CARD16  majorVersion B16;   
-    CARD16  minorVersion B16;   
-    CARD32  pad2 B32;
-    CARD32  pad3 B32;
-    CARD32  pad4 B32;
-    CARD32  pad5 B32;
-    CARD32  pad6 B32;
+    WORD    sequenceNumber B16;
+    ULONG   length B32;
+    WORD    majorVersion B16;   
+    WORD    minorVersion B16;   
+    ULONG   pad2 B32;
+    ULONG   pad3 B32;
+    ULONG   pad4 B32;
+    ULONG   pad5 B32;
+    ULONG   pad6 B32;
 } xRDCGFXQueryVersionReply;
 
 typedef struct {
-    CARD8   reqType;
-    CARD8   RDCGFXReqType;
-    CARD16  length B16;
-    CARD32  util_cmd_id;
-    CARD32  *inBuffer;
-    CARD32  inBufferSize;
-    CARD32  *outBuffer;
-    CARD32  outBufferSize;
-    CARD32  result_header;
-    CARD32  pad;
+    BYTE    reqType;
+    BYTE    RDCGFXReqType;
+    WORD    length B16;
+    ULONG   util_cmd_id;
+    ULONG   *inBuffer;
+    ULONG   inBufferSize;
+    ULONG   *outBuffer;
+    ULONG   outBufferSize;
+    ULONG   result_header;
+    ULONG   pad;
 } xRDCGFXCommandReq;
 
 
@@ -201,14 +228,6 @@ typedef struct _LCDINFO
 	WORD wLCDWidth; 
 } LCDINFO, *PLCDINFO;
 
-int EC_SetLCDPWM(ScrnInfoPtr pScrn, char *level);
-int EC_QueryLCDPWM(ScrnInfoPtr pScrn, char *level);
-extern void SetTV_CVBS_CCRSLevel(UCHAR *Level);
-extern UCHAR ucGetTV_CVBS_CCRSLevel(UCHAR *Level);
-
-//Limitation Define
-#define VIDEO_MAX_COLOR_REGISTER  0xFF
-
 //Prototype Declaration
 void vInitializeGammaRamp(
     ScrnInfoPtr pScrn
@@ -225,3 +244,35 @@ typedef struct _TVINFO
     WORD wType;             
     UCHAR bConnector;        
 } __attribute__((packed)) TVINFO, *PTVINFO;
+
+typedef struct _TV_Disp_Info
+{
+    unsigned char    ucCCRSLevel;        
+    unsigned char    ucHPosition;        
+    unsigned char    ucVPosition;        
+    int              iHScaler;           
+    unsigned char    ucVScaler;          
+} TV_Disp_Info,*PTV_Disp_Info;
+
+typedef struct _CBTV_Disp_Info
+{
+    BYTE    ucCCRSLevel;        
+    BYTE    ucHPosition;        
+    BYTE    ucVPosition;        
+    int     iHScaler;           
+    BYTE    ucVScaler;          
+    BYTE    bTVType;            
+    BYTE    bChange;            
+    BYTE    bEnableHPanning;    
+    WORD    wTVOut_HSize;       
+    WORD    wModeHres;          
+} CBTV_Disp_Info,*PCBTV_Disp_Info;
+
+
+int EC_SetLCDPWM(RDCRecPtr pRDC, char *level);
+int EC_QueryLCDPWM(RDCRecPtr pRDC, char *level);
+void GetFS473PositionFromVBIOS(RDCRecPtr pRDC);
+void CBIOS_SetTVEncDispRegModify(RDCRecPtr pRDC, PTV_Disp_Info pTVDispInfo, BYTE bChange);
+void GetSAA7105CCRSLevel(UCHAR ucI2Cport, UCHAR ucDevAddress, UCHAR *Level);
+UCHAR ucGetTV_CVBS_CCRSLevel(UCHAR *Level);
+
