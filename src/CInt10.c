@@ -1,1405 +1,212 @@
-/*
+/* 
  * Copyright (C) 2009 RDC Semiconductor Co.,Ltd
- * All Rights Reserved.
  *
- * Permission is hereby granted, free of charge, to any person obtaining a
- * copy of this software and associated documentation files (the
- * "Software"), to deal in the Software without restriction, including
- * without limitation the rights to use, copy, modify, merge, publish,
- * distribute, sub license, and/or sell copies of the Software, and to
- * permit persons to whom the Software is furnished to do so, subject to
- * the following conditions:
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
- * The above copyright notice and this permission notice (including the
- * next paragraph) shall be included in all copies or substantial portions
- * of the Software.
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
  *
- * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS
- * OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
- * MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NON-INFRINGEMENT.
- * IN NO EVENT SHALL PRECISION INSIGHT AND/OR ITS SUPPLIERS BE LIABLE FOR
- * ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,
- * TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE
- * SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+ * You should have received a copy of the GNU General Public License
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  * For technical support : 
  *     <rdc_xorg@rdc.com.tw>
  */
- 
-
+#include <stdlib.h>
 #include <string.h>
-
-#ifndef XFree86Module
-#include "compiler.h"
-#else
-#include "xf86_ansic.h"
-#endif
-
-#include "typedef.h"
+#include "cbdbg.h"
 #include "CInt10.h"
-#include "CInt10FunProto.h"
 #include "CInt10Tbl.h"
-
-#define I2C_ERROR    0
-#define I2C_OK       1
-#define I2CWriteCMD  0
-#define I2CReadCMD   1
+#include "CInt10FunProto.h"
 
 
-USHORT Relocate_IOAddress;
-
-extern UCHAR bSetSAA7105Reg(UCHAR bDisplayPath, USHORT wModeNum, UCHAR ucTVType, UCHAR ucI2Cport, UCHAR ucDevAddress);
-extern void SetSAA7105DACPower(UCHAR ucI2Cport, UCHAR ucDevAddress, UCHAR ucTVConnectorType);
-extern void SetSAA7105InitReg(UCHAR ucI2Cport, UCHAR ucDevAddress);
-extern void SetSAA7105CCRSLevel(UCHAR ucI2Cport, UCHAR ucDevAddress, UCHAR Level);
-extern void GetSAA7105CCRSLevel(UCHAR ucI2Cport, UCHAR ucDevAddress, UCHAR *Level);
+BYTE* pRelated_IOAddress;
 
 
-__inline void OutPort(UCHAR Index,UCHAR Value)     
+__inline void OutPort(WORD Index,BYTE Value)     
 {              
-
-    outb(Relocate_IOAddress+Index, Value);
-
+    *((volatile BYTE*)pRelated_IOAddress + Index) = Value;
     return;                          
 }                                                                       
 
-__inline UCHAR InPort(UCHAR Index)                        
+__inline BYTE InPort(WORD Index)                        
 {                                                                      
-    UCHAR bInVal = 0x0;    
+    BYTE temp = 0x0;    
 
-    bInVal = inb(Relocate_IOAddress+Index);
+    temp = *((volatile BYTE*)pRelated_IOAddress + Index);
     
-    return bInVal;                                                 
+    return temp;                                                 
 }
 
-void I2CWriteClock(UCHAR I2CPort, UCHAR data)
+__inline void OutIOPort(WORD Index,BYTE Value)     
 {
-    ULONG i;
-    UCHAR ucMaskData=1, ucTmpData;
-    if(data)            
-        ucMaskData &= 0;
-    for (i=0;i<0x1000; i++)
-    {
-        SetCRReg(I2CPort, ucMaskData, 0x1);
-        ucTmpData = GetCRReg(I2CPort) & 0x01;
-        if (ucMaskData == ucTmpData) 
-            break;
-    }
-}
-
-void I2CDelay(UCHAR I2CPort)
-{
-    UCHAR     i,jtemp;
     
-    for (i=0;i<100;i++)
-        jtemp = GetCRReg(I2CPort);
 }
 
-void I2CWriteData(UCHAR I2CPort, UCHAR data)
+__inline BYTE InIOPort(WORD Index)     
 {
+    BYTE temp = 0x0;    
 
-    ULONG i;
-    UCHAR ucMaskData=0x4, ucTmpData;
-    if(data)            
-        ucMaskData &= 0;
-    for (i=0;i<0x1000; i++)
+    
+
+    return temp;                                                 
+}
+
+void ResetATTR()
+{
+    InPort(COLOR_INPUT_STATUS1_READ);
+    InPort(MONO_INPUT_STATUS1_READ);
+}
+
+void EnableATTR()
+{
+    ResetATTR();
+    OutPort(ATTR_DATA_WRITE, 0x20);
+    ResetATTR();
+}
+
+
+void SetCRReg(BYTE bRegIndex, BYTE bRegValue, BYTE bMask)
+{
+    BYTE btemp = 0x0,btemp1 = 0x0;
+    
+    if(bMask != 0xFF)
     {
-        SetCRReg(I2CPort, ucMaskData, 0x4);
-        ucTmpData = GetCRReg(I2CPort) & 0x04;
-        if (ucMaskData == ucTmpData) 
-            break;
+        OutPort(COLOR_CRTC_INDEX,bRegIndex);
+        btemp = (BYTE)InPort(COLOR_CRTC_DATA);
+        bRegValue &= bMask;
+        btemp &=~(bMask);
+        btemp |= bRegValue;
+        OutPort(COLOR_CRTC_DATA,btemp);
     }
-}
-
-void I2CStart(UCHAR I2CPort)
-{
-    I2CWriteClock(I2CPort, 0x00);               
-    I2CDelay(I2CPort);
-    I2CWriteData(I2CPort, 0x01);                
-    I2CDelay(I2CPort);    
-    I2CWriteClock(I2CPort, 0x01);               
-    I2CDelay(I2CPort);    
-    I2CWriteData(I2CPort, 0x00);                
-    I2CDelay(I2CPort);    
-    I2CWriteClock(I2CPort, 0x01);                  
-    I2CDelay(I2CPort);                    
-}
-
-void SendI2CDataByte(UCHAR I2CPort, UCHAR Data)
-{
-    char i;
-
-    for (i=7;i>=0;i--)
+    else
     {
-        I2CWriteClock(I2CPort, 0x00);           
-        I2CDelay(I2CPort);         
-        if((Data>>i)&0x1)
-            I2CWriteData(I2CPort, 0x1);           
-        else
-            I2CWriteData(I2CPort, 0x0);           
+        OutPort(COLOR_CRTC_INDEX,bRegIndex);
+        OutPort(COLOR_CRTC_DATA,bRegValue);
+    }
+
+    return;
+}
+
+
+BYTE GetCRReg(BYTE bRegIndex)
+{
+    BYTE btemp = 0x0;
+    
+    OutPort(COLOR_CRTC_INDEX,bRegIndex);
+    btemp = (BYTE)InPort(COLOR_CRTC_DATA);
         
-        I2CDelay(I2CPort);         
+    return btemp;
+}
+
+
+void SetSRReg(BYTE bRegIndex, BYTE bRegValue, BYTE bMask)
+{
+    BYTE btemp = 0x0,btemp1 = 0x0;
+    
+    if(bMask != 0xFF)
+    {
+        OutPort(SEQ_INDEX,bRegIndex);
+        btemp = (BYTE)InPort(SEQ_DATA);
+        bRegValue &= bMask;
+        btemp &=~(bMask);
+        btemp |= bRegValue;
+        OutPort(SEQ_DATA,btemp);
+    }
+    else
+    {
+        OutPort(SEQ_INDEX,bRegIndex);
+        OutPort(SEQ_DATA,bRegValue);
+    }
+
+    return;
+}
+
+
+BYTE GetSRReg(BYTE bRegIndex)
+{
+    BYTE btemp = 0x0;
+    
+    OutPort(SEQ_INDEX,bRegIndex);
+    btemp = (BYTE)InPort(SEQ_DATA);
         
-        I2CWriteClock(I2CPort, 0x01);           
-        I2CDelay(I2CPort);                           
-    }                
+    return btemp;
 }
 
-UCHAR CheckACK(UCHAR I2CPort)
-{    
-    I2CWriteClock(I2CPort, 0x00);               
-    I2CDelay(I2CPort);    
-    I2CWriteData(I2CPort, 0x01);                
-    I2CDelay(I2CPort);    
-    I2CWriteClock(I2CPort, 0x01);               
-    I2CDelay(I2CPort);             
-    return ((GetCRReg(I2CPort) & 0x20) ? 0:1);                
-}
-
-UCHAR ReceiveI2CDataByte(UCHAR I2CPort, UCHAR I2CSlave)
+void SetARReg(BYTE index,BYTE value)
 {
-    UCHAR jData=0, jTempData;
-    char i;
-    ULONG j;
+    ResetATTR();
 
-    for (i=7;i>=0;i--)
-    {
-        I2CWriteClock(I2CPort, 0x00);                
-        I2CDelay(I2CPort);     
-            
-        I2CWriteData(I2CPort, 0x01);                 
-        I2CDelay(I2CPort);         
-        
-        I2CWriteClock(I2CPort, 0x01);                
-        I2CDelay(I2CPort);           
-        
-        for (j=0; j<0x1000; j++)
-        {   
-            if (((GetCRReg(I2CPort) & 0x10) >> 4))
-                break;
-        }    
-                    
-        jTempData =  (GetCRReg(I2CPort) & 0x20) >> 5;
-        jData |= ((jTempData & 0x01) << i); 
-        
-        I2CWriteClock(I2CPort, 0x01);                
-        I2CDelay(I2CPort);                           
-    }    
-    
-    return (jData);                              
+    OutPort(ATTR_DATA_WRITE,index);
+    OutPort(ATTR_DATA_WRITE,value);
+
+    InPort(COLOR_INPUT_STATUS1_READ);
+    OutPort(ATTR_DATA_WRITE,BIT5);
 }
 
-void SendNACK(UCHAR I2CPort)
+BYTE GetARReg(BYTE index)
 {
-    I2CWriteClock(I2CPort, 0x00);               
-    I2CDelay(I2CPort);    
-    I2CWriteData(I2CPort, 0x01);                
-    I2CDelay(I2CPort);    
-    I2CWriteClock(I2CPort, 0x01);               
-    I2CDelay(I2CPort);    
-}
-
-void I2CStop(UCHAR I2CPort)
-{
-    I2CWriteClock(I2CPort, 0x00);               
-    I2CDelay(I2CPort);    
-    I2CWriteData(I2CPort, 0x00);                
-    I2CDelay(I2CPort);    
-    I2CWriteClock(I2CPort, 0x01);               
-    I2CDelay(I2CPort);    
-    I2CWriteData(I2CPort, 0x01);                
-    I2CDelay(I2CPort);    
-    I2CWriteClock(I2CPort, 0x01);                
-    I2CDelay(I2CPort);                      
+    BYTE bTmp;
+    InPort(COLOR_INPUT_STATUS1_READ);
+    OutPort(ATTR_DATA_WRITE,index);
+    bTmp = (BYTE)InPort(0x3C1);
+    InPort(COLOR_INPUT_STATUS1_READ);
+    OutPort(ATTR_DATA_WRITE,BIT5);
+    return bTmp;
 }
 
 
-UCHAR ReadI2C(UCHAR I2CPort, UCHAR I2CSlave, UCHAR RegIdx, UCHAR* RegData)
+void SetGRReg(BYTE bRegIndex, BYTE bRegValue, BYTE bMask)
 {
-    I2CStart(I2CPort);
-
+    BYTE btemp = 0x0,btemp1 = 0x0;
     
-    SendI2CDataByte(I2CPort, I2CSlave);
-    
-    if (!CheckACK(I2CPort))
+    if(bMask != 0xFF)
     {
-        return I2C_ERROR;
-    }    
-
-    
-    SendI2CDataByte(I2CPort, RegIdx);
-
-    if (!CheckACK(I2CPort))
-    {
-        return I2C_ERROR;
-    }    
-    
-    I2CStart(I2CPort);
-   
-    
-    SendI2CDataByte(I2CPort, I2CSlave+1);
-    
-    if (!CheckACK(I2CPort))
-    {
-        return I2C_ERROR;
-    }    
-    
-    *RegData = ReceiveI2CDataByte(I2CPort, I2CSlave);
-
-    SendNACK(I2CPort);
-
-    I2CStop(I2CPort);
-
-    return I2C_OK;       
-}
-
-UCHAR WriteI2C(UCHAR I2CPort, UCHAR I2CSlave, UCHAR RegIdx, UCHAR RegData)
-{
-    I2CStart(I2CPort);
-
-    
-    SendI2CDataByte(I2CPort, I2CSlave);
-    if (!CheckACK(I2CPort))
-    {
-        return I2C_ERROR;
-    }    
-
-    
-    SendI2CDataByte(I2CPort, RegIdx);
-    if (!CheckACK(I2CPort))
-    {
-        return I2C_ERROR;
-    }    
-
-    
-    SendI2CDataByte(I2CPort, RegData);
-    if (!CheckACK(I2CPort))
-    {
-        return I2C_ERROR;
-    }
-    
-    SendNACK(I2CPort);
-         
-    I2CStop(I2CPort);
-    return I2C_OK;       
-}
-
-
-void SetVBERerurnStatus(USHORT VBEReturnStatus, CBIOS_ARGUMENTS *pCBiosArguments)
-{
-    pCBiosArguments->reg.x.AX = VBEReturnStatus;
-}
-
-
-void SetTimingRegs(UCHAR ucDisplayPath, MODE_INFO *pModeInfo, RRATE_TABLE *pRRateTable)
-{
-    USHORT usHBorder = 0, usVBorder = 0;
-    USHORT usHtotal, usHDispEnd, usHBlankStart, usHBlankEnd, usHSyncStart, usHSyncEnd;
-    USHORT usVtotal, usVDispEnd, usVBlankStart, usVBlankEnd, usVSyncStart, usVSyncEnd;
-    ULONG  ulPixelClock;
-    
-    xf86DrvMsgVerb(0, X_INFO, DefaultLevel, "==Enter SetTimingRegs()==\n");
-
-    if (pRRateTable->Attribute & HB)
-    {
-        usHBorder = 8;
-    }
-
-    if (pRRateTable->Attribute & VB)
-    {
-        usVBorder = 8;
-    }
-
-    usHtotal =      pModeInfo->H_Size + usHBorder*2 + pRRateTable->H_Blank_Time;
-    usHDispEnd =    pModeInfo->H_Size;
-    usHBlankStart = pModeInfo->H_Size + usHBorder;
-    usHBlankEnd =   pModeInfo->H_Size + usHBorder + pRRateTable->H_Blank_Time;
-    usHSyncStart =  pRRateTable->H_Sync_Start;
-    usHSyncEnd =    pRRateTable->H_Sync_Start + pRRateTable->H_Sync_Time;
-
-    usVtotal =      pModeInfo->V_Size + usVBorder*2 + pRRateTable->V_Blank_Time;
-    usVDispEnd =    pModeInfo->V_Size;
-    usVBlankStart = pModeInfo->V_Size + usVBorder;
-    usVBlankEnd =   pModeInfo->V_Size + usVBorder + pRRateTable->V_Blank_Time;
-    usVSyncStart =  pRRateTable->V_Sync_Start;
-    usVSyncEnd =    pRRateTable->V_Sync_Start + pRRateTable->V_Sync_Time;
-
-    ulPixelClock =  pRRateTable->Clock;
-    
-    xf86DrvMsgVerb(0, X_INFO, InfoLevel, "H total = %d\n", usHtotal);
-    SetHTotal(ucDisplayPath, usHtotal);
-    
-    xf86DrvMsgVerb(0, X_INFO, InfoLevel, "H disp end = %d\n", usHDispEnd);
-    SetHDisplayEnd(ucDisplayPath, usHDispEnd);
-
-    xf86DrvMsgVerb(0, X_INFO, InfoLevel, "H blank start = %d\n", usHBlankStart);
-    SetHBlankingStart(ucDisplayPath, usHBlankStart);
-
-    xf86DrvMsgVerb(0, X_INFO, InfoLevel, "H blank end = %d\n", usHBlankEnd);
-    SetHBlankingEnd(ucDisplayPath, usHBlankEnd);
-
-    xf86DrvMsgVerb(0, X_INFO, InfoLevel, "H sync start = %d\n", usHSyncStart);
-    SetHSyncStart(ucDisplayPath, usHSyncStart);
-
-    xf86DrvMsgVerb(0, X_INFO, InfoLevel, "H sync end = %d\n", usHSyncEnd);
-    SetHSyncEnd(ucDisplayPath, usHSyncEnd);
-
-    xf86DrvMsgVerb(0, X_INFO, InfoLevel, "V total = %d\n", usVtotal);
-    SetVTotal(ucDisplayPath, usVtotal);
-    
-    xf86DrvMsgVerb(0, X_INFO, InfoLevel, "V disp end = %d\n", usVDispEnd);
-    SetVDisplayEnd(ucDisplayPath, usVDispEnd);
-
-    xf86DrvMsgVerb(0, X_INFO, InfoLevel, "V blank start = %d\n", usVBlankStart);
-    SetVBlankingStart(ucDisplayPath, usVBlankStart);
-
-    xf86DrvMsgVerb(0, X_INFO, InfoLevel, "V blank end = %d\n", usVBlankEnd);
-    SetVBlankingEnd(ucDisplayPath, usVBlankEnd);
-
-    xf86DrvMsgVerb(0, X_INFO, InfoLevel, "V sync start = %d\n", usVSyncStart);
-    SetVSyncStart(ucDisplayPath, usVSyncStart);
-
-    xf86DrvMsgVerb(0, X_INFO, InfoLevel, "V sync end = %d\n", usVSyncEnd);
-    SetVSyncEnd(ucDisplayPath, usVSyncEnd);
-    
-    xf86DrvMsgVerb(0, X_INFO, InfoLevel, "Pixel clock = %d\n", ulPixelClock);
-    SetPixelClock(ucDisplayPath, ulPixelClock);
-
-    xf86DrvMsgVerb(0, X_INFO, DefaultLevel, "==Exit SetTimingRegs()==\n");
-}
-
-
-void SetHTotal(UCHAR DisplayPath, USHORT Value)
-{
-    
-    Value -= 40;
-    
-    
-    Value += 7;
-
-    if(DisplayPath == DISP1)
-    {
-        WriteRegToHW(HTotal1, Value);
+        OutPort(GRAPH_INDEX,bRegIndex);
+        btemp = (BYTE)InPort(GRAPH_DATA);
+        bRegValue &= bMask;
+        btemp &=~(bMask);
+        btemp |= bRegValue;
+        OutPort(GRAPH_DATA,btemp);
     }
     else
     {
-        WriteRegToHW(HTotal2, Value);
+        OutPort(GRAPH_INDEX,bRegIndex);
+        OutPort(GRAPH_DATA,bRegValue);
     }
 
     return;
 }
 
-
-void SetHDisplayEnd(UCHAR DisplayPath, USHORT Value)
+void SetMSReg(BYTE bRegValue)
 {
-    
-    Value -= 8;
-
-    if(DisplayPath == DISP1)
-    {
-        WriteRegToHW(HDispEnd1, Value);
-    }
-    else
-    {
-        WriteRegToHW(HDispEnd2, Value);
-    }
-
-    return;
-    
+    OutPort(MISC_WRITE,bRegValue);
 }
 
 
-void SetHBlankingStart(UCHAR DisplayPath, USHORT Value)
+WORD ReadRegFromHW(REG_OP *pRegOp)
 {
-    
-    Value -= 8;
+    WORD wValue = 0x0;
+    BYTE    btemp = 0x0, bMasktemp = 0x0;
 
-    if(DisplayPath == DISP1)
-    {
-        WriteRegToHW(HBnkSt1, Value);
-    }
-    else
-    {
-        WriteRegToHW(HBnkSt2, Value);
-    }
-
-    return;
-    
-}
-
-
-void SetHBlankingEnd(UCHAR DisplayPath, USHORT Value)
-{
-    
-    Value -= 8;
-
-    if(DisplayPath == DISP1)
-    {
-        WriteRegToHW(HBnkEnd1, Value);
-    }
-    else
-    {
-        WriteRegToHW(HBnkEnd2, Value);
-    }
-
-    return;
-    
-}
-
-
-void SetHSyncStart(UCHAR DisplayPath, USHORT Value)
-{
-    
-    Value -= 0;
-
-    if(DisplayPath == DISP1)
-    {
-        WriteRegToHW(HSyncSt1, Value);
-    }
-    else
-    {
-        WriteRegToHW(HSyncSt2, Value);
-    }
-
-    return;
-    
-}
-
-
-void SetHSyncEnd(UCHAR DisplayPath, USHORT Value)
-{
-    
-    Value -= 0;
-
-    if(DisplayPath == DISP1)
-    {
-        WriteRegToHW(HSyncEnd1, Value);
-    }
-    else
-    {
-        WriteRegToHW(HSyncEnd2, Value);
-    }
-
-    return;
-    
-}
-
-
-void SetVTotal(UCHAR DisplayPath, USHORT Value)
-{
-    
-    Value -= 2;
-
-    if(DisplayPath == DISP1)
-    {
-        WriteRegToHW(VTotal1, Value);
-    }
-    else
-    {
-        WriteRegToHW(VTotal2, Value);
-    }
-
-    return;
-    
-}
-
-
-void SetVDisplayEnd(UCHAR DisplayPath, USHORT Value)
-{
-    
-    Value -= 1;
-
-    if(DisplayPath == DISP1)
-    {
-        WriteRegToHW(VDispEnd1, Value);
-    }
-    else
-    {
-        WriteRegToHW(VDispEnd2, Value);
-    }
-
-    return;
-    
-}
-
-
-void SetVBlankingStart(UCHAR DisplayPath, USHORT Value)
-{
-    
-    Value -= 1;
-
-    if(DisplayPath == DISP1)
-    {
-        WriteRegToHW(VBnkSt1, Value);
-    }
-    else
-    {
-        WriteRegToHW(VBnkSt2, Value);
-    }
-
-    return;
-    
-}
-
-
-void SetVBlankingEnd(UCHAR DisplayPath, USHORT Value)
-{
-    
-    Value -= 1;
-
-    if(DisplayPath == DISP1)
-    {
-        WriteRegToHW(VBnkEnd1, Value);
-    }
-    else
-    {
-        WriteRegToHW(VBnkEnd2, Value);
-    }
-
-    return;
-    
-}
-
-
-void SetVSyncStart(UCHAR DisplayPath, USHORT Value)
-{
-    
-    Value -= 1;
-
-    if(DisplayPath == DISP1)
-    {
-        WriteRegToHW(VSyncSt1, Value);
-    }
-    else
-    {
-        WriteRegToHW(VSyncSt2, Value);
-    }
-
-    return;
-    
-}
-
-
-void SetVSyncEnd(UCHAR DisplayPath, USHORT Value)
-{
-    
-    Value -= 1;
-
-    if(DisplayPath == DISP1)
-    {
-        WriteRegToHW(VSyncEnd1, Value);
-    }
-    else
-    {
-        WriteRegToHW(VSyncEnd2, Value);
-    }
-
-    return;
-    
-}
-
-
-void SetPixelClock(UCHAR bDisplayPath, ULONG dwClock)
-{
-    PLL_Info PLLInfo;
-    
-    PLLInfo = ClockToPLLF9003A(dwClock);
-    SetDPLL(bDisplayPath, PLLInfo);
-}
-
-void SetHSource(UCHAR bDisplayPath, USHORT wValue)
-{
-    wValue -= 1;
-    
-    if(bDisplayPath == DISP1)
-    {
-        WriteRegToHW(HSource1, wValue);
-    }
-    else
-    {
-        WriteRegToHW(HSource2, wValue);
-    }
-}
-
-
-void SetHorDownScaleSrcSize(USHORT wValue)
-{
-    if (bLCDSUPPORT)
-    {
-        WriteRegToHW(HorDownScaleSrcSize1, wValue);
-    }
-}
-
-
-void SetVerDownScaleSrcSize(USHORT wValue)
-{
-    if (bLCDSUPPORT)
-    {
-        WriteRegToHW(VerDownScaleSrcSize1, wValue);
-    }
-}
-
-
-PLL_Info ClockToPLLF9003A(ULONG Clock)
-{
-    ULONG MSCount, NSCount, RSCount, FCKVCO, FCKOUT;    
-    ULONG NearestClock = 0xFFFFFFFF;
-    PLL_Info PLLInfo;
-    
-    for (MSCount = 3; MSCount < 6; MSCount++)
-    {
-        for (NSCount = 1; NSCount < 256; NSCount++)
-        {
-            FCKVCO = PLLReferenceClock * NSCount / MSCount;
-            
-            if ( (MaxFCKVCO9003A >= FCKVCO) && (FCKVCO >= MinFCKVCO9003A) )
-            {
-                for (RSCount = 1; RSCount < 6; RSCount++)
-                {
-                    FCKOUT = FCKVCO >> RSCount;
-                    if ( Difference(FCKOUT, Clock) < Difference(NearestClock, Clock) )
-                    {
-                        NearestClock = FCKOUT;
-                        if (MSCount == 3)
-                            PLLInfo.MS = 0x00;
-                        if (MSCount == 4)
-                            PLLInfo.MS = BIT3;
-                        if (MSCount == 5)
-                            PLLInfo.MS = BIT4+BIT3;
-                        PLLInfo.NS = (UCHAR)NSCount;
-                        PLLInfo.RS = (UCHAR)RSCount-1;
-                    }
-                }
-            }
-        }
-
-    }
-
-    return PLLInfo;
-
-}
-
-
-void SetDPLL(UCHAR DisplayPath, PLL_Info PLLInfo)
-{
-    UCHAR RetValue; 
-
-    if (DisplayPath == DISP1)
-    {
-        SetCRReg(0xC1, PLLInfo.MS, BIT4+BIT3);
-        SetCRReg(0xC0, PLLInfo.NS, 0xFF);
-        SetCRReg(0xCF, PLLInfo.RS, BIT2+BIT1+BIT0);
-    }
-    else
-    {
-        SetCRReg(0xBF, PLLInfo.MS, BIT4+BIT3);
-        SetCRReg(0xBE, PLLInfo.NS, 0xFF);
-        SetCRReg(0xCE, PLLInfo.RS, BIT2+BIT1+BIT0);
-    }
-
-    
-    RetValue = GetCRReg(0xBB);
-    SetCRReg(0xBB, RetValue, 0xFF);
-
-}
-
-
-void SetPolarity(UCHAR DevicePort, UCHAR Value)
-{
-    Value ^= BIT2+BIT1; 
-    
-    switch (DevicePort)
-    {
-        case CRT_PORT:
-            OutPort(MISC_WRITE, ((Value<<5) & 0xC0) | (InPort(MISC_READ) & 0x3F));
-            break;
-        
-        case DVP1:
-        case DVP12:
-            SetSRReg(0x20, Value>>1, BIT1+BIT0);
-            break;
-
-        case DVP2:
-            SetSRReg(0x20, Value<<2, BIT4+BIT3);
-            break;
-    }
-}
-
-
-void SetFIFO(UCHAR DisplayPath)
-{
-    UCHAR *pucPCIDataStruct = (UCHAR*)PCIDataStruct;
-
-    if (DisplayPath == DISP1)
-    {
-        if (*(USHORT*)(pucPCIDataStruct + OFF_DID) == 0x2010)
-        {
-            SetCRReg(0xA7, 0x5F, 0xFF);
-            SetCRReg(0xA6, 0x3F, 0xFF);
-        }
-        else if (*(USHORT*)(pucPCIDataStruct + OFF_DID) == 0x2012)
-        {
-            SetCRReg(0xA7, 0x9F, 0xFF);
-            SetCRReg(0xA6, 0x7F, 0xFF);
-        }
-        else
-        {
-            SetCRReg(0xA7, 0x3F, 0xFF);
-            SetCRReg(0xA6, 0x3F, 0xFF);
-        }
-    }
-    else if (DisplayPath == DISP2)
-    {
-        SetCRReg(0x35, 0x3F, 0xFF);
-        SetCRReg(0x34, 0x3F, 0xFF);
-    }
-}
-
-
-void SetPitch(UCHAR DisplayPath, USHORT Value)
-{
-    
-    Value += 7;
-    Value >>= 3;
-
-    if(DisplayPath == DISP1)
-    {
-        WriteRegToHW(Pitch1, Value);
-    }
-    else
-    {
-        WriteRegToHW(Pitch2, Value);
-    }
-
-    return;
-    
-}
-
-
-USHORT GetPitch(UCHAR DisplayPath)
-{
-    USHORT wPitch;
-    
-    if(DisplayPath == DISP1)
-    {
-        wPitch = ReadRegFromHW(Pitch1);
-    }
-    else
-    {
-        wPitch = ReadRegFromHW(Pitch2);
-    }
-
-    wPitch <<= 3;
-
-    return wPitch;
-}
-
-
-USHORT GetVDisplayEnd(UCHAR DisplayPath)
-{
-    USHORT  wDisplayEnd = 0x0;
-    
-    if(DisplayPath == DISP1)
-    {
-        wDisplayEnd = ReadRegFromHW(VDispEnd1);
-    }
-    else
-    {
-        wDisplayEnd = ReadRegFromHW(VDispEnd2);
-    }
-    
-    
-    wDisplayEnd += 1;
-
-    return  wDisplayEnd;
-}
-
-
-void SetColorDepth(UCHAR DisplayPath, UCHAR Value)
-{
-    UCHAR bSetBit = 0x0;
-
-    switch(Value)
-    {
-        case 8:
-            bSetBit = (UCHAR)BIT0;
-            break;
-        case 16:
-            bSetBit = (UCHAR)BIT2;
-            break;
-        case 32:
-            bSetBit = (UCHAR)BIT3;
-            break;
-        default:
-            return;
-    }
-
-    if(DisplayPath == DISP1)
-    {
-        SetCRReg(0xA3, bSetBit, 0x0F);
-    }
-    else
-    {
-        
-        if(Value == 8)
-            return;
-        
-        SetCRReg(0x33, bSetBit, 0x0F);
-    }
-    
-}
-
-
-void ConfigDigitalPort(UCHAR bDisplayPath)
-{
-    PORT_CONFIG *pDevicePortConfig;
-    UCHAR bDeviceIndex;
-    UCHAR bRegValue;
-
-    bDeviceIndex = Get_DEV_ID(bDisplayPath);
-
-    if(bDisplayPath == DISP1)
-    {
-        bRegValue = 0x3;
-    }
-    else
-    {
-        bRegValue = 0x4;
-    }
-
-    if (GetDevicePortConfig(bDeviceIndex, &pDevicePortConfig))
-    {
-        switch(pDevicePortConfig->PortID)
-        {
-            case CRT_PORT:
-                SetSRReg(0x1F, bRegValue, BIT2);
-                break;
-                
-            case DVP1:
-                Set12BitDVP();
-                SetSRReg(0x1F, bRegValue, BIT0);
-                break;
-                
-            case DVP2:
-                Set12BitDVP();
-                SetSRReg(0x1F, bRegValue, BIT1);
-                break;
-                
-            case DVP12:
-                Set24BitDVP();
-                SetSRReg(0x1F, bRegValue, BIT0);
-                break;
-        }
-    }
-}
-
-
-void LoadTiming(UCHAR bDisplayPath, USHORT wModeNum)
-{
-    UCHAR bDeviceIndex = Get_DEV_ID(bDisplayPath);
-
-     
-
-    switch(bDeviceIndex)
-    {
-        case CRT_ID:
-        case CRT2_ID:
-        case DVI_ID:
-        case DVI2_ID:
-            LoadVESATiming(bDisplayPath, wModeNum);
-            break;
-
-        case LCD_ID:
-        case LCD2_ID:
-            LoadLCDTiming(bDisplayPath, wModeNum);
-        case TV_ID:
-        case TV2_ID:
-            LoadTVTiming(bDisplayPath, wModeNum, bDeviceIndex);
-            TurnOnTVClock();
-            break;
-    }
-
-}
-
-
-void LoadVESATiming(UCHAR bDisplayPath, USHORT wModeNum)
-{
-    UCHAR bR_Rate_value = 0x0;
-    MODE_INFO *pModeInfo = NULL;
-    RRATE_TABLE *pRRateTable = NULL;
-    xf86DrvMsgVerb(0, X_INFO, DefaultLevel, "==Enter LoadVESATiming()==\n");
-    bR_Rate_value = Get_RRATE_ID(bDisplayPath);
-    
-    if(GetModePointerFromVESATable(wModeNum, bR_Rate_value, &pModeInfo, &pRRateTable))
-    {
-        SetTimingRegs(bDisplayPath, pModeInfo, pRRateTable);
-    }
-    else
-    {
-        xf86DrvMsgVerb(0, X_INFO, InfoLevel, "Mode not found!!\n");
-        
-    }
-    xf86DrvMsgVerb(0, X_INFO, DefaultLevel, "==Exit LoadVESATiming()==\n");
-}
-
-void LoadLCDTiming(UCHAR bDisplayPath, USHORT wModeNum)
-{
-    UCHAR bDeviceIndex = Get_DEV_ID(bDisplayPath);
-    MODE_INFO *pPanelModeInfo, *pUserModeInfo;
-    PANEL_TABLE *pPanelTable;
-
-    xf86DrvMsgVerb(0, X_INFO, DefaultLevel, "==Enter LoadLCDTiming()==\n");
-
-    if(GetModePointerFromLCDTable(bDeviceIndex,  &pPanelModeInfo, &pPanelTable))
-    {
-        xf86DrvMsgVerb(0, X_INFO, DefaultLevel, "&pPanelTable->Timing = 0x%x\n", &pPanelTable->Timing);
-        SetTimingRegs(bDisplayPath, pPanelModeInfo, &pPanelTable->Timing);
-        Get_MODE_INFO(wModeNum, &pUserModeInfo);
-        SetScalingFactor(bDisplayPath, pUserModeInfo, pPanelModeInfo);
-    }
-    else
-    {
-        
-    }
-
-    xf86DrvMsgVerb(0, X_INFO, DefaultLevel, "==Exit LoadLCDTiming()==\n");
-}
-
-
-void LoadTVTiming(UCHAR bDisplayPath, USHORT wModeNum, UCHAR bDeviceIndex)
-{
-    UCHAR ucTVType;
-    PORT_CONFIG *pDevicePortConfig;    
-    ucTVType = Get_TV_Type();
-    if(GetDevicePortConfig(bDeviceIndex, &pDevicePortConfig))
-    {
-        if(pDevicePortConfig->TX_Enc_ID == ENC_SAA7105)
-        {
-            if(bSetSAA7105Reg(bDisplayPath, wModeNum, ucTVType, pDevicePortConfig->TX_I2C_Port, pDevicePortConfig->TX_I2C_Addr))
-            {
-                xf86DrvMsgVerb(0, X_INFO, DefaultLevel, "==SAA7105 Load TV Timing Success()==\n");
-                if(pDevicePortConfig->PortID & DVP1) 
-                    SetDVP1DPA(0x4);
-                else
-                    SetDVP2DPA(0x4);
-            }
-            else
-                xf86DrvMsgVerb(0, X_INFO, DefaultLevel, "==SAA7105 Load TV Timing Fail()==\n");
-        }else
-            xf86DrvMsgVerb(0, X_INFO, DefaultLevel, "==Can not Load TV Timing ==\n");
-    }else
-        xf86DrvMsgVerb(0, X_INFO, DefaultLevel, "==Can not Load TV Timing ==\n");
-}
-
-
-void SetScalingFactor(UCHAR bDisplayPath, MODE_INFO *pUserModeInfo, MODE_INFO *pPanelModeInfo)
-{
-    ULONG dwScalingFactor;
-
-    USHORT usUserModeHSize, usUserModeVSize;
-    USHORT usPanelModeHSize, usPanelModeVSize;
-
-    xf86DrvMsgVerb(0, X_INFO, DefaultLevel, "==Enter SetScalingFactor()==\n");
-    usUserModeHSize = pUserModeInfo->H_Size;
-
-    usUserModeVSize = pUserModeInfo->V_Size;
-
-    usPanelModeHSize = pPanelModeInfo->H_Size;
-
-    usPanelModeVSize = pPanelModeInfo->V_Size;
-
-
-    TurnOffHorScaler(bDisplayPath);
-
-    TurnOffVerScaler(bDisplayPath);
-
-    SetHSource(bDisplayPath, usUserModeHSize);
-
-    if (bDS_SUPPORT)
-    {
-        SetHorDownScaleSrcSize(usUserModeHSize);
-        if (usPanelModeHSize < usUserModeHSize)
-        {
-            dwScalingFactor = ((ULONG)usUserModeHSize << 8) / usPanelModeHSize;
-            SetHorDownScalingFactor(DISP1, (USHORT)dwScalingFactor);
-            TurnOnHorDownScaler(DISP1);
-        }
-    }
-
-    if (usPanelModeHSize > usUserModeHSize)
-    {
-        xf86DrvMsgVerb(0, X_INFO, InfoLevel, "Enable H scaler\n");
-        dwScalingFactor = ((ULONG)usUserModeHSize << 12) / usPanelModeHSize;
-        SetHorScalingFactor(bDisplayPath, dwScalingFactor);
-        TurnOnHorScaler(bDisplayPath);
-        TurnOnScaler(bDisplayPath);
-    }
-
-    if (bDS_SUPPORT)
-    {
-        SetVerDownScaleSrcSize(usUserModeVSize);
-        if (usPanelModeVSize < usUserModeVSize)
-        {
-            dwScalingFactor = ((ULONG)usUserModeVSize << 8) / usPanelModeVSize;
-            SetVerDownScalingFactor(DISP1, (USHORT)dwScalingFactor);
-            TurnOnVerDownScaler(DISP1);
-        }
-    }
-
-    if (usPanelModeVSize > usUserModeVSize)
-    {
-        xf86DrvMsgVerb(0, X_INFO, InfoLevel, "Enable V scaler\n");
-        dwScalingFactor = ((ULONG)usUserModeVSize << 11) / usPanelModeVSize;
-        SetVerScalingFactor(bDisplayPath, dwScalingFactor);
-        TurnOnVerScaler(bDisplayPath);
-        TurnOnScaler(bDisplayPath);
-    }
-    xf86DrvMsgVerb(0, X_INFO, DefaultLevel, "==Exit SetScalingFactor()==\n");
-}
-
-void SetHorScalingFactor(UCHAR bDisplayPath, USHORT wValue)
-{
-    if(bDisplayPath == DISP1)
-    {
-        WriteRegToHW(HScalingFactor1, wValue);
-    }
-    else
-    {
-        WriteRegToHW(HScalingFactor2, wValue);
-    }
-}
-
-void SetVerScalingFactor(UCHAR bDisplayPath, USHORT wValue)
-{
-    if(bDisplayPath == DISP1)
-    {
-        WriteRegToHW(VScalingFactor1, wValue);
-    }
-    else
-    {
-        WriteRegToHW(VScalingFactor2, wValue);
-    }
-}
-
-
-void SetHorDownScalingFactor(UCHAR bDisplayPath, USHORT wValue)
-{
-    if (bLCDSUPPORT)
-    {
-        if (bDisplayPath == DISP1)
-        {
-            WriteRegToHW(HorDownScaleFactor1, wValue);
-        }
-    }
-}
-
-
-SetVerDownScalingFactor(UCHAR bDisplayPath, USHORT wValue)
-{
-    if (bLCDSUPPORT)
-    {
-        if (bDisplayPath == DISP1)
-        {
-            WriteRegToHW(VerDownScaleFactor1, wValue);
-        }
-    }
-}
-
-CI_STATUS isLCDFitMode(UCHAR bDeviceIndex, USHORT wModeNum)
-{
-    MODE_INFO *pModeInfo;
-    
-    if (Get_MODE_INFO_From_LCD_Table(bDeviceIndex, &pModeInfo))
-    {
-        if ((wModeNum == pModeInfo->Mode_ID_8bpp) ||
-            (wModeNum == pModeInfo->Mode_ID_16bpp) ||
-            (wModeNum == pModeInfo->Mode_ID_32bpp))
-        {
-            return true;
-        }
-        else
-        {
-            return false;
-        }
-    }
-    else
-    {
-        return false;
-    }
-}
-
-CI_STATUS GetModePointerFromVESATable(USHORT wModeNum, UCHAR ucRRIndex, MODE_INFO **ppModeInfo, RRATE_TABLE **ppRRateTable)
-{
-    int iRRateTableIndex;
-
-    xf86DrvMsgVerb(0, X_INFO, DefaultLevel, "==Enter GetModePointerFromVESATable()==\n");
- 
-    
-    if(Get_MODE_INFO_From_VESA_Table(wModeNum, ppModeInfo))
-    {
-        
-        *ppRRateTable = (RRATE_TABLE*)((int)(*ppModeInfo) + sizeof(MODE_INFO));
-
-        for(iRRateTableIndex = 0; iRRateTableIndex < (*ppModeInfo)->RRTableCount; iRRateTableIndex++, (*ppRRateTable)++)
-        {
-            xf86DrvMsgVerb(0, X_INFO, InternalLevel, "*ppRRateTable = 0x%x\n", *ppRRateTable);
-
-            if(((*ppRRateTable)->RRate_ID == ucRRIndex) && (!((*ppRRateTable)->Attribute & DISABLE)))
-            {
-                xf86DrvMsgVerb(0, X_INFO, InternalLevel, "*ppRRateTable = 0x%x\n", *ppRRateTable);
-                xf86DrvMsgVerb(0, X_INFO, DefaultLevel, "  Exit1 GetModePointerFromVESATable()== return success\n");
-                return true;
-            }
-        }
-    }
-
-    
-    xf86DrvMsgVerb(0, X_INFO, DefaultLevel, "  Exit2 GetModePointerFromVESATable()== return fail!!\n");
-    return false;
-}
-
-
-CI_STATUS GetModePointerFromLCDTable(UCHAR bDeviceIndex, MODE_INFO **ppModeInfo, PANEL_TABLE **ppPanelTable)
-{
-    xf86DrvMsgVerb(0, X_INFO, DefaultLevel, "==Enter GetModePointerFromLCDTable()==\n");
-    if (Get_MODE_INFO_From_LCD_Table(bDeviceIndex, ppModeInfo))
-    {
-        *ppPanelTable = (PANEL_TABLE*)((int)(*ppModeInfo) + sizeof(MODE_INFO));
-        xf86DrvMsgVerb(0, X_INFO, InternalLevel, "*ppPanelTable = 0x%x\n", *ppPanelTable);
-        xf86DrvMsgVerb(0, X_INFO, DefaultLevel, "==Exit1 GetModePointerFromLCDTable()== return success\n");
-        return true;
-    }
-    else
-    {
-        xf86DrvMsgVerb(0, X_INFO, DefaultLevel, "==Exit1 GetModePointerFromLCDTable()== return fail\n");
-        return false;
-    }
-}
-
-CI_STATUS Get_MODE_INFO(USHORT wModeNum, MODE_INFO **ppModeInfo)
-{
-    if (Get_MODE_INFO_From_VESA_Table(wModeNum, ppModeInfo))
-    {
-        return true;
-    }
-    else if(isLCDFitMode(LCD_ID, wModeNum))
-    {
-        Get_MODE_INFO_From_LCD_Table(LCD_ID, ppModeInfo);
-        return true;
-    }
-    else if(isLCDFitMode(LCD2_ID, wModeNum))
-    {
-        Get_MODE_INFO_From_LCD_Table(LCD2_ID, ppModeInfo);
-        return true;
-    }
-    else
-    {
-        return false;
-    }
-}
-
-CI_STATUS Get_MODE_INFO_From_LCD_Table(UCHAR bDeviceIndex, MODE_INFO **ppModeInfo)
-{
-    int i;
-    UCHAR bLCDTableIndex;
-     
-    xf86DrvMsgVerb(0, X_INFO, DefaultLevel, "==Enter Get_MODE_INFO_From_LCD_Table()==\n");
-    
-    if (bLCDSUPPORT)
-    {
-        *ppModeInfo = pLCDTable;
-        
-        if (bDeviceIndex == LCD_ID)
-        {
-            bLCDTableIndex = Get_LCD_TABLE_INDEX();
-        }
-        else if (bDeviceIndex == LCD2_ID)
-        {
-            bLCDTableIndex = Get_LCD2_TABLE_INDEX();
-        }
-        else
-        {
-            xf86DrvMsgVerb(0, X_INFO, DefaultLevel, "==Exit1 Get_MODE_INFO_From_LCD_Table()== return fail!!\n");
-            return false;
-        }
-
-
-        if (bLCDTableIndex == 0)
-        {
-            xf86DrvMsgVerb(0, X_INFO, InfoLevel, "LCD Index = 0\n");
-            xf86DrvMsgVerb(0, X_INFO, DefaultLevel, "==Exit2 Get_MODE_INFO_From_LCD_Table()== return fail!!\n");
-            return false;
-        }
-
-        while ((*ppModeInfo)->H_Size != 0xFFFF)
-        {
-            xf86DrvMsgVerb(0, X_INFO, InternalLevel, "(*ppModeInfo)->H_Size = %d\n", (*ppModeInfo)->H_Size);
-
-            if (bLCDTableIndex == 1)
-            {
-                xf86DrvMsgVerb(0, X_INFO, DefaultLevel, "==Exit3 Get_MODE_INFO_From_LCD_Table()== return success\n");
-                return true;
-            }
-            (*ppModeInfo) = (MODE_INFO*)((int)*ppModeInfo + sizeof(MODE_INFO) + sizeof(PANEL_TABLE));
-            bLCDTableIndex--;
-        }
-    }
-    
-    xf86DrvMsgVerb(0, X_INFO, DefaultLevel, "==Exit4 Get_MODE_INFO_From_LCD_Table()== return fail!!\n");
-
-    return false;
-    
-}
-
-#if 0
-CI_STATUS Get_MODE_INFO_From_VESA_Table(USHORT wModeNum, MODE_INFO **ppModeInfo)
-{
-    int i;
-    VESA_TABLE *pVESATable = VESATable;
-    
-    for( i = 0; i < (sizeof(VESATable)/sizeof(VESA_TABLE)); i++, pVESATable++)
-    {
-        if((pVESATable->ModeInfo.Mode_ID_8bpp == wModeNum) || (pVESATable->ModeInfo.Mode_ID_16bpp == wModeNum)|| (pVESATable->ModeInfo.Mode_ID_32bpp == wModeNum))
-        {
-            *ppModeInfo = &(pVESATable->ModeInfo);
-            return true;
-        }
-    }
-    
-    return false;
-}
-#else
-CI_STATUS Get_MODE_INFO_From_VESA_Table(USHORT wModeNum, MODE_INFO **ppModeInfo)
-{
-    UCHAR ucColorDepth;
-
-    xf86DrvMsgVerb(0, X_INFO, DefaultLevel, "==Enter Get_MODE_INFO_From_VESA_Table()==\n");
-
-    *ppModeInfo = pVESATable;
-
-    while((*ppModeInfo)->H_Size != 0xFFFF)
-    {
-        xf86DrvMsgVerb(0, X_INFO, InternalLevel, "*ppModeInfo = 0x%x\n", *ppModeInfo);
-        xf86DrvMsgVerb(0, X_INFO, InternalLevel, "(*ppModeInfo)->H_Size = %d\n", (*ppModeInfo)->H_Size);
-
-        if (GetModeColorDepth(wModeNum, *ppModeInfo, &ucColorDepth))
-        {
-            xf86DrvMsgVerb(0, X_INFO, InfoLevel, "*ppModeInfo = 0x%x\n", *ppModeInfo);
-            xf86DrvMsgVerb(0, X_INFO, DefaultLevel, "  Exit1 Get_MODE_INFO_From_VESA_Table()== return success\n");
-            return true;
-        }
-
-        *ppModeInfo = (MODE_INFO*)((*ppModeInfo)->RRTableCount * sizeof(RRATE_TABLE) + sizeof(MODE_INFO) + (void*)(*ppModeInfo));
-    }
-
-    *ppModeInfo = (MODE_INFO*)(&CInt10VESATable);
-
-    while((*ppModeInfo)->H_Size != 0xFFFF)
-    {
-        xf86DrvMsgVerb(0, X_INFO, InternalLevel, "*ppModeInfo = 0x%x\n", *ppModeInfo);
-        xf86DrvMsgVerb(0, X_INFO, InternalLevel, "(*ppModeInfo)->H_Size = %d\n", (*ppModeInfo)->H_Size);
-
-        if (GetModeColorDepth(wModeNum, *ppModeInfo, &ucColorDepth))
-        {
-            xf86DrvMsgVerb(0, X_INFO, InfoLevel, "*ppModeInfo = 0x%x\n", *ppModeInfo);
-            xf86DrvMsgVerb(0, X_INFO, DefaultLevel, "  Exit1 Get_MODE_INFO_From_VESA_Table()== return success\n");
-            return true;
-        }
-
-        *ppModeInfo = (MODE_INFO*)((*ppModeInfo)->RRTableCount * sizeof(RRATE_TABLE) + sizeof(MODE_INFO) + (void*)(*ppModeInfo));
-    }
-
-    xf86DrvMsgVerb(0, X_INFO, DefaultLevel, "  Exit2 Get_MODE_INFO_From_VESA_Table()== return fail!!\n");
-    return false;
-}
-#endif
-
-CI_STATUS GetModeColorDepth(USHORT wModeNum, MODE_INFO *pModeInfo, UCHAR *pucColorDepth)
-{
-#if CBIOS_DEBUG
-    xf86DrvMsgVerb(0, X_INFO, DefaultLevel, "==Enter GetModeColorDepth()==\n");
-    xf86DrvMsgVerb(0, X_INFO, InternalLevel, "pModeInfo->Mode_ID_8bpp = 0x%x\n", pModeInfo->Mode_ID_8bpp);
-    xf86DrvMsgVerb(0, X_INFO, InternalLevel, "pModeInfo->Mode_ID_16bpp = 0x%x\n", pModeInfo->Mode_ID_16bpp);
-    xf86DrvMsgVerb(0, X_INFO, InternalLevel, "pModeInfo->Mode_ID_32bpp = 0x%x\n", pModeInfo->Mode_ID_32bpp);
-#endif
-    if(pModeInfo->Mode_ID_8bpp == wModeNum)
-    {
-        *pucColorDepth = 8;
-#if CBIOS_DEBUG
-        xf86DrvMsgVerb(0, X_INFO, DefaultLevel, "==Exit1 GetModeColorDepth()== *pucColorDepth = %d\n", *pucColorDepth);
-#endif
-        return true;
-    }
-    else if(pModeInfo->Mode_ID_16bpp == wModeNum)
-    {
-        *pucColorDepth = 16;
-#if CBIOS_DEBUG
-        xf86DrvMsgVerb(0, X_INFO, DefaultLevel, "==Exit2 GetModeColorDepth()== *pucColorDepth = %d\n", *pucColorDepth);
-#endif
-        return true;
-    }
-    else if(pModeInfo->Mode_ID_32bpp == wModeNum)
-    {
-        *pucColorDepth = 32;
-#if CBIOS_DEBUG
-        xf86DrvMsgVerb(0, X_INFO, DefaultLevel, "==Exit3 GetModeColorDepth()== *pucColorDepth = %d\n", *pucColorDepth);
-#endif
-        return true;
-    }
-    else
-    {
-        *pucColorDepth = 0;
-#if CBIOS_DEBUG
-        xf86DrvMsgVerb(0, X_INFO, DefaultLevel, "==Exit4 GetModeColorDepth()== *pucColorDepth = %d\n", *pucColorDepth);
-#endif
-        return false;
-    }    
-}
-
-CI_STATUS GetModePitch(USHORT ModeNum, USHORT *pPitch)
-{
-    MODE_INFO *pModeInfo = NULL;
-    UCHAR ucColorDepth = 0;
-    
-    
-    if(!Get_MODE_INFO(ModeNum, &pModeInfo))
-    {
-        return false;
-    }
-    else
-    {
-        if(!GetModeColorDepth(ModeNum, pModeInfo, &ucColorDepth))
-        {
-            return false;
-        }
-        else
-        {
-            ucColorDepth = ucColorDepth >> 4;
-            *pPitch = ((pModeInfo->H_Size << ucColorDepth)+0x7)&0xFFF8;
-        }
-    }
-
-    return true;
-}
-
-USHORT ReadRegFromHW(REG_OP *pRegOp)
-{
-    USHORT wValue = 0x0;
-    UCHAR    btemp = 0x0, bMasktemp = 0x0;
-
-    while((pRegOp->RegGroup)!= NR)
+    while(pRegOp!=NULL)
     {        
         if(pRegOp->RegGroup == CR)
         {
             
             OutPort(COLOR_CRTC_INDEX,(pRegOp->RegIndex));
-            btemp = (UCHAR)InPort(COLOR_CRTC_DATA);
+            btemp = (BYTE)InPort(COLOR_CRTC_DATA);
         }
         else
         {
             
             OutPort(SEQ_INDEX,(pRegOp->RegIndex));
-            btemp = (UCHAR)InPort(SEQ_DATA);
+            btemp = (BYTE)InPort(SEQ_DATA);
         }
         
         bMasktemp = (pRegOp->RegMask);
@@ -1415,7 +222,8 @@ USHORT ReadRegFromHW(REG_OP *pRegOp)
         }
 
         
-        wValue |= (((USHORT)btemp) << (pRegOp->RegShiftBit));
+        btemp = btemp << (pRegOp->RegShiftBit);
+        wValue |= btemp;    
         
         
         pRegOp++;
@@ -1426,11 +234,11 @@ USHORT ReadRegFromHW(REG_OP *pRegOp)
 }
 
 
-void WriteRegToHW(REG_OP *pRegOp, USHORT value)
+void WriteRegToHW(REG_OP *pRegOp, WORD value)
 {
-    UCHAR btemp, btemp1;
-    UCHAR bCount;
-    UCHAR bMasktemp;
+    BYTE btemp, btemp1;
+    BYTE bCount;
+    BYTE bMasktemp;
 
     while((pRegOp->RegGroup)!= NR)
     {
@@ -1460,7 +268,7 @@ void WriteRegToHW(REG_OP *pRegOp, USHORT value)
         {
             
             OutPort(COLOR_CRTC_INDEX,(pRegOp->RegIndex));
-            btemp1 = (UCHAR)InPort(COLOR_CRTC_DATA);
+            btemp1 = (BYTE)InPort(COLOR_CRTC_DATA);
             btemp1 &= ~(pRegOp->RegMask);
             btemp1 |= btemp;
             OutPort(COLOR_CRTC_DATA,btemp1);
@@ -1469,7 +277,7 @@ void WriteRegToHW(REG_OP *pRegOp, USHORT value)
         {
             
             OutPort(SEQ_INDEX,(pRegOp->RegIndex));
-            btemp1 = (UCHAR)InPort(SEQ_DATA);
+            btemp1 = (BYTE)InPort(SEQ_DATA);
             btemp1 &= ~(pRegOp->RegMask);
             btemp1 |= btemp;
             OutPort(SEQ_DATA,btemp1);            
@@ -1482,141 +290,196 @@ void WriteRegToHW(REG_OP *pRegOp, USHORT value)
 }
 
 
-void UnLockCR0ToCR7()
+BYTE AlignDataToLSB(BYTE Data, BYTE Mask)
 {
+    Data &= Mask;
     
-    SetCRReg(0x11, 0x00, BIT7);
-}
-
-
-void LockCR0ToCR7()
-{
-    
-    SetCRReg(0x11, 0x80, BIT7);
-}
-
-
-CI_STATUS CheckForModeAvailable(USHORT ModeNum)
-{
-    MODE_INFO *pModeInfo = NULL;
-    return Get_MODE_INFO_From_VESA_Table(ModeNum, &pModeInfo);
-}
-
-CI_STATUS CheckForNewDeviceAvailable(UCHAR bDeviceIndex)
-{
-    PORT_CONFIG *pDevicePortConfig;
-    
-    return GetDevicePortConfig(bDeviceIndex, &pDevicePortConfig);
-}
-
-void Display1TurnOnTX()
-{
-
-}
-
-void Display1TurnOffTX()
-{
-
-}
-
-void Display2TurnOnTX()
-{
-
-}
-
-void Display2TurnOffTX()
-{
-
-}
-
-
-void TurnOnDigitalPort(UCHAR bDeviceIndex)
-{
-    PORT_CONFIG *pDevicePortConfig;
-
-    if (GetDevicePortConfig(bDeviceIndex, &pDevicePortConfig))
+    while ((Mask & BIT0) == 0)
     {
-        switch(pDevicePortConfig->PortID)
-        {
-            case CRT_PORT:
-                TurnOnDAC();
-                TurnOnCRTPad();
-                break;
-                
-            case DVP1:
-                TurnOnDVP1Pad();
-                break;
-                
-            case DVP2:
-                TurnOnDVP2Pad();
-                break;
-                
-            case DVP12:
-                TurnOnDVP12Pad();
-                break;
-        }
-    }
-}       
-
-void TurnOffDigitalPort(UCHAR bDeviceIndex)
-{
-    PORT_CONFIG *pDevicePortConfig;
-    
-    if (GetDevicePortConfig(bDeviceIndex, &pDevicePortConfig))
-    
-    switch(pDevicePortConfig->PortID)
-    {
-        case CRT_PORT:
-            TurnOffCRTPad();
-//            TurnOffDAC();
-            break;
-            
-        case DVP1:
-            TurnOffDVP1Pad();
-            break;
-            
-        case DVP2:
-            TurnOffDVP2Pad();
-            break;
-            
-        case DVP12:
-            TurnOffDVP12Pad();
-            break;
-    }
-}       
-
-
-UCHAR GetPortConnectPath(UCHAR PortType)
-{
-    UCHAR SR1F, PortMask;
-
-    SR1F = GetSRReg(0x1F);
-    SR1F ^= 0x03;
-    
-    switch(PortType)
-    {
-        case CRT_PORT:
-            PortMask = BIT2;
-            break;
-            
-        case DVP1:
-        case DVP12:
-            PortMask = BIT0;
-            break;
-            
-        case DVP2:
-            PortMask = BIT1;
-            break;
+        Data >>= 1;
+        Mask >>= 1;
     }
     
-    return ((SR1F & PortMask) ? 1 : 0);
-
+    return Data;
 }
 
 
-USHORT TransDevIDtoBit(UCHAR DeviceIndex)
+BYTE AlignDataToMask(BYTE Data, BYTE Mask)
 {
-    return (1 << (DeviceIndex - 1));
+    
+    
+    while ((Mask & BIT0) == 0)
+    {
+        Data <<= 1;
+        Mask >>= 1;
+    }
+    
+    return Data;
+}
+
+
+BYTE ReadScratch(WORD IndexMask)
+{
+    BYTE Index = (BYTE)(IndexMask >> 8);
+    BYTE Mask = (BYTE)IndexMask;
+    BYTE RetValue;
+
+    RetValue = GetCRReg(Index);
+    RetValue &= Mask;
+    
+    RetValue = AlignDataToLSB(RetValue, Mask);
+
+    return RetValue;
+}
+
+
+void WriteScratch(WORD IndexMask, BYTE Data)
+{
+    BYTE Index = (BYTE)(IndexMask >> 8);
+    BYTE Mask = (BYTE)IndexMask;
+
+    Data = AlignDataToMask(Data, Mask);
+    Data &= Mask;
+    
+    SetCRReg(Index, Data, Mask);
+}
+
+BYTE Get_DEV_ID(BYTE DisplayPath)
+{
+    return ((DisplayPath == DISP1) ? ReadScratch(IDX_IGA1_DEV_ID) : ReadScratch(IDX_IGA2_DEV_ID));
+}
+
+void Set_DEV_ID(BYTE DeviceID, BYTE DisplayPath)
+{
+    if (DisplayPath == DISP1)
+        WriteScratch(IDX_IGA1_DEV_ID, DeviceID);
+    else
+        WriteScratch(IDX_IGA2_DEV_ID, DeviceID);
+}
+
+BYTE Get_NEW_DEV_ID(BYTE DisplayPath)
+{
+    return ((DisplayPath == DISP1) ? ReadScratch(IDX_NEW_IGA1_DEV_ID) : ReadScratch(IDX_NEW_IGA2_DEV_ID));
+}
+
+void Set_NEW_DEV_ID(BYTE DeviceID, BYTE DisplayPath)
+{
+    if (DisplayPath == DISP1)
+        WriteScratch(IDX_NEW_IGA1_DEV_ID, DeviceID);
+    else
+        WriteScratch(IDX_NEW_IGA2_DEV_ID, DeviceID);
+}
+
+DWORD Get_LCD_Panel_Size()
+{
+    DWORD dwLCDPanelSize=0;
+    BYTE  ucHigh,ucLow;
+    ucLow = ReadScratch(IDX_LCD_V_SIZE);
+    ucHigh= ReadScratch(IDX_LCD_V_SIZE_OVERFLOW);
+    dwLCDPanelSize = ((ucHigh << 8) | ucLow) << 16;
+    ucLow = ReadScratch(IDX_LCD_H_SIZE);
+    ucHigh= ReadScratch(IDX_LCD_H_SIZE_OVERFLOW);
+    dwLCDPanelSize |= ((ucHigh << 8) | ucLow);
+    return dwLCDPanelSize;
+}
+
+void  Set_LCD_Panel_Size(DWORD dwHres,DWORD dwVres)
+{
+    BYTE  ucHigh,ucLow;
+    ucLow = (BYTE)dwHres;
+    ucHigh= (BYTE)(dwHres >> 8);
+    WriteScratch(IDX_LCD_H_SIZE,ucLow);
+    WriteScratch(IDX_LCD_H_SIZE_OVERFLOW,ucHigh);
+    ucLow = (BYTE)dwVres;
+    ucHigh= (BYTE)(dwVres >> 8);
+    WriteScratch(IDX_LCD_V_SIZE,ucLow);
+    WriteScratch(IDX_LCD_V_SIZE_OVERFLOW,ucHigh);
+}
+
+DWORD Get_LCD2_Panel_Size()
+{
+    DWORD dwLCD2PanelSize=0;
+    BYTE  ucHigh,ucLow;
+    ucLow = ReadScratch(IDX_LCD2_V_SIZE);
+    ucHigh= ReadScratch(IDX_LCD2_V_SIZE_OVERFLOW);
+    dwLCD2PanelSize = ((ucHigh << 8) + ucLow) << 16;
+    ucLow = ReadScratch(IDX_LCD2_H_SIZE);
+    ucHigh= ReadScratch(IDX_LCD2_H_SIZE_OVERFLOW);
+    dwLCD2PanelSize = dwLCD2PanelSize + (ucHigh << 8) + ucLow;
+    return dwLCD2PanelSize;
+}
+
+void  Set_LCD2_Panel_Size(DWORD dwHres,DWORD dwVres)
+{
+    BYTE  ucHigh,ucLow;
+    ucLow = (BYTE)dwHres;
+    ucHigh= (BYTE)(dwHres >> 8);
+    WriteScratch(IDX_LCD2_H_SIZE,ucLow);
+    WriteScratch(IDX_LCD2_H_SIZE_OVERFLOW,ucHigh);
+    ucLow = (BYTE)dwVres;
+    ucHigh= (BYTE)(dwVres >> 8);
+    WriteScratch(IDX_LCD2_V_SIZE,ucLow);
+    WriteScratch(IDX_LCD2_V_SIZE_OVERFLOW,ucHigh);
+}
+
+BYTE Get_RRATE_ID(BYTE DisplayPath)
+{
+    return ((DisplayPath == DISP1) ? ReadScratch(IDX_IGA1_RRATE_ID) : ReadScratch(IDX_IGA2_RRATE_ID));
+}
+
+void Set_RRATE_ID(BYTE RRateID, BYTE DisplayPath)
+{
+    if (DisplayPath == DISP1)
+        WriteScratch(IDX_IGA1_RRATE_ID, RRateID);
+    else
+        WriteScratch(IDX_IGA2_RRATE_ID, RRateID);
+}
+
+WORD Get_VESA_MODE(BYTE DisplayPath)
+{
+    BYTE VESAMode, VESAModeOver;
+
+    if (DisplayPath == DISP1)
+    {
+        VESAMode = ReadScratch(IDX_IGA1_VESA_MODE);
+        VESAModeOver = ReadScratch(IDX_IGA1_VESA_MODE_OVERFLOW);
+    }
+    else
+    {
+        VESAMode = ReadScratch(IDX_IGA2_VESA_MODE);
+        VESAModeOver = ReadScratch(IDX_IGA2_VESA_MODE_OVERFLOW);
+    }
+    
+    return  ((WORD)VESAModeOver) << 8 | (WORD)VESAMode;
+}
+
+void Set_VESA_MODE(WORD ModeNum, BYTE DisplayPath)
+{
+    if (DisplayPath == DISP1)
+    {
+        WriteScratch(IDX_IGA1_VESA_MODE, (BYTE)ModeNum);
+        WriteScratch(IDX_IGA1_VESA_MODE_OVERFLOW, (BYTE)(ModeNum >> 8));
+    }
+    else
+    {
+        WriteScratch(IDX_IGA2_VESA_MODE, (BYTE)ModeNum);
+        WriteScratch(IDX_IGA2_VESA_MODE_OVERFLOW, (BYTE)(ModeNum >> 8));
+    }
+}
+
+BYTE Get_LVDS_TX_ID()
+{
+    return ReadScratch(IDX_LVDS1_TX_ID);
+}
+
+void Set12BitDVP()
+{
+    SetSRReg(0x1E, 0x0, BIT3);
+}
+
+void Set24BitDVP()
+{
+    SetSRReg(0x1E, BIT3, BIT3);
 }
 
 void TurnOnCRTPad()
@@ -1661,330 +524,31 @@ void TurnOffDVP12Pad()
     TurnOffDVP2Pad();
 }
 
-void TurnOnScaler(UCHAR bDisplayPath)
+void SequencerOn(BYTE DisplayPath)
 {
-    if (bDisplayPath == DISP1)
-        SetSRReg(0x58, BIT0, BIT0);
+    if (DisplayPath == DISP1)
+        SetSRReg(0x01, 0, BIT5);
     else
-        SetSRReg(0x50, BIT0, BIT0);
+        SetCRReg(0x33, 0, BIT0);
 }
 
-void TurnOffScaler(UCHAR bDisplayPath)
+void SequencerOff(BYTE DisplayPath)
 {
-    if (bDisplayPath == DISP1)
-        SetSRReg(0x58, 0, BIT0);
+    if (DisplayPath == DISP1)
+        SetSRReg(0x01, BIT5, BIT5);
     else
-        SetSRReg(0x50, 0, BIT0);
-}
-
-void TurnOnHorScaler(UCHAR bDisplayPath)
-{
-    if (bDisplayPath == DISP1)
-        SetSRReg(0x58, BIT2, BIT2);
-    else
-        SetSRReg(0x50, BIT2, BIT2);
-}
-
-void TurnOffHorScaler(UCHAR bDisplayPath)
-{
-    if (bDisplayPath == DISP1)
-        SetSRReg(0x58, 0, BIT2);
-    else
-        SetSRReg(0x50, 0, BIT2);
-}
-
-void TurnOnVerScaler(UCHAR bDisplayPath)
-{
-    if (bDisplayPath == DISP1)
-        SetSRReg(0x58, BIT1, BIT1);
-    else
-        SetSRReg(0x50, BIT1, BIT1);
-}
-
-void TurnOffVerScaler(UCHAR bDisplayPath)
-{
-    if (bDisplayPath == DISP1)
-        SetSRReg(0x58, 0, BIT1);
-    else
-        SetSRReg(0x50, 0, BIT1);
+        SetCRReg(0x33, BIT0, BIT0);
 }
 
 
-void TurnOnHorDownScaler(UCHAR bDisplayPath)
+void WaitPowerSequenceDone()
 {
-    if (bDisplayPath == DISP1)
-        SetSRReg(0x74, BIT7, BIT7);
-}
-
-void TurnOffHorDownScaler(UCHAR bDisplayPath)
-{
-    if (bDisplayPath == DISP1)
-        SetSRReg(0x74, 0, BIT7);
-}
-
-void TurnOnVerDownScaler(UCHAR bDisplayPath)
-{
-    if (bDisplayPath == DISP1)
-        SetSRReg(0x70, BIT7, BIT7);
-}
-
-void TurnOffVerDownScaler(UCHAR bDisplayPath)
-{
-    if (bDisplayPath == DISP1)
-        SetSRReg(0x70, 0, BIT7);
-}
-
-void Set12BitDVP()
-{
-    SetSRReg(0x1E, 0x00, BIT3);
-}
-
-void Set24BitDVP()
-{
-    SetSRReg(0x1E, 0x08, BIT3);
-}
-
-void SetDVP1DPA(UCHAR ucDPA)
-{
-    UCHAR ucTmp;
-    ucTmp = ucDPA&0x7;
-    SetSRReg(0x21, 0x07, ucTmp);
-}
-
-void SetDVP2DPA(UCHAR ucDPA)
-{
-    UCHAR ucTmp;
-    ucTmp = (ucDPA&0x7)<<3;
-    SetSRReg(0x21, 0x38, ucTmp);
-}
-
-void TurnOnPowerSequenceByPASS()
-{
-    SetSRReg(0x32, 0x01, BIT0);
-}
-
-void TurnOffPowerSequenceByPASS()
-{
-    SetSRReg(0x32, 0x00, BIT0);
-}
-
-void TurnOnDAC()
-{
-    SetCRReg(0xDF, 0x00, BIT2);
-}
-void TurnOffDAC()
-{
-    SetCRReg(0xDF, 0x04, BIT2);
-}
-
-void TurnOnTVClock()
-{
-    UCHAR ucTVConnectorType;
-    PORT_CONFIG *pDevicePortConfig;
-    ucTVConnectorType = Get_TV_ConnectorType();
-    if(GetDevicePortConfig(TV_ID, &pDevicePortConfig))
-    {
-        if(pDevicePortConfig->TX_Enc_ID == ENC_SAA7105)
-        {
-            SetSAA7105DACPower(pDevicePortConfig->TX_I2C_Port, pDevicePortConfig->TX_I2C_Addr,ucTVConnectorType);
-        }
-    }
-    SetCRReg(0xD0, 0x40, BIT6);
-    TurnOnPowerSequenceByPASS();
-}
-
-void TurnOffTVClock()
-{
-    PORT_CONFIG *pDevicePortConfig;
-    TurnOffPowerSequenceByPASS();
-    if(GetDevicePortConfig(TV_ID, &pDevicePortConfig))
-    {
-        if(pDevicePortConfig->TX_Enc_ID == ENC_SAA7105)
-        {
-            SetSAA7105DACPower(pDevicePortConfig->TX_I2C_Port, pDevicePortConfig->TX_I2C_Addr,0);
-        }
-    }
-    SetCRReg(0xD0, 0x00, BIT6);
-}
-
-#if 0
-void Display1HWResetOn()
-{
-    SetCRReg(0x17, 0x00, BIT7);
-}
-void Display1HWResetOff()
-{
-    SetCRReg(0x17, 0x80, BIT7);
-}
-
-void Display2HWResetOn()
-{
-    SetCRReg(0x33, 0x00, BIT4);
-}
-void Display2HWResetOn()
-{
-    SetCRReg(0x33, 0x10, BIT4);
-}
-#endif
-
-
-void SerialLoadTable(UCHAR **ppucTablePointer, UCHAR ucI2Cport, UCHAR ucI2CAddr)
-{
-    UCHAR ucRegGroup;
-
-    while (**ppucTablePointer != 0xFF)
-    {
-        ucRegGroup = **ppucTablePointer;
-        (*ppucTablePointer)++;
-        if (ucRegGroup & BITS)
-        {
-            SerialLoadRegBits(ppucTablePointer, ucRegGroup, 0, 0);
-        }
-        else
-        {
-            SerialLoadReg(ppucTablePointer, ucRegGroup, 0, 0);
-        }
-    }
-    (*ppucTablePointer)++;
-}
-
-
-void SerialLoadRegBits(UCHAR **ppucTablePointer, UCHAR ucRegGroup, UCHAR ucI2Cport, UCHAR ucI2CAddr)
-{
-    UCHAR ucRegIndex, ucRegValue, ucMask;
-    ucRegGroup &= 0x7F;
-
-    while (**ppucTablePointer != 0xFF)
-    {
-        ucRegIndex = **ppucTablePointer;
-        (*ppucTablePointer)++;
-
-        ucRegValue = **ppucTablePointer;
-        (*ppucTablePointer)++;
-
-        ucMask = **ppucTablePointer;
-        (*ppucTablePointer)++;
-
-        switch(ucRegGroup)
-        {
-            case SR:
-                SetSRReg(ucRegIndex, ucRegValue, ucMask);
-                break;
-
-            case CR:
-                SetCRReg(ucRegIndex, ucRegValue, ucMask);
-                break;
-                
-            case I2C:
-                break;
-        }
-    }
-    (*ppucTablePointer)++;
-}
-
-
-void SerialLoadReg(UCHAR **ppucTablePointer, UCHAR ucRegGroup, UCHAR ucI2Cport, UCHAR ucI2CAddr)
-{
-    UCHAR ucRegIndex, ucRegValue;
-
-    while (**ppucTablePointer != 0xFF)
-    {
-        ucRegIndex = **ppucTablePointer;
-        (*ppucTablePointer)++;
-
-        ucRegValue = **ppucTablePointer;
-        (*ppucTablePointer)++;
-
-        switch(ucRegGroup)
-        {
-            case SR:
-                SetSRReg(ucRegIndex, ucRegValue, 0xFF);
-                break;
-
-            case CR:
-                SetCRReg(ucRegIndex, ucRegValue, 0xFF);
-                break;
-                
-            case GR:
-                SetGRReg(ucRegIndex, ucRegValue, 0xFF);
-                break;
-
-            case I2C:
-                break;
-        }
-    }
-    (*ppucTablePointer)++;
-}
-
-
-void LoadDisplay1VESAModeInitRegs()
-{
-    UCHAR *pucDisplay1VESAModeInitRegs = (UCHAR*)Display1VESAModeInitRegs;
-    
-    OutPort(MISC_WRITE, 0x2F);
-
-    UnLockCR0ToCR7();
-    
-    xf86DrvMsgVerb(0, X_INFO, DefaultLevel, "&pucDisplay1VESAModeInitRegs = 0x%x\n", &pucDisplay1VESAModeInitRegs);
-    SerialLoadTable(&pucDisplay1VESAModeInitRegs, 0, 0);
-
-    ResetATTR();
-    
-    SetARReg(0x10, *pucDisplay1VESAModeInitRegs);
-    pucDisplay1VESAModeInitRegs++;
-    SetARReg(0x11, *pucDisplay1VESAModeInitRegs);
-    pucDisplay1VESAModeInitRegs++;
-    SetARReg(0x12, *pucDisplay1VESAModeInitRegs);
-    pucDisplay1VESAModeInitRegs++;
-    SetARReg(0x13, *pucDisplay1VESAModeInitRegs);
-    pucDisplay1VESAModeInitRegs++;
-    SetARReg(0x14, *pucDisplay1VESAModeInitRegs);
-    
-    EnableATTR();
-}
-
-void VESASetBIOSData(USHORT ModeNum)
-{
-    
-}
-
-
-void DisableDisplayPathAndDevice(UCHAR bDisplayPath)
-{
-    UCHAR bDeviceIndex = Get_DEV_ID(bDisplayPath);
+    BYTE SR32;
+     
+    SR32 = GetSRReg(0x32);
 
     
-    ControlPwrSeqOff(bDeviceIndex);
-
-    
-
-    
-    TurnOffDigitalPort(bDeviceIndex);
-    
-    
-    SequencerOff(bDisplayPath);
-}
-
-CI_STATUS GetDevicePortConfig(UCHAR bDeviceIndex, PORT_CONFIG **ppDevicePortConfig)
-{
-    xf86DrvMsgVerb(0, X_INFO, DefaultLevel, "==Enter GetDevicePortConfig()==\n");
-
-    *ppDevicePortConfig = pPortConfig;
-    
-    while(((*ppDevicePortConfig)->DevID != 0xFF) && ((*ppDevicePortConfig)->Attribute & Dev_SUPPORT))
-    {
-        xf86DrvMsgVerb(0, X_INFO, InternalLevel, "(*ppDevicePortConfig)->DevID = %x\n", (*ppDevicePortConfig)->DevID);
-        
-        if (bDeviceIndex == (*ppDevicePortConfig)->DevID)
-        {
-            xf86DrvMsgVerb(0, X_INFO, DefaultLevel, "  Exit1 GetDevicePortConfig()== return success\n");
-            return true;
-        }
-        (*ppDevicePortConfig)++;
-    }
-
-    xf86DrvMsgVerb(0, X_INFO, DefaultLevel, "  Exit1 GetDevicePortConfig()== return fail!!\n");
-    return false;
+    while(SR32 == GetSRReg(0x32));
 }
 
 void PowerSequenceOn()
@@ -2019,407 +583,345 @@ void PowerSequenceOff()
     }
 }
 
-void SequencerOn(UCHAR DisplayPath)
+void TurnOnCRTMask()
 {
-    if (DisplayPath == DISP1)
-        SetSRReg(0x01, 0, BIT5);
-    else
-        SetCRReg(0x33, 0, BIT0);
+    SetSRReg(0x31, BIT4, BIT4);
 }
 
-void SequencerOff(UCHAR bDisplayPath)
+void TurnOffCRTMask()
 {
-    if (bDisplayPath == DISP1)
+    SetSRReg(0x31, 0, BIT4);
+}
+
+void TurnOnDVP1Mask()
+{
+    SetSRReg(0x31, 3, 3);
+}
+
+void TurnOffDVP1Mask()
+{
+    SetSRReg(0x31, 0, 3);
+}
+
+void TurnOnDVP2Mask()
+{
+    SetSRReg(0x31, 0xc, 0xc);
+}
+
+void TurnOffDVP2Mask()
+{
+    SetSRReg(0x31, 0, 0xc);
+}
+
+void TurnOnDVPMask(BYTE bDigitalDevice)
+{    
+    switch (bDigitalDevice)
     {
-        if (!(GetSRReg(0x01) & BIT5))
-        {
-            LongWait();
-        }
-        SetSRReg(0x01, BIT5, BIT5);
-    }
-    else
-        SetCRReg(0x33, BIT0, BIT0);
-}
-
-void ControlPwrSeqOn(UCHAR bDeviceIndex)
-{
-    PORT_CONFIG *pDevicePortConfig;
-    
-    if ((TransDevIDtoBit(bDeviceIndex) & (B_LCD+B_LCD2)) && (GetDevicePortConfig(bDeviceIndex, &pDevicePortConfig)))
-    {
-        if (pDevicePortConfig->Attribute & TX_PS)
-        {
-            if (pDevicePortConfig->TX_Enc_ID == TX_VT1636)
-            {
-
-            }
-        }
-        else if ((pDevicePortConfig->PortID == DVP1) || (pDevicePortConfig->PortID == DVP12))
-        {
-            PowerSequenceOn();
-        }
-    }    
-}
-
-void ControlPwrSeqOff(UCHAR bDeviceIndex)
-{
-    PORT_CONFIG *pDevicePortConfig;
-    
-    if ((TransDevIDtoBit(bDeviceIndex) & (B_LCD+B_LCD2)) && (GetDevicePortConfig(bDeviceIndex, &pDevicePortConfig)))
-    {
-        if (pDevicePortConfig->Attribute & TX_PS)
-        {
-            if (pDevicePortConfig->TX_Enc_ID == TX_VT1636)
-            {
-
-            }
-        }
-        else if ((pDevicePortConfig->PortID == DVP1) || (pDevicePortConfig->PortID == DVP12))
-        {
-            PowerSequenceOff();
-        }
-    }    
-}
-
-void LongWait()
-{
-     while (GetIS1Reg() & BIT3);
-     
-     while (!(GetIS1Reg() & BIT3));
-}
-
-UCHAR Get_DEV_ID(UCHAR DisplayPath)
-{
-    return ((DisplayPath == DISP1) ? ReadScratch(IDX_IGA1_DEV_ID) : ReadScratch(IDX_IGA2_DEV_ID));
-}
-
-
-void Set_DEV_ID(UCHAR DeviceID, UCHAR DisplayPath)
-{
-    if (DisplayPath == DISP1)
-        WriteScratch(IDX_IGA1_DEV_ID, DeviceID);
-    else
-        WriteScratch(IDX_IGA2_DEV_ID, DeviceID);
-}
-
-
-UCHAR Get_NEW_DEV_ID(UCHAR DisplayPath)
-{
-    return ((DisplayPath == DISP1) ? ReadScratch(IDX_NEW_IGA1_DEV_ID) : ReadScratch(IDX_NEW_IGA2_DEV_ID));
-}
-
-void Set_NEW_DEV_ID(UCHAR DeviceID, UCHAR DisplayPath)
-{
-    if (DisplayPath == DISP1)
-        WriteScratch(IDX_NEW_IGA1_DEV_ID, DeviceID);
-    else
-        WriteScratch(IDX_NEW_IGA2_DEV_ID, DeviceID);
-}
-
-USHORT Get_LCD_H_SIZE()
-{
-    USHORT wValue;
-
-    wValue = (USHORT)ReadScratch(IDX_LCD_H_SIZE_OVERFLOW);
-    wValue <<= 8;
-    wValue |= (USHORT)ReadScratch(IDX_LCD_H_SIZE);
-    
-    return wValue;
-}
-
-USHORT Get_LCD_V_SIZE()
-{
-    USHORT wValue;
-
-    wValue = (USHORT)ReadScratch(IDX_LCD_V_SIZE_OVERFLOW);
-    wValue <<= 8;
-    wValue |= (USHORT)ReadScratch(IDX_LCD_V_SIZE);
-    
-    return wValue;
-}
-
-ULONG Get_LCD_SIZE()
-{
-    ULONG dwValue;
-
-    dwValue = (ULONG)Get_LCD_V_SIZE();
-    dwValue <<= 16;
-    dwValue |= (ULONG)Get_LCD_H_SIZE();
-    
-    return dwValue;
-}
-
-USHORT Get_LCD2_H_SIZE()
-{
-    USHORT wValue;
-
-    wValue = (USHORT)ReadScratch(IDX_LCD2_H_SIZE_OVERFLOW);
-    wValue <<= 8;
-    wValue |= (USHORT)ReadScratch(IDX_LCD2_H_SIZE);
-    
-    return wValue;
-}
-
-USHORT Get_LCD2_V_SIZE()
-{
-    USHORT wValue;
-
-    wValue = (USHORT)ReadScratch(IDX_LCD2_V_SIZE_OVERFLOW);
-    wValue <<= 8;
-    wValue |= (USHORT)ReadScratch(IDX_LCD2_V_SIZE);
-    
-    return wValue;
-}
-
-ULONG Get_LCD2_SIZE()
-{
-    ULONG dwValue;
-
-    dwValue = (ULONG)Get_LCD2_V_SIZE();
-    dwValue <<= 16;
-    dwValue |= (ULONG)Get_LCD2_H_SIZE();
-    
-    return dwValue;
-}
-
-UCHAR Get_RRATE_ID(UCHAR DisplayPath)
-{
-    return ((DisplayPath == DISP1) ? ReadScratch(IDX_IGA1_RRATE_ID) : ReadScratch(IDX_IGA2_RRATE_ID));
-}
-
-void Set_RRATE_ID(UCHAR RRateID, UCHAR DisplayPath)
-{
-    if (DisplayPath == DISP1)
-        WriteScratch(IDX_IGA1_RRATE_ID, RRateID);
-    else
-        WriteScratch(IDX_IGA2_RRATE_ID, RRateID);
-}
-
-UCHAR Get_LCD_TABLE_INDEX(void)
-{
-    return ReadScratch(IDX_LCD1_TABLE_INDEX);
-}
-
-UCHAR Get_LCD2_TABLE_INDEX(void)
-{
-    return ReadScratch(IDX_LCD2_TABLE_INDEX);
-}
-
-void Set_LCD_TABLE_INDEX(UCHAR bLCDIndex)
-{
-    WriteScratch(IDX_LCD1_TABLE_INDEX, bLCDIndex);
-}
-
-UCHAR Get_TV_ConnectorType(void)
-{
-    return ReadScratch(IDX_TV1_CONNECTION_TYPE);
-}
-
-UCHAR Get_TV_Type(void)
-{
-    return ReadScratch(IDX_TV1_TYPE);
-}
-
-void Set_TV_Confiuration(UCHAR TVConfig)
-{
-    WriteScratch(IDX_TV1_TYPE, (TVConfig&0xF));
-    WriteScratch(IDX_TV1_CONNECTION_TYPE, ((TVConfig>>4)&0x3));
-}
-
-USHORT Get_VESA_MODE(UCHAR DisplayPath)
-{
-    UCHAR VESAMode, VESAModeOver;
-
-    if (DisplayPath == DISP1)
-    {
-        VESAMode = ReadScratch(IDX_IGA1_VESA_MODE);
-        VESAModeOver = ReadScratch(IDX_IGA1_VESA_MODE_OVERFLOW);
-    }
-    else
-    {
-        VESAMode = ReadScratch(IDX_IGA2_VESA_MODE);
-        VESAModeOver = ReadScratch(IDX_IGA2_VESA_MODE_OVERFLOW);
-    }
-    
-    return  ((USHORT)VESAModeOver) << 8 | (USHORT)VESAMode;
-}
-
-void Set_VESA_MODE(USHORT ModeNum, UCHAR DisplayPath)
-{
-    if (DisplayPath == DISP1)
-    {
-        WriteScratch(IDX_IGA1_VESA_MODE, (UCHAR)ModeNum);
-        WriteScratch(IDX_IGA1_VESA_MODE_OVERFLOW, (UCHAR)(ModeNum >> 8));
-    }
-    else
-    {
-        WriteScratch(IDX_IGA2_VESA_MODE, (UCHAR)ModeNum);
-        WriteScratch(IDX_IGA2_VESA_MODE_OVERFLOW, (UCHAR)(ModeNum >> 8));
-    }
-}
-
-void ResetATTR()
-{
-    InPort(COLOR_INPUT_STATUS1_READ);
-    InPort(MONO_INPUT_STATUS1_READ);
-}
-
-void EnableATTR()
-{
-    ResetATTR();
-    OutPort(ATTR_DATA_WRITE, 0x20);
-}
-
-
-void SetCRReg(UCHAR bRegIndex, UCHAR bRegValue, UCHAR bMask)
-{
-    UCHAR btemp = 0x0;
-    
-    if(bMask != 0xFF)
-    {
-        OutPort(COLOR_CRTC_INDEX,bRegIndex);
-        btemp = (UCHAR)InPort(COLOR_CRTC_DATA);
-        bRegValue &= bMask;
-        btemp &=~(bMask);
-        btemp |= bRegValue;
-        OutPort(COLOR_CRTC_DATA,btemp);
-    }
-    else
-    {
-        OutPort(COLOR_CRTC_INDEX,bRegIndex);
-        OutPort(COLOR_CRTC_DATA,bRegValue);
-    }
-
-    return;
-}
-
-
-UCHAR GetCRReg(UCHAR bRegIndex)
-{
-    UCHAR btemp = 0x0;
-    
-    OutPort(COLOR_CRTC_INDEX,bRegIndex);
-    btemp = (UCHAR)InPort(COLOR_CRTC_DATA);
+        case CRT_PORT:
+            TurnOnCRTMask();
+            break;
         
-    return btemp;
+        case DVP1:
+            TurnOnDVP1Mask();
+            break;
+
+        case DVP2:
+            TurnOnDVP2Mask();
+            break;
+            
+        case DVP12:
+            TurnOnDVP1Mask();
+            TurnOnDVP2Mask();
+            break;
+    }
 }
 
-
-void SetSRReg(UCHAR bRegIndex, UCHAR bRegValue, UCHAR bMask)
+void TurnOffDVPMask(BYTE bDigitalDevice)
 {
-    UCHAR btemp = 0x0;
-    
-    if(bMask != 0xFF)
+    switch (bDigitalDevice)
     {
-        OutPort(SEQ_INDEX,bRegIndex);
-        btemp = (UCHAR)InPort(SEQ_DATA);
-        bRegValue &= bMask;
-        btemp &=~(bMask);
-        btemp |= bRegValue;
-        OutPort(SEQ_DATA,btemp);
-    }
-    else
-    {
-        OutPort(SEQ_INDEX,bRegIndex);
-        OutPort(SEQ_DATA,bRegValue);
-    }
-
-    return;
-}
-
-
-UCHAR GetSRReg(UCHAR bRegIndex)
-{
-    UCHAR btemp = 0x0;
-    
-    OutPort(SEQ_INDEX,bRegIndex);
-    btemp = (UCHAR)InPort(SEQ_DATA);
+        case CRT_PORT:
+            TurnOffCRTMask();
+            break;
         
-    return btemp;
+        case DVP1:
+            TurnOffDVP1Mask();
+            break;
+
+        case DVP2:
+            TurnOffDVP2Mask();
+            break;
+            
+        case DVP12:
+            TurnOffDVP1Mask();
+            TurnOffDVP2Mask();
+            break;
+    }
+
 }
 
-void SetARReg(UCHAR index,UCHAR value)
+void UnLockTiming(BYTE DisplayPath)
 {
-    OutPort(ATTR_DATA_WRITE,index);
-    OutPort(ATTR_DATA_WRITE,value);
+    if (DisplayPath == DISP1)
+        SetSRReg(0x65, 0, 0xFF);
+    else
+        SetSRReg(0x68, 0, 0xFF);
 }
 
-UCHAR GetARReg(UCHAR index)
+void LockTiming(BYTE DisplayPath)
 {
-    UCHAR bTmp;
-    InPort(COLOR_INPUT_STATUS1_READ);
-    OutPort(ATTR_DATA_WRITE,index);
-    bTmp = (UCHAR)InPort(ATTR_DATA_READ);
-    InPort(COLOR_INPUT_STATUS1_READ);
-    OutPort(ATTR_DATA_WRITE,BIT5);
-    return bTmp;
+    if (DisplayPath == DISP1)
+        SetSRReg(0x65, 0xFF, 0xFF);
+    else
+        SetSRReg(0x68, 0xFF, 0xFF);
 }
 
 
-void SetGRReg(UCHAR bRegIndex, UCHAR bRegValue, UCHAR bMask)
+void SetHTotal(BYTE DisplayPath, WORD Value)
 {
-    UCHAR btemp = 0x0;
     
-    if(bMask != 0xFF)
+    Value -= 40;
+
+    if(DisplayPath == DISP1)
     {
-        OutPort(GRAPH_INDEX,bRegIndex);
-        btemp = (UCHAR)InPort(GRAPH_DATA);
-        bRegValue &= bMask;
-        btemp &=~(bMask);
-        btemp |= bRegValue;
-        OutPort(GRAPH_DATA,btemp);
+        WriteRegToHW(HTotal1, Value);
     }
     else
     {
-        OutPort(GRAPH_INDEX,bRegIndex);
-        OutPort(GRAPH_DATA,bRegValue);
+        WriteRegToHW(HTotal2, Value);
     }
 
     return;
 }
 
-void SetMSReg(UCHAR bRegValue)
+
+void SetHDisplayEnd(BYTE DisplayPath, WORD Value)
 {
-    OutPort(MISC_WRITE,bRegValue);
-}
-
-UCHAR GetIS1Reg()
-{
-    return InPort(COLOR_INPUT_STATUS1_READ);
-}
-
-
-void ClearFrameBuffer(UCHAR DisplayPath,ULONG *pFrameBufferBase, MODE_INFO *pModeInfo, UCHAR ucColorDepth)
-{
-    ULONG dwWidth = (ULONG)pModeInfo->H_Size, dwHeight = (ULONG)pModeInfo->V_Size, dwFactor  = 0;
-    ULONG i = 0;
-
-    xf86DrvMsgVerb(0, X_INFO, DefaultLevel, "==Enter ClearFrameBuffer()==\n");
     
-    
-    
-    switch(ucColorDepth)
+    Value -= 8;
+
+    if(DisplayPath == DISP1)
     {
-        case 8:
-        case 16:
-        case 32:    
-          dwFactor = 32 / ucColorDepth;
-          break;
-          
-        default:
-            return;
+        WriteRegToHW(HDispEnd1, Value);
+    }
+    else
+    {
+        WriteRegToHW(HDispEnd2, Value);
     }
 
-    
-    for(i = 0;i<((dwWidth*dwHeight)/dwFactor);i++)
-    {
-        *(pFrameBufferBase+i) = 0x00000000;
-    }
-    xf86DrvMsgVerb(0, X_INFO, DefaultLevel, "==Exit ClearFrameBuffer()==\n");
+    return;
     
 }
 
-ULONG Difference(ULONG Value1, ULONG Value2)
+
+void SetHBlankingStart(BYTE DisplayPath, WORD Value)
+{
+    
+    Value -= 8;
+
+    if(DisplayPath == DISP1)
+    {
+        WriteRegToHW(HBnkSt1, Value);
+    }
+    else
+    {
+        WriteRegToHW(HBnkSt2, Value);
+    }
+
+    return;
+    
+}
+
+
+void SetHBlankingEnd(BYTE DisplayPath, WORD Value)
+{
+    
+    Value -= 8;
+
+    if(DisplayPath == DISP1)
+    {
+        WriteRegToHW(HBnkEnd1, Value);
+    }
+    else
+    {
+        WriteRegToHW(HBnkEnd2, Value);
+    }
+
+    return;
+    
+}
+
+
+void SetHSyncStart(BYTE DisplayPath, WORD Value)
+{
+    
+    Value -= 0;
+
+    if(DisplayPath == DISP1)
+    {
+        WriteRegToHW(HSyncSt1, Value);
+    }
+    else
+    {
+        WriteRegToHW(HSyncSt2, Value);
+    }
+
+    return;
+    
+}
+
+
+void SetHSyncEnd(BYTE DisplayPath, WORD Value)
+{
+    
+    Value -= 0;
+
+    if(DisplayPath == DISP1)
+    {
+        WriteRegToHW(HSyncEnd1, Value);
+    }
+    else
+    {
+        WriteRegToHW(HSyncEnd2, Value);
+    }
+
+    return;
+    
+}
+
+
+void SetVTotal(BYTE DisplayPath, WORD Value)
+{
+    
+    Value -= 2;
+
+    if(DisplayPath == DISP1)
+    {
+        WriteRegToHW(VTotal1, Value);
+    }
+    else
+    {
+        WriteRegToHW(VTotal2, Value);
+    }
+
+    return;
+    
+}
+
+
+void SetVDisplayEnd(BYTE DisplayPath, WORD Value)
+{
+    
+    Value -= 1;
+
+    if(DisplayPath == DISP1)
+    {
+        WriteRegToHW(VDispEnd1, Value);
+    }
+    else
+    {
+        WriteRegToHW(VDispEnd2, Value);
+    }
+
+    return;
+    
+}
+
+
+void SetVBlankingStart(BYTE DisplayPath, WORD Value)
+{
+    
+    Value -= 1;
+
+    if(DisplayPath == DISP1)
+    {
+        WriteRegToHW(VBnkSt1, Value);
+    }
+    else
+    {
+        WriteRegToHW(VBnkSt2, Value);
+    }
+
+    return;
+    
+}
+
+
+void SetVBlankingEnd(BYTE DisplayPath, WORD Value)
+{
+    
+    Value -= 1;
+
+    if(DisplayPath == DISP1)
+    {
+        WriteRegToHW(VBnkEnd1, Value);
+    }
+    else
+    {
+        WriteRegToHW(VBnkEnd2, Value);
+    }
+
+    return;
+    
+}
+
+
+void SetVSyncStart(BYTE DisplayPath, WORD Value)
+{
+    
+    Value -= 1;
+
+    if(DisplayPath == DISP1)
+    {
+        WriteRegToHW(VSyncSt1, Value);
+    }
+    else
+    {
+        WriteRegToHW(VSyncSt2, Value);
+    }
+
+    return;
+    
+}
+
+
+void SetVSyncEnd(BYTE DisplayPath, WORD Value)
+{
+    
+    Value -= 1;
+
+    if(DisplayPath == DISP1)
+    {
+        WriteRegToHW(VSyncEnd1, Value);
+    }
+    else
+    {
+        WriteRegToHW(VSyncEnd2, Value);
+    }
+
+    return;
+    
+}
+
+
+void SetPixelClock(CBIOS_Extension *pCBIOSExtension, BYTE DisplayPath, DWORD Clock)
+{
+    PLL_Info PLLInfo;
+    BYTE bPLLDiv=0;
+    
+    
+    if(Clock<25000)
+        bPLLDiv|=2;
+        
+        
+        
+        
+    Clock <<= bPLLDiv;
+    PLLInfo = pCBIOSExtension->pfnCBIOS_TransVGAPLL(Clock);
+    pCBIOSExtension->pfnCBIOS_SetVGAPLLReg(DisplayPath, PLLInfo);
+}
+
+DWORD Difference(DWORD Value1, DWORD Value2)
 {
     if (Value1 > Value2)
         return (Value1 - Value2);
@@ -2428,94 +930,1397 @@ ULONG Difference(ULONG Value1, ULONG Value2)
 }
 
 
-UCHAR ReadScratch(USHORT IndexMask)
+PLL_Info ClockToPLLF4002A(DWORD Clock)
 {
-    UCHAR Index = (UCHAR)(IndexMask >> 8);
-    UCHAR Mask = (UCHAR)IndexMask;
-    UCHAR RetValue;
+    DWORD MSCount, NSCount, RSCount, FCKVCO, FCKOUT;    
+    DWORD NearestClock = 300000000; 
+    PLL_Info PLLInfo = {0, 0, 0};
 
-    RetValue = GetCRReg(Index);
-    RetValue &= Mask;
-    
-    RetValue = AlignDataToLSB(RetValue, Mask);
-
-    return RetValue;
-}
-
-
-void WriteScratch(USHORT IndexMask, UCHAR Data)
-{
-    UCHAR Index = (UCHAR)(IndexMask >> 8);
-    UCHAR Mask = (UCHAR)IndexMask;
-
-    Data = AlignDataToMask(Data, Mask);
-    Data &= Mask;
-    SetCRReg(Index, Data, Mask);
-}
-
-
-UCHAR AlignDataToLSB(UCHAR bData, UCHAR bMask)
-{
-    bData &= bMask;
-    
-    while ((bMask & BIT0) == 0)
+    for (MSCount = 3; MSCount < 6; MSCount++)
     {
-        bData >>= 1;
-        bMask >>= 1;
+        for (NSCount = 1; NSCount < 256; NSCount++)
+        {
+            FCKVCO = PLLReferenceClock * NSCount / MSCount;
+            
+            if ( (MaxFCKVCO4002A >= FCKVCO) && (FCKVCO >= MinFCKVCO4002A) )
+            {
+                for (RSCount = 1; RSCount <= 7; RSCount++)
+                {
+                    FCKOUT = FCKVCO >> RSCount;
+                    if ( Difference(FCKOUT, Clock) < Difference(NearestClock, Clock) )
+                    {
+                        NearestClock = FCKOUT;
+                        PLLInfo.MS = (BYTE)MSCount;
+                        PLLInfo.NS = (BYTE)NSCount;
+                        PLLInfo.RS = (BYTE)RSCount;
+                    }
+                }
+            }
+        }
+
     }
+
     
-    return bData;
+    PLLInfo.MS <<=3 ;
+
+    return PLLInfo;
+
 }
 
 
-UCHAR AlignDataToMask(UCHAR bData, UCHAR bMask)
+PLL_Info ClockToPLLF9003A(DWORD Clock)
 {
-    while ((bMask & BIT0) == 0)
+    DWORD MSCount, NSCount, RSCount, FCKVCO, FCKOUT;    
+    DWORD NearestClock = 300000000; 
+    PLL_Info PLLInfo = {0, 0, 0};
+
+    for (MSCount = 3; MSCount < 6; MSCount++)
     {
-        bData <<= 1;
-        bMask >>= 1;
+        for (NSCount = 1; NSCount < 256; NSCount++)
+        {
+            FCKVCO = PLLReferenceClock * NSCount / MSCount;
+            
+            if ( (MaxFCKVCO9003A >= FCKVCO) && (FCKVCO >= MinFCKVCO9003A) )
+            {
+                for (RSCount = 1; RSCount < 6; RSCount++)
+                {
+                    FCKOUT = FCKVCO >> RSCount;
+                    if ( Difference(FCKOUT, Clock) < Difference(NearestClock, Clock) )
+                    {
+                        NearestClock = FCKOUT;
+                        if (MSCount == 3)
+                            PLLInfo.MS = 0x00;
+                        if (MSCount == 4)
+                            PLLInfo.MS = BIT3;
+                        if (MSCount == 5)
+                            PLLInfo.MS = BIT4+BIT3;
+                        PLLInfo.NS = (BYTE)NSCount;
+                        PLLInfo.RS = (BYTE)RSCount-1;
+                    }
+                }
+            }
+        }
+
     }
-    
-    return bData;
+
+    return PLLInfo;
+
 }
 
 
-void SetDPMS(UCHAR DPMSState, UCHAR DisplayPath)
+void SetF9003APLLReg(BYTE DisplayPath, PLL_Info PLLInfo)
 {
-    UCHAR RegValue;
+    BYTE RetValue; 
 
-    if (DPMSState > DPMS__OFF)
-        RegValue = 3;
-    else if (DPMSState <= DPMS__SUSPEND)
-        RegValue = DPMSState;
-        
     if (DisplayPath == DISP1)
-        SetCRReg(0xB6, RegValue, BIT1+BIT0);
-    else if (DisplayPath == DISP2)
-        SetCRReg(0x3E, RegValue, BIT1+BIT0);
+    {
+        SetCRReg(0xC1, PLLInfo.MS, BIT4+BIT3);
+        SetCRReg(0xC0, PLLInfo.NS, 0xFF);
+        SetCRReg(0xCF, PLLInfo.RS, BIT2+BIT1+BIT0);
+    }
+    else
+    {
+        SetCRReg(0xBF, PLLInfo.MS, BIT4+BIT3);
+        SetCRReg(0xBE, PLLInfo.NS, 0xFF);
+        SetCRReg(0xCE, PLLInfo.RS, BIT2+BIT1+BIT0);
+    }
+
+    
+    RetValue = GetCRReg(0xBB);
+    SetCRReg(0xBB, RetValue, 0xFF);
 
 }
 
-CI_STATUS DetectMonitor()
+
+void SetF4002APLLReg(BYTE DisplayPath, PLL_Info PLLInfo)
 {
-    CI_STATUS ConnectStatus;
+    BYTE RetValue; 
+
+    if (DisplayPath == DISP1)
+    {
+        SetCRReg(0xC1, PLLInfo.MS, BIT5+BIT4+BIT3);
+        SetCRReg(0xC0, PLLInfo.NS, 0xFF);
+        SetCRReg(0xCF, PLLInfo.RS, BIT2+BIT1+BIT0);
+    }
+    else
+    {
+        SetCRReg(0xBF, PLLInfo.MS, BIT5+BIT4+BIT3);
+        SetCRReg(0xBE, PLLInfo.NS, 0xFF);
+        SetCRReg(0xCE, PLLInfo.RS, BIT2+BIT1+BIT0);
+    }
 
     
-    SetCRReg(0xA9, 0x80, 0xFF);
+    RetValue = GetCRReg(0xBB);
+    SetCRReg(0xBB, RetValue, 0xFF);
 
-    
-    SetCRReg(0xA8, BIT6, BIT6);
-
-    
-    WaitDisplayPeriod();
-
-    
-    ConnectStatus = ((InPort(INPUT_STATUS_0_READ) & BIT4) ? true : false);
-
-    SetCRReg(0xA8, 0x00, BIT6);
-
-    return ConnectStatus;
 }
+
+
+void SetPolarity(BYTE DevicePort, WORD wValue)
+{
+    BYTE ucTmpData = 0;
+    wValue &= NCLK+NVS+NHS; 
+    ucTmpData = (BYTE)wValue;
+    ucTmpData |= (BYTE)(wValue>>8); 
+    switch (DevicePort)
+    {
+        case CRT_PORT:
+            OutPort(MISC_WRITE, ((wValue<<5) & 0xC0) | (InPort(MISC_READ) & 0x3F));
+            break;
+        
+        case DVP1:
+        case DVP12:
+            SetSRReg(0x20, wValue>>1, BIT2+BIT1+BIT0);
+            break;
+
+        case DVP2:
+            SetSRReg(0x20, wValue<<2, BIT5+BIT4+BIT3);
+            break;
+    }
+}
+
+
+void SetFIFO(BYTE DisplayPath)
+{
+    if (DisplayPath == DISP1)
+    {
+        SetCRReg(0xA7, 0xBF, 0xFF);
+        SetCRReg(0xA6, 0x9F, 0xFF);
+    }
+    else if (DisplayPath == DISP2)
+    {
+        SetCRReg(0x35, 0x5F, 0xFF);
+        SetCRReg(0x34, 0x3F, 0xFF);
+    }
+}
+
+
+void SetTimingRegs(CBIOS_Extension *pCBIOSExtension, BYTE DisplayPath, MODE_INFO *pModeInfo, RRATE_TABLE *pRRateTable)
+{
+    WORD  Attribute    = pRRateTable->Attribute;
+    BYTE ucDeviceID   = Get_DEV_ID(DisplayPath);
+    BYTE ucDevicePort = GetDevicePort(ucDeviceID);
+    
+    SetHTotal(DisplayPath, pRRateTable->H_Total);
+
+    SetHBlankingEnd(DisplayPath, (Attribute & HB) ? pRRateTable->H_Total-8 : pRRateTable->H_Total);
+
+    SetHDisplayEnd(DisplayPath, pModeInfo->H_Size);
+
+    SetHBlankingStart(DisplayPath, (Attribute & HB) ? pModeInfo->H_Size+8 : pModeInfo->H_Size);
+
+    SetHSyncStart(DisplayPath, pRRateTable->H_Sync_Start);
+
+    SetHSyncEnd(DisplayPath, pRRateTable->H_Sync_End);
+
+    SetVTotal(DisplayPath, pRRateTable->V_Total);
+
+    SetVBlankingEnd(DisplayPath, (Attribute & VB) ? pRRateTable->V_Total-8 : pRRateTable->V_Total);
+
+    SetVDisplayEnd(DisplayPath, pModeInfo->V_Size);
+
+    SetVBlankingStart(DisplayPath, (Attribute & VB) ? pModeInfo->V_Size+8 : pModeInfo->V_Size);
+
+    SetVSyncStart(DisplayPath, pRRateTable->V_Sync_Start);
+
+    SetVSyncEnd(DisplayPath, pRRateTable->V_Sync_End);
+    
+    SetPixelClock(pCBIOSExtension, DisplayPath, pRRateTable->Clock);
+
+    if(ucDeviceID != CRTIndex && pCBIOSExtension->bPLLFromTVEnc)  
+        UpdatePLLByTVEnc(pRRateTable->Clock);
+    if(ucDeviceID == DVIIndex || ucDeviceID == HDMIIndex)
+        SetTMDSDPAReg(pRRateTable->Clock, ucDeviceID);
+    SetPolarity(ucDevicePort, pRRateTable->Attribute);
+
+    
+}
+
+void SetTimingCentering(CBIOS_Extension *pCBIOSExtension, BYTE DisplayPath, MODE_INFO *pModeInfo, RRATE_TABLE *pRRateTable)
+{
+    WORD  Attribute    = pRRateTable->Attribute;
+    WORD  wHDMITypeHSize =1280, wHDMITypeVSize =720;
+    WORD  wHDiff=0, wVDiff=0;
+    BYTE ucDeviceID   = Get_DEV_ID(DisplayPath);
+    BYTE ucDevicePort = GetDevicePort(ucDeviceID);
+    
+    if(ucDeviceID == HDMIIndex)
+    {
+        if(Get_HDMI_TYPE()==HDMI1080P)
+        {
+            wHDMITypeHSize = 1920;
+            wHDMITypeVSize = 1080;
+        }
+        wHDiff = (wHDMITypeHSize - pModeInfo->H_Size)>>1;
+        wVDiff = (wHDMITypeVSize - pModeInfo->V_Size)>>1;
+        SetHTotal(DisplayPath, pRRateTable->H_Total);
+
+        SetHBlankingEnd(DisplayPath, pRRateTable->H_Total-wHDiff);
+
+        SetHDisplayEnd(DisplayPath, pModeInfo->H_Size);
+
+        SetHBlankingStart(DisplayPath, pModeInfo->H_Size+wHDiff);
+
+        SetHSyncStart(DisplayPath, pRRateTable->H_Sync_Start-wHDiff);
+
+        SetHSyncEnd(DisplayPath, pRRateTable->H_Sync_End-wHDiff);
+
+        SetVTotal(DisplayPath, pRRateTable->V_Total);
+
+        SetVBlankingEnd(DisplayPath, pRRateTable->V_Total-wVDiff);
+
+        SetVDisplayEnd(DisplayPath, pModeInfo->V_Size);
+
+        SetVBlankingStart(DisplayPath, pModeInfo->V_Size+wVDiff);
+
+        SetVSyncStart(DisplayPath, pRRateTable->V_Sync_Start-wVDiff);
+
+        SetVSyncEnd(DisplayPath, pRRateTable->V_Sync_End-wVDiff);
+        
+        SetPixelClock(pCBIOSExtension, DisplayPath, pRRateTable->Clock);
+        
+        if(ucDeviceID != CRTIndex)  
+            UpdatePLLByTVEnc(pRRateTable->Clock);
+
+        SetPolarity(ucDevicePort, pRRateTable->Attribute);
+    }
+    
+}
+
+
+void SetPitch(BYTE DisplayPath, WORD Value)
+{
+    
+    Value += 7;
+    Value >>= 3;
+
+    if(DisplayPath == DISP1)
+    {
+        WriteRegToHW(Pitch1, Value);
+    }
+    else
+    {
+        WriteRegToHW(Pitch2, Value);
+    }
+
+    return;
+    
+}
+
+
+WORD GetPitch(BYTE DisplayPath)
+{
+    WORD wPitch;
+    
+    if(DisplayPath == DISP1)
+    {
+        wPitch = ReadRegFromHW(Pitch1);
+    }
+    else
+    {
+        wPitch = ReadRegFromHW(Pitch2);
+    }
+
+    wPitch <<= 3;
+
+    return wPitch;
+}
+
+
+WORD GetVDisplayEnd(BYTE DisplayPath)
+{
+    WORD  wDisplayEnd = 0x0;
+    
+    if(DisplayPath == DISP1)
+    {
+        wDisplayEnd = ReadRegFromHW(VDispEnd1);
+    }
+    else
+    {
+        wDisplayEnd = ReadRegFromHW(VDispEnd2);
+    }
+    
+    
+    wDisplayEnd += 1;
+
+    return  wDisplayEnd;
+}
+
+
+void SetColorDepth(BYTE DisplayPath, BYTE Value)
+{
+    BYTE bSetBit = 0x0;
+
+    switch(Value)
+    {
+        case 8:
+            bSetBit = (BYTE)BIT0;
+            break;
+        case 16:
+            bSetBit = (BYTE)BIT2;
+            break;
+        case 32:
+            bSetBit = (BYTE)BIT3;
+            break;
+        default:
+            return;
+    }
+
+    if(DisplayPath == DISP1)
+    {
+        SetCRReg(0xA3, 0x0, BIT0+BIT1+BIT2+BIT3); 
+        SetCRReg(0xA3, bSetBit, bSetBit);
+    }
+    else
+    {
+        
+        if(Value == 8)
+            return;
+        SetCRReg(0x33, 0x0, BIT1+BIT2+BIT3); 
+        SetCRReg(0x33, bSetBit, bSetBit);
+    }
+    
+}
+
+void HandleShareConnector(BYTE *pDeviceIndex)
+{
+    
+    if(*pDeviceIndex == DVIIndex)
+    {
+        if(TMDS_ID_EP932M==Get_TMDS_TX_ID()) 
+            *pDeviceIndex = HDMIIndex;
+    }
+    
+    
+}
+
+
+BYTE GetVBIOSBootUpDevice(WORD* ucDeiceBit)
+{
+    BYTE i;
+    *ucDeiceBit = 0;
+    
+    for(i=0;i<(sizeof(PortConfig)/sizeof(PORT_CONFIG));i++)
+    {
+        if(PortConfig[i].Attribute & Dev_Boot)
+        {
+            *ucDeiceBit |= TransDevIDtoBit(PortConfig[i].DeviceIndex);
+            return TRUE;
+        }
+    }
+    
+    i = ReadScratch(IDX_BOOT_DEV_ID);
+    if(i)
+    {
+        *ucDeiceBit |= TransDevIDtoBit(i);     
+        return TRUE;
+    }
+    return FALSE;
+}
+
+
+BYTE GetDevicePort(BYTE DeviceIndex)
+{
+    BYTE i;
+    HandleShareConnector(&DeviceIndex);
+    for(i=0;i<(sizeof(PortConfig)/sizeof(PORT_CONFIG));i++)
+    {
+        if(PortConfig[i].DeviceIndex==DeviceIndex)
+            return PortConfig[i].PortID;
+    }
+    return FALSE;
+}
+
+
+void ConfigDigitalPort(BYTE DisplayPath)
+{
+    BYTE bDigitalDevice = 0x0, bSetValue = 0x0, DeviceIndex = 0x0;
+    
+    
+    if(DisplayPath == DISP1)
+    {
+        DeviceIndex    = Get_DEV_ID(DISP1);
+        bSetValue      = BIT0+BIT1;  
+    }
+    else
+    {
+        DeviceIndex    = Get_DEV_ID(DISP2);
+        bSetValue      = BIT2;       
+    }
+
+    
+    bDigitalDevice = GetDevicePort(DeviceIndex);
+    switch(bDigitalDevice)
+    {          
+        case DVP1:
+            Set12BitDVP();
+            SetSRReg(0x1F, bSetValue, BIT0);
+            break;
+        case DVP2:
+            Set12BitDVP();
+            SetSRReg(0x1F, bSetValue, BIT1);
+            break;
+        case DVP12:
+            Set24BitDVP();
+            SetSRReg(0x1F, bSetValue, BIT0);
+            break;
+        case CRT_PORT:
+            SetSRReg(0x1F, bSetValue, BIT2);
+            break;
+        default:
+            return;
+    }
+    return;
+    
+}
+
+
+void CheckLCDSyncStartValue(BYTE DisplayPath) 
+{
+    WORD wCheckData;
+    wCheckData = LCDTable[0].pPanelTable.Timing.H_Sync_Start + 64;
+    if(wCheckData >= LCDTable[0].pPanelTable.Timing.H_Total) 
+    {
+        SetHSyncStart(DisplayPath, LCDTable[0].pPanelTable.Timing.H_Total-64); 
+    }
+}
+
+BYTE bHDMIUnscan(BYTE ucHDMIType)
+{
+    WORD wHSize, wVSize;
+    if(ucHDMIType==HDMI1080P)
+    {
+        wHSize = 1920;
+        wVSize = 1080;
+    }else
+    {
+        wHSize = 1280;
+        wVSize = 720;
+    }
+    if(wHSize>HDMITable[ucHDMIType].H_Size || 
+       wVSize>HDMITable[ucHDMIType].V_Size)
+        return TRUE;
+    else
+        return FALSE;
+}
+
+
+void SetDisplay1UpScalingFactor(MODE_INFO *pModeInfo, MODE_INFO *pPanelInfo)
+{
+    WORD  wScalingVector=0;
+    BYTE  ucScalingCTLReg = (GetSRReg(0x58)&0xF8);
+    
+    if((pModeInfo->H_Size <  pPanelInfo->H_Size) || 
+       (pModeInfo->V_Size <  pPanelInfo->V_Size))
+    {
+        
+        SetSRReg(0x4B,(BYTE)(pModeInfo->H_Size-1) ,0xFF);
+        SetSRReg(0x4C,(BYTE)(pModeInfo->H_Size>>8),0x0F);
+        
+        
+        if((pModeInfo->H_Size < pPanelInfo->H_Size))
+        {
+            wScalingVector = (WORD)(((DWORD)(pModeInfo->H_Size << 12)) / pPanelInfo->H_Size);
+            SetSRReg(0x59,(BYTE)wScalingVector ,0xFF);
+            SetSRReg(0x5B,(BYTE)(wScalingVector>>8) ,0x0F);
+            ucScalingCTLReg |= BIT2; 
+        }
+        
+        
+        if((pModeInfo->V_Size < pPanelInfo->V_Size))
+        {
+            wScalingVector = (WORD)(((DWORD)(pModeInfo->V_Size << 11)) / pPanelInfo->V_Size);
+            SetSRReg(0x5A,(BYTE)wScalingVector ,0xFF);
+            SetSRReg(0x5B,(BYTE)(wScalingVector>>4) ,0x70); 
+            ucScalingCTLReg |= BIT1; 
+        }
+        
+        if(ucScalingCTLReg&0x6) 
+            ucScalingCTLReg |= BIT0; 
+        SetSRReg(0x58, ucScalingCTLReg, 0xFF); 
+    }
+}
+
+
+void SetDisplay2UpScalingFactor(MODE_INFO *pModeInfo, MODE_INFO *pPanelInfo)
+{
+    WORD  wScalingVector=0;
+    BYTE  ucScalingCTLReg = (GetSRReg(0x50)&0xF8);
+    
+    if((pModeInfo->H_Size <  pPanelInfo->H_Size) || 
+       (pModeInfo->V_Size <  pPanelInfo->V_Size))
+    {
+        
+        SetSRReg(0x4D,(BYTE)(pModeInfo->H_Size-1) ,0xFF);
+        SetSRReg(0x4E,(BYTE)(pModeInfo->H_Size>>8),0x0F);
+        
+        
+        if((pModeInfo->H_Size < pPanelInfo->H_Size))
+        {
+            wScalingVector = (WORD)(((DWORD)(pModeInfo->H_Size << 12)) / pPanelInfo->H_Size);
+            SetSRReg(0x51,(BYTE)wScalingVector ,0xFF);
+            SetSRReg(0x53,(BYTE)(wScalingVector>>8) ,0x0F);
+            ucScalingCTLReg |= BIT2; 
+        }
+        
+        
+        if((pModeInfo->V_Size < pPanelInfo->V_Size))
+        {
+            wScalingVector = (WORD)(((DWORD)(pModeInfo->V_Size << 11)) / pPanelInfo->V_Size);
+            SetSRReg(0x52,(BYTE)wScalingVector ,0xFF);
+            SetSRReg(0x53,(BYTE)(wScalingVector>>4) ,0x70); 
+            ucScalingCTLReg |= BIT1; 
+        }
+        
+        if(ucScalingCTLReg&0x6) 
+            ucScalingCTLReg |= BIT0; 
+        SetSRReg(0x50, ucScalingCTLReg, 0xFF); 
+    }
+}
+
+
+void SetDisplay1DownScalingFactor(MODE_INFO *pModeInfo, MODE_INFO *pPanelInfo)
+{
+    WORD  wScalingVector=0;
+    
+    if((pModeInfo->H_Size > pPanelInfo->H_Size) || 
+       (pModeInfo->V_Size > pPanelInfo->V_Size))
+    {
+        
+        if(pModeInfo->H_Size > pPanelInfo->H_Size)
+        {
+            
+            SetSRReg(0x77, (BYTE)pModeInfo->H_Size, 0xFF);
+            SetSRReg(0x76, (BYTE)(pModeInfo->H_Size>>8),0x07);
+            
+            
+            wScalingVector = (WORD)(((DWORD)(pModeInfo->H_Size << 8)) / pPanelInfo->H_Size);
+            SetSRReg(0x75, (BYTE)wScalingVector ,0xFF);
+            SetSRReg(0x74, (BYTE)(wScalingVector>>8), 0x03);
+            SetSRReg(0x74, BIT7, BIT7); 
+        }
+        
+        if(pModeInfo->V_Size > pPanelInfo->V_Size)
+        {
+            
+            SetSRReg(0x73, (BYTE)pModeInfo->V_Size, 0xFF);
+            SetSRReg(0x72, (BYTE)(pModeInfo->V_Size>>8),0x07);
+            
+            
+            wScalingVector = (WORD)(((DWORD)(pModeInfo->V_Size << 8)) / pPanelInfo->V_Size);
+            SetSRReg(0x71, (BYTE)wScalingVector ,0xFF);
+            SetSRReg(0x70, (BYTE)(wScalingVector>>8), 0x03);
+            SetSRReg(0x70, BIT7, BIT7); 
+        }
+    }
+}
+
+
+CBStatus Get_MODE_INFO_From_VESA_Table(WORD ModeNum, MODE_INFO **ppModeInfo)
+{
+    MODE_INFO *pModeTemp = VESATable;
+    CBStatus    bCheck = FALSE;
+    
+    do
+    {
+        if(((pModeTemp->Mode_ID_8bpp) == ModeNum)||
+           ((pModeTemp->Mode_ID_16bpp) == ModeNum)||
+           ((pModeTemp->Mode_ID_32bpp) == ModeNum)
+          )
+        {
+            bCheck = TRUE;
+            (*ppModeInfo) = pModeTemp;
+        }
+        
+        pModeTemp++;
+        
+    }while((pModeTemp->pRRTable) !=NULL);
+    
+    return bCheck;
+}
+
+
+CBStatus Get_MODE_INFO_From_HDMI_Table(WORD ModeNum, MODE_INFO **ppModeInfo)
+{
+    MODE_INFO *pModeTemp = HDMITable;
+    CBStatus    bCheck = FALSE;
+    
+    do
+    {
+        if(((pModeTemp->Mode_ID_8bpp) == ModeNum)||
+           ((pModeTemp->Mode_ID_16bpp) == ModeNum)||
+           ((pModeTemp->Mode_ID_32bpp) == ModeNum)
+          )
+        {
+            bCheck = TRUE;
+            (*ppModeInfo) = pModeTemp;
+        }
+        
+        pModeTemp++;
+        
+    }while((pModeTemp->pRRTable) !=NULL);
+    
+    return bCheck;
+}
+
+
+CBStatus Get_MODE_INFO_From_LCD_Table(WORD ModeNum, MODE_INFO **ppModeInfo)
+{
+    *ppModeInfo = (MODE_INFO *)LCDTable;   
+    if((((*ppModeInfo)->Mode_ID_8bpp) == ModeNum)||
+       (((*ppModeInfo)->Mode_ID_16bpp) == ModeNum)||
+       (((*ppModeInfo)->Mode_ID_32bpp) == ModeNum))
+        return TRUE;
+    else
+        return FALSE;
+}
+
+
+CBStatus GetModePointerFromVESATable(WORD ModeNum, BYTE RRIndex, MODE_INFO **ppModeInfo, RRATE_TABLE **ppRRateTable)
+{
+    RRATE_TABLE* pRRateTable_temp = NULL;
+    MODE_INFO *pModeInfo_temp = NULL;
+    
+    
+    if(!Get_MODE_INFO_From_VESA_Table(ModeNum,&pModeInfo_temp))
+    {
+        return FALSE;
+    }
+    else
+    {
+        
+
+        pRRateTable_temp = pModeInfo_temp->pRRTable;
+         
+        do
+        {   
+            if(pRRateTable_temp->RRate_ID == RRIndex)
+            {
+                (*ppRRateTable) = pRRateTable_temp;
+                (*ppModeInfo) = pModeInfo_temp;
+                return TRUE;
+            }
+            else
+            {
+                pRRateTable_temp++;
+            }
+
+        }while(pRRateTable_temp!=NULL);
+
+    }
+
+    
+    return FALSE;
+}
+
+
+CBStatus GetModePointerFromHDMITable(WORD ModeNum, BYTE RRIndex, MODE_INFO **ppModeInfo, RRATE_TABLE **ppRRateTable)
+{
+    RRATE_TABLE* pRRateTable_temp = NULL;
+    MODE_INFO *pModeInfo_temp = NULL;
+    
+    
+    if(!Get_MODE_INFO_From_HDMI_Table(ModeNum,&pModeInfo_temp))
+    {
+        return FALSE;
+    }
+    else
+    {
+        
+
+        pRRateTable_temp = pModeInfo_temp->pRRTable;
+         
+        do
+        {   
+            if(pRRateTable_temp->RRate_ID == RRIndex)
+            {
+                (*ppRRateTable) = pRRateTable_temp;
+                (*ppModeInfo) = pModeInfo_temp;
+                return TRUE;
+            }
+            else
+            {
+                pRRateTable_temp++;
+            }
+
+        }while(pRRateTable_temp!=NULL);
+
+    }
+
+    
+    return FALSE;
+}
+
+
+void LoadVESATiming(CBIOS_Extension *pCBIOSExtension, BYTE DisplayPath, WORD ModeNum)
+{
+    BYTE bR_Rate_value = 0x0;
+    MODE_INFO *pModeInfo = NULL, *pRefMode = NULL;
+    MODE_INFO RefMode;
+    RRATE_TABLE *pRRateTable = NULL;
+    CBStatus    bUserSpecifiedTiming = ((pCBIOSExtension->pCBiosArguments->BX & BIT11) ? TRUE : FALSE);
+
+    if(DisplayPath == DISP1)
+    {
+        
+        bR_Rate_value = Get_RRATE_ID(DISP1);
+    }
+    else
+    {
+        
+        bR_Rate_value = Get_RRATE_ID(DISP2);
+    }
+
+    
+    if(pCBIOSExtension->bEDIDValid)
+    {
+        pModeInfo = VESAEDIDTable;
+        pRRateTable = VESAEDIDTable[0].pRRTable;
+    }
+    else
+    {
+        
+        
+        GetModePointerFromVESATable(ModeNum,bR_Rate_value,&pModeInfo,&pRRateTable);
+    }
+
+    pCBIOSExtension->wCRTDefaultH = pModeInfo->H_Size;
+    pCBIOSExtension->wCRTDefaultV = pModeInfo->V_Size;
+
+    
+    CBIOSDebugPrint((0, "CBIOS: Setting %d x %d resolution\n", pModeInfo->H_Size, pModeInfo->V_Size));
+    SetTimingRegs(pCBIOSExtension, DisplayPath,pModeInfo,pRRateTable);
+    
+    
+    if((pCBIOSExtension->bDuoView)&&(DisplayPath != DISP1))
+    {
+        RefMode.H_Size = pCBIOSExtension->DisplayOneModeH;
+        RefMode.V_Size = pCBIOSExtension->DisplayOneModeV;
+
+        
+        
+        
+        SetDisplay2UpScalingFactor(&RefMode, pModeInfo);
+    }
+    else
+    {
+        
+        if(!bUserSpecifiedTiming)
+        {
+            if(GetModePointerFromVESATable(ModeNum,bR_Rate_value,&pRefMode,&pRRateTable))
+            {
+                CBIOSDebugPrint((0, "CBIOS: Original Setting %d x %d resolution\n", pRefMode->H_Size, pRefMode->V_Size));
+                
+                
+                
+                
+                SetDisplay1UpScalingFactor(pRefMode, pModeInfo);
+            }
+            else
+            {
+                CBIOSDebugPrint((0, "CBIOS: Setting Mode Fail, could not find Mode Num=%Xh\n", ModeNum));
+            }
+        }
+
+        
+        if(pCBIOSExtension->bEDIDValid)
+        {
+            pCBIOSExtension->DisplayOneModeH = VESAEDIDTable[0].H_Size;
+            pCBIOSExtension->DisplayOneModeV = VESAEDIDTable[0].V_Size;
+        }
+        else
+        {
+            
+            pCBIOSExtension->DisplayOneModeH = pModeInfo->H_Size;
+            pCBIOSExtension->DisplayOneModeV = pModeInfo->V_Size;
+        }
+        
+    }
+    
+    return;
+}
+
+
+void LoadLCDTiming(CBIOS_Extension *pCBIOSExtension, BYTE DisplayPath, WORD ModeNum)
+{
+    MODE_INFO pModeInfo;
+    MODE_INFO *pMode = NULL;
+    
+    pModeInfo.H_Size = LCDTable[0].H_Size;
+    pModeInfo.V_Size = LCDTable[0].V_Size;
+    SetTimingRegs(pCBIOSExtension, DisplayPath, &pModeInfo, &(LCDTable[0].pPanelTable.Timing));
+    CheckLCDSyncStartValue(DisplayPath);
+
+    
+    if((!Get_MODE_INFO_From_LCD_Table(ModeNum, &pMode)) &&
+        Get_MODE_INFO_From_VESA_Table(ModeNum, &pMode))
+    {
+        
+        if(DisplayPath==DISP1)
+        {
+            if(ReadScratch(IDX_DS_ENABLE)) 
+                SetDisplay1DownScalingFactor(pMode, &pModeInfo);
+            else
+                SetDisplay1UpScalingFactor(pMode, &pModeInfo);
+        }else
+            SetDisplay2UpScalingFactor(pMode, &pModeInfo);
+        
+        
+        pCBIOSExtension->DisplayOneModeH = pMode->H_Size;
+        pCBIOSExtension->DisplayOneModeV = pMode->V_Size;
+    }
+}
+
+
+void LoadHDMITiming(CBIOS_Extension *pCBIOSExtension, BYTE DisplayPath, WORD ModeNum)
+{
+    BYTE bR_Rate_value = 0x0, bType= 0;
+    MODE_INFO *pModeInfo = NULL, *pMode = NULL;
+    RRATE_TABLE *pRRateTable = NULL;
+        
+    if(DisplayPath == DISP1)
+    {
+        
+        bR_Rate_value = Get_RRATE_ID(DISP1);
+    }
+    else
+    {
+        
+        bR_Rate_value = Get_RRATE_ID(DISP2);
+    }
+    
+    bType = Get_HDMI_TYPE();
+    if(GetModePointerFromHDMITable(HDMITable[bType].Mode_ID_32bpp,bR_Rate_value,&pModeInfo,&pRRateTable)) 
+    {
+        if(bHDMIUnscan(bType))
+        {
+            SetTimingCentering(pCBIOSExtension, DisplayPath,pModeInfo,pRRateTable);
+            CBIOSDebugPrint((0, "HDMI: Runs Unscan mode\n"));
+        }
+        else
+            SetTimingRegs(pCBIOSExtension, DisplayPath,pModeInfo,pRRateTable);
+        if(Get_MODE_INFO_From_VESA_Table(ModeNum, &pMode))
+        {
+            if(DisplayPath == DISP1)
+                SetDisplay1UpScalingFactor(pMode, pModeInfo);
+            else
+                SetDisplay2UpScalingFactor(pMode, pModeInfo);
+        }
+        else
+            CBIOSDebugPrint((0, "HDMI: Get VESA mode error\n"));
+
+        pCBIOSExtension->DisplayOneModeH = pMode->H_Size;
+        pCBIOSExtension->DisplayOneModeV = pMode->V_Size;
+    }else
+        CBIOSDebugPrint((0, "HDMI: Get native mode error\n"));
+
+    return;
+}
+
+
+void LoadTiming(CBIOS_Extension *pCBIOSExtension, BYTE DisplayPath, WORD ModeNum)
+{
+    BYTE ucDevice;
+    ucDevice = Get_DEV_ID(DisplayPath);
+    UnLockTiming(DisplayPath); 
+    
+
+    switch(ucDevice)
+    {
+        case CRTIndex:
+        case CRT2Index:
+        case DVIIndex:
+        case DVI2Index:
+             LoadVESATiming(pCBIOSExtension, DisplayPath,ModeNum);
+             break;
+
+        case LCDIndex:
+        case LCD2Index:                    
+             LoadLCDTiming(pCBIOSExtension, DisplayPath,ModeNum);
+             LockTiming(DisplayPath);
+             break;
+        case TVIndex:
+        case TV2Index:
+             LoadTVTiming(pCBIOSExtension, DisplayPath,ModeNum);
+             LockTiming(DisplayPath);
+             break;
+        case HDMIIndex:
+        case HDMI2Index:
+             LoadHDMITiming(pCBIOSExtension, DisplayPath,ModeNum);
+             break;
+       default:
+            break;
+    }
+}
+
+
+CBStatus GetModeColorDepth(WORD ModeNum, MODE_INFO *pModeInfo, BYTE *pColorDepth)
+{
+    if(pModeInfo->Mode_ID_8bpp == ModeNum)
+    {
+        *pColorDepth = 8;
+        return TRUE;
+
+    }
+    else if(pModeInfo->Mode_ID_16bpp == ModeNum)
+    {
+        *pColorDepth = 16;
+        return TRUE;
+    }
+    else if(pModeInfo->Mode_ID_32bpp == ModeNum)
+    {
+        *pColorDepth = 32;
+        return TRUE;
+    }
+    CBIOSDebugPrint((0, "CBIOS GetModeColorDepth Fail !!==\n"));
+    
+    *pColorDepth = 0;
+    
+    return FALSE;
+    
+}
+
+CBStatus GetModePitch(BYTE DisplayPath, WORD ModeNum, WORD *pPitch)
+{
+    MODE_INFO* pModeInfo = NULL;
+    BYTE ColorDepth = 0, ucDevice;
+    CBStatus bStatus;
+    ucDevice = Get_DEV_ID(DisplayPath);
+    
+    switch(ucDevice)
+    {
+        case LCDIndex:
+        case LCD2Index:
+            bStatus = Get_MODE_INFO_From_LCD_Table(ModeNum,&pModeInfo);
+            if(!bStatus) 
+                bStatus = Get_MODE_INFO_From_VESA_Table(ModeNum,&pModeInfo);
+            break;
+        case HDMIIndex:
+        case HDMI2Index:
+            bStatus = Get_MODE_INFO_From_HDMI_Table(ModeNum,&pModeInfo);
+            if(!bStatus) 
+                bStatus = Get_MODE_INFO_From_VESA_Table(ModeNum,&pModeInfo);
+            break;
+       default: 
+            bStatus = Get_MODE_INFO_From_VESA_Table(ModeNum,&pModeInfo);
+            break;
+    }
+    
+    
+    if(!bStatus)
+    {
+        CBIOSDebugPrint((0, "CBIOS GetModePitch Fail !!==\n"));
+        return FALSE;
+    }
+    else
+    {
+        if(!GetModeColorDepth(ModeNum, pModeInfo, &ColorDepth))
+        {
+            return FALSE;
+        }
+        else
+        {
+            ColorDepth = ColorDepth >> 4;
+            *pPitch = ((((pModeInfo ->H_Size) << ColorDepth)+0x7)&0xFFF8);
+        }
+    }
+
+    return TRUE;
+}
+
+
+void UnLockCR0ToCR7()
+{
+    
+    SetCRReg(0x11, 0x00, BIT7);
+}
+
+
+void LockCR0ToCR7()
+{
+    
+    SetCRReg(0x11, 0x80, BIT7);
+}
+
+
+CBStatus CheckForModeAvailable(WORD ModeNum)
+{
+    CBStatus bStatus;
+    MODE_INFO *pModeInfo = NULL;
+    bStatus = Get_MODE_INFO_From_VESA_Table(ModeNum, &pModeInfo);
+    if(!bStatus)
+        bStatus = Get_MODE_INFO_From_LCD_Table(ModeNum, &pModeInfo);
+    if(!bStatus)
+        bStatus = Get_MODE_INFO_From_HDMI_Table(ModeNum, &pModeInfo);
+    return bStatus;
+}
+
+
+void TurnOnDigitalPort(BYTE DisplayPath)
+{
+    BYTE DeviceIndex, DevicePort;
+    
+    DeviceIndex = Get_DEV_ID(DisplayPath);
+
+    
+    if(DeviceIndex)
+    {
+        DevicePort = GetDevicePort(DeviceIndex);
+        switch(DevicePort)
+        {
+        case CRT_PORT:
+            TurnOnCRTPad();
+            break;
+        case DVP1:
+            TurnOnDVP1Pad();
+            break;
+        case DVP2:
+            TurnOnDVP2Pad();
+            break;
+        case DVP12:        
+            TurnOnDVP12Pad();
+            break;
+        default:
+            break;
+        }    
+    }
+}
+
+
+void TurnOffDigitalPort(BYTE DisplayPath)
+{
+    BYTE DeviceIndex, DevicePort;
+    
+    DeviceIndex = Get_DEV_ID(DisplayPath); 
+
+    
+    if(DeviceIndex)
+    {
+        DevicePort = GetDevicePort(DeviceIndex);
+        switch(DevicePort)
+        {
+        case CRT_PORT:
+            TurnOffCRTPad();
+            break;
+        case DVP1:
+            TurnOffDVP1Pad();
+            break;
+        case DVP2:
+            TurnOffDVP2Pad();
+            break;
+        case DVP12:        
+            TurnOffDVP12Pad();
+            break;
+        default:
+            break;
+        }
+    }    
+}
+
+BYTE GetDevicePortConfig(BYTE DeviceIndex)
+{
+    BYTE i;
+    BYTE Result = 0;
+    
+    HandleShareConnector(&DeviceIndex);
+
+    for(i=0;i<(sizeof(PortConfig)/sizeof(PORT_CONFIG));i++)
+    {
+        if(PortConfig[i].DeviceIndex==DeviceIndex)
+        {
+            Result = i;
+            break;
+        }
+        else
+        {
+            Result = BIT7;
+        }
+    }
+
+    return Result;
+}
+
+
+BYTE GetPortConnectPath(BYTE PortType)
+{
+    BYTE SR1F, PortMask;
+
+    SR1F = GetSRReg(0x1F);
+    SR1F ^= 0x03;
+    
+    switch(PortType)
+    {
+        case CRT_PORT:
+            PortMask = BIT2;
+            break;
+            
+        case DVP1:
+        case DVP12:
+            PortMask = BIT0;
+            break;
+            
+        case DVP2:
+            PortMask = BIT1;
+            break;
+    }
+    
+    return ((SR1F & PortMask) ? 1 : 0);
+
+}
+
+
+WORD TransDevIDtoBit(BYTE DeviceIndex)
+{
+    if(DeviceIndex == LCDIndex)
+        return B_LCD;
+    else
+    return (1 << (DeviceIndex - 1));
+}
+
+void TurnOnScaler(BYTE DisplayPath)
+{
+    if (DisplayPath == DISP1)
+        SetSRReg(0x58, BIT0, BIT0);
+    else
+        SetSRReg(0x50, BIT0, BIT0);
+}
+
+void TurnOffScaler(BYTE DisplayPath)
+{
+    if (DisplayPath == DISP1)
+        SetSRReg(0x58, 0, BIT0);
+    else
+        SetSRReg(0x50, 0, BIT0);
+    SetSRReg(0x70, 0, BIT7);
+    SetSRReg(0x74, 0, BIT7);
+}
+
+void SetDPAReg(BYTE ucDPADelay, BYTE ucDeviceID)
+{
+    BYTE bDigitalDevice = GetDevicePort(ucDeviceID);
+    if(bDigitalDevice & DVP1)
+    {          
+        SetSRReg(0x21, ucDPADelay, 0x07);
+    }else 
+        SetSRReg(0x21, ucDPADelay, 0x38);
+}
+
+void SetDrivingReg(BYTE ucDrivingStatus)
+{
+    SetSRReg(SR4A, ucDrivingStatus, BIT0+BIT1);
+}
+
+
+void SerialLoadTable(REG_PACKAGE *pREG_PACKAGE_Table)
+{
+    REG_PACKAGE *pTemp_Reg = pREG_PACKAGE_Table;
+    
+    do{
+        
+         switch(pTemp_Reg->RegGroup)
+        {
+            case SR:
+                SetSRReg(pTemp_Reg->RegIndex, pTemp_Reg->RegValue, pTemp_Reg->RegMask);
+                break;
+            case CR:
+                SetCRReg(pTemp_Reg->RegIndex, pTemp_Reg->RegValue, pTemp_Reg->RegMask);
+                break;
+            case GR:
+                SetGRReg(pTemp_Reg->RegIndex, pTemp_Reg->RegValue, pTemp_Reg->RegMask);                
+                break;
+            case MR:
+                SetMSReg(pTemp_Reg->RegValue);
+                break;
+            case AR:
+                SetARReg(pTemp_Reg->RegIndex, pTemp_Reg->RegValue);                
+                break;
+            default:
+                break;
+        }
+        pTemp_Reg++;
+    }while(pTemp_Reg->RegGroup!=NR);
+
+}
+
+void LoadDisplay1VESAModeInitRegs()
+{
+    OutPort(MISC_WRITE, 0x2F);
+
+    UnLockCR0ToCR7();
+    
+    SerialLoadTable(Display1VESAModeInitRegs);
+
+    ResetATTR();
+
+    SetARReg(0x10, 0x01);
+    SetARReg(0x11, 0x00);
+    SetARReg(0x12, 0x00);
+    SetARReg(0x13, 0x00);
+    SetARReg(0x14, 0x00);
+
+    EnableATTR();
+}
+
+void EnableSWPSByPass()
+{
+    SetSRReg(0x32, BIT0, BIT0);
+}
+
+void DisableSWPSByPass()
+{
+    SetSRReg(0x32, 0, BIT0);
+}
+
+void ResetLVDSChannelOutPut()
+{
+    SetSRReg(0x1E, 0, BIT0+BIT2);
+}
+
+void DisableLCDDither()
+{
+    SetSRReg(0x22, 0, BIT0);
+}
+
+void TurnOffTxEncReg(BYTE DisplayPath, BYTE bDigitalDevice)
+{
+    BYTE ucDeviceID, bDVP1 = (bDigitalDevice & DVP1);
+    ucDeviceID = Get_DEV_ID(DisplayPath);
+    
+    switch(ucDeviceID)
+    {
+        case LCDIndex:
+        case LCD2Index:
+                if(bDVP1)
+                PowerSequenceOff();
+            break;
+                        
+        case TVIndex:
+        case TV2Index:
+            
+            DisableTVClock();
+            break;
+
+        case HDMIIndex:
+        case DVIIndex:    
+        case HDMI2Index:
+        case DVI2Index:    
+            
+            
+            DisableTMDSReg();
+            if(bDVP1)
+                DisableSWPSByPass();
+            break;
+    }
+    
+}
+
+void TurnOnTxEncReg(BYTE DisplayPath ,BYTE bDigitalDevice)
+{
+    BYTE ucDeviceID, bDVP1 = (bDigitalDevice & DVP1);
+    ucDeviceID = Get_DEV_ID(DisplayPath);
+
+    switch(ucDeviceID)
+    {
+        case LCDIndex:
+        case LCD2Index:
+            PowerSequenceOn();
+            break;
+        
+        case TVIndex:
+        case TV2Index:
+            EnableSWPSByPass();
+            EnableTVClock();
+            SetTVDACPower(DeviceON); 
+            SetDPAReg(6, ucDeviceID);
+            break;
+        
+        case HDMIIndex:
+        case DVIIndex:    
+        case HDMI2Index:
+        case DVI2Index:    
+            if(bDVP1)
+            {
+                ResetLVDSChannelOutPut();
+                DisableLCDDither();        
+                EnableSWPSByPass();
+            }
+            
+            EnableTMDSReg(ucDeviceID, Get_HDMI_TYPE());
+            break;
+    }
+}
+
+
+void DisableDisplayPathAndDevice(BYTE DisplayPath)
+{
+    BYTE DeviceIndex = Get_DEV_ID(DisplayPath);
+    BYTE DevicePort = GetDevicePort(DeviceIndex);
+
+    TurnOnDVPMask(DevicePort);
+    TurnOffScaler(DisplayPath);
+    SequencerOff(DisplayPath);
+    TurnOffTxEncReg(DisplayPath,DevicePort);
+    TurnOffDigitalPort(DisplayPath);    
+}
+
+
+void ClearFrameBuffer(BYTE DisplayPath, DWORD *pFrameBufferBase, DWORD ulWidth, DWORD ulHeight, BYTE bColorDepth)
+{
+    DWORD dwFactor  = 0;
+    DWORD i = 0;
+    
+    
+    switch(bColorDepth)
+    {
+        case 8:
+        case 16:
+        case 32:    
+          dwFactor = 32 / bColorDepth;
+          break;
+          
+        default:
+            return;
+    }
+
+    
+    for(i = 0;i<((ulWidth*ulHeight)/dwFactor);i++)
+    {
+        *(pFrameBufferBase+i) = 0x00000000;
+    }
+    
+}
+
+
+void SetDPMS(BYTE DPMSState, BYTE DisplayPath)
+{
+    BYTE RegValue=0; 
+
+    
+    if(DPMSState > DeviceON)
+        RegValue = BIT1+BIT0; 
+        
+    if(DisplayPath == DISP1)
+        SetCRReg(0xB6, RegValue, BIT1+BIT0);
+    else
+        SetCRReg(0x3E, RegValue, BIT1+BIT0);
+        
+    
+    if(DPMSState > DeviceON) 
+    {
+        RegValue =0; 
+        if(DisplayPath == DISP1)
+            SetCRReg(0xB6, RegValue, BIT3);
+        else
+            SetCRReg(0xB4, RegValue, BIT0);
+    }else
+    {   
+        if(DisplayPath == DISP1)
+            SetCRReg(0xB6, BIT3, BIT3);
+        else
+            SetCRReg(0xB4, BIT0, BIT0);
+    }
+}
+
 
 void WaitDisplayPeriod()
 {
@@ -2524,1169 +2329,1928 @@ void WaitDisplayPeriod()
      while ((InPort(COLOR_INPUT_STATUS1_READ)&BIT0) == 0);
 }
 
-
-void WaitPowerSequenceDone()
+void CBIOSI2CWriteClock(BYTE I2CPort, BYTE data)
 {
-    UCHAR SR32;
-     
-    SR32 = GetSRReg(0x32);
-
-    
-    while(SR32 == GetSRReg(0x32));
+    ULONG i;
+    BYTE ucMaskData=1, ucTmpData;
+    if(data)            
+        ucMaskData &= 0;
+    for (i=0;i<0x1000; i++)
+    {
+        SetCRReg(I2CPort, ucMaskData, 0x1);
+        ucTmpData = GetCRReg(I2CPort) & 0x01;
+        if (ucMaskData == ucTmpData) 
+            break;
+    }
 }
 
-CI_STATUS CheckForDSTNPanel(UCHAR bDeviceIndex)
+void CBIOSI2CDelay(BYTE I2CPort)
 {
-    PORT_CONFIG *pDevicePortConfig;
+    BYTE     i,jtemp;
     
-    if (GetDevicePortConfig(bDeviceIndex, &pDevicePortConfig))
+    for (i=0;i<100;i++)
+        jtemp = GetCRReg(I2CPort);
+}
+
+void CBIOSI2CWriteData(BYTE I2CPort, BYTE data)
+{
+
+    ULONG i;
+    BYTE ucMaskData=0x4, ucTmpData;
+    if(data)            
+        ucMaskData &= 0;
+    for (i=0;i<0x1000; i++)
     {
-        if ((pDevicePortConfig->TX_Enc_ID == DSTN) && 
-            ((pDevicePortConfig->PortID == DVP1) || (pDevicePortConfig->PortID == DVP12)))
-        {
-            return true;
-        }
+        SetCRReg(I2CPort, ucMaskData, 0x4);
+        ucTmpData = GetCRReg(I2CPort) & 0x04;
+        if (ucMaskData == ucTmpData) 
+            break;
+    }
+}
+
+void CBIOSI2CStart(BYTE I2CPort)
+{
+    CBIOSI2CWriteClock(I2CPort, 0x00);               
+    CBIOSI2CDelay(I2CPort);
+    CBIOSI2CWriteData(I2CPort, 0x01);                
+    CBIOSI2CDelay(I2CPort);    
+    CBIOSI2CWriteClock(I2CPort, 0x01);               
+    CBIOSI2CDelay(I2CPort);    
+    CBIOSI2CWriteData(I2CPort, 0x00);                
+    CBIOSI2CDelay(I2CPort);    
+    CBIOSI2CWriteClock(I2CPort, 0x01);                  
+    CBIOSI2CDelay(I2CPort);                    
+}
+
+void CBIOSSendI2CDataByte(BYTE I2CPort, BYTE Data)
+{
+    char i;
+
+    for (i=7;i>=0;i--)
+    {
+        CBIOSI2CWriteClock(I2CPort, 0x00);           
+        CBIOSI2CDelay(I2CPort);         
+        if((Data>>i)&0x1)
+            CBIOSI2CWriteData(I2CPort, 0x1);           
         else
+            CBIOSI2CWriteData(I2CPort, 0x0);           
+        
+        CBIOSI2CDelay(I2CPort);         
+        
+        CBIOSI2CWriteClock(I2CPort, 0x01);           
+        CBIOSI2CDelay(I2CPort);                           
+    }                
+}
+
+BYTE CBIOSCheckACK(BYTE I2CPort)
+{    
+    CBIOSI2CWriteClock(I2CPort, 0x00);               
+    CBIOSI2CDelay(I2CPort);    
+    CBIOSI2CWriteData(I2CPort, 0x01);                
+    CBIOSI2CDelay(I2CPort);    
+    CBIOSI2CWriteClock(I2CPort, 0x01);               
+    CBIOSI2CDelay(I2CPort);             
+    return ((GetCRReg(I2CPort) & 0x20) ? 0:1);                
+}
+
+BYTE CBIOSReceiveI2CDataByte(BYTE I2CPort, BYTE I2CSlave)
+{
+    BYTE jData=0, jTempData;
+    char i;
+    DWORD j;
+
+    for (i=7;i>=0;i--)
+    {
+        CBIOSI2CWriteClock(I2CPort, 0x00);                
+        CBIOSI2CDelay(I2CPort);     
+            
+        CBIOSI2CWriteData(I2CPort, 0x01);                 
+        CBIOSI2CDelay(I2CPort);         
+        
+        CBIOSI2CWriteClock(I2CPort, 0x01);                
+        CBIOSI2CDelay(I2CPort);           
+        
+        for (j=0; j<0x1000; j++)
+        {   
+            if (((GetCRReg(I2CPort) & 0x10) >> 4))
+                break;
+        }    
+                    
+        jTempData =  (GetCRReg(I2CPort) & 0x20) >> 5;
+        jData |= ((jTempData & 0x01) << i); 
+        
+        CBIOSI2CWriteClock(I2CPort, 0x01);                
+        CBIOSI2CDelay(I2CPort);                           
+    }    
+    
+    return (jData);                              
+}
+
+void CBIOSSendNACK(BYTE I2CPort)
+{
+    CBIOSI2CWriteClock(I2CPort, 0x00);               
+    CBIOSI2CDelay(I2CPort);    
+    CBIOSI2CWriteData(I2CPort, 0x01);                
+    CBIOSI2CDelay(I2CPort);    
+    CBIOSI2CWriteClock(I2CPort, 0x01);               
+    CBIOSI2CDelay(I2CPort);    
+}
+
+void CBIOSI2CStop(BYTE I2CPort)
+{
+    CBIOSI2CWriteClock(I2CPort, 0x00);               
+    CBIOSI2CDelay(I2CPort);    
+    CBIOSI2CWriteData(I2CPort, 0x00);                
+    CBIOSI2CDelay(I2CPort);    
+    CBIOSI2CWriteClock(I2CPort, 0x01);               
+    CBIOSI2CDelay(I2CPort);    
+    CBIOSI2CWriteData(I2CPort, 0x01);                
+    CBIOSI2CDelay(I2CPort);    
+    CBIOSI2CWriteClock(I2CPort, 0x01);                
+    CBIOSI2CDelay(I2CPort);                      
+}
+
+BYTE CBIOSReadI2C(BYTE I2CPort, BYTE I2CSlave, BYTE RegIdx, BYTE* RegData)
+{
+    CBIOSI2CStart(I2CPort);
+
+    
+    CBIOSSendI2CDataByte(I2CPort, I2CSlave);
+    
+    if (!CBIOSCheckACK(I2CPort))
+    {
+        return CBIOSI2C_ERROR;
+    }    
+
+    
+    CBIOSSendI2CDataByte(I2CPort, RegIdx);
+
+    if (!CBIOSCheckACK(I2CPort))
+    {
+        return CBIOSI2C_ERROR;
+    }    
+    
+    CBIOSI2CStart(I2CPort);
+   
+    
+    CBIOSSendI2CDataByte(I2CPort, I2CSlave+1);
+    
+    if (!CBIOSCheckACK(I2CPort))
+    {
+        return CBIOSI2C_ERROR;
+    }    
+    
+    *RegData = CBIOSReceiveI2CDataByte(I2CPort, I2CSlave);
+
+    CBIOSSendNACK(I2CPort);
+
+    CBIOSI2CStop(I2CPort);
+
+    return CBIOSI2C_OK;       
+}
+
+BYTE CBIOSWriteI2C(BYTE I2CPort, BYTE I2CSlave, BYTE RegIdx, BYTE RegData)
+{
+    CBIOSI2CStart(I2CPort);
+
+    
+    CBIOSSendI2CDataByte(I2CPort, I2CSlave);
+    if (!CBIOSCheckACK(I2CPort))
+    {
+        return CBIOSI2C_ERROR;
+    }    
+
+    
+    CBIOSSendI2CDataByte(I2CPort, RegIdx);
+    if (!CBIOSCheckACK(I2CPort))
+    {
+        return CBIOSI2C_ERROR;
+    }    
+
+    
+    CBIOSSendI2CDataByte(I2CPort, RegData);
+    if (!CBIOSCheckACK(I2CPort))
+    {
+        return CBIOSI2C_ERROR;
+    }
+    
+    CBIOSSendNACK(I2CPort);
+         
+    CBIOSI2CStop(I2CPort);
+    return CBIOSI2C_OK;       
+}
+
+void CBIOSGetDeviceI2CInformation(BYTE ucDevice, BYTE* ucI2Cport, BYTE* ucI2CAddress)
+{
+    BYTE i;
+    WORD wI2C_Info=0;
+
+    HandleShareConnector(&ucDevice);
+
+    *ucI2Cport    = 0;
+    *ucI2CAddress = 0;
+    
+    
+    for(i=0;i<(sizeof(PortConfig)/sizeof(PORT_CONFIG));i++)
+    {
+        if(PortConfig[i].DeviceIndex == ucDevice)
         {
-            return false;
+            *ucI2Cport    = (BYTE)(PortConfig[i].TX_I2C_Port_Addr);
+            *ucI2CAddress = (BYTE)(PortConfig[i].TX_I2C_Port_Addr>>8);        
+            break;
         }
+    }
+    
+    
+    if(ucDevice == HDMIIndex || 
+       ucDevice == DVIIndex)
+    {
+        switch(Get_TMDS_TX_ID())
+        {
+        case TMDS_ID_ITE6610:
+            *ucI2CAddress = 0x98;
+            break;
+        case TMDS_ID_SII162:
+        case TMDS_ID_EP932M:
+            *ucI2CAddress = 0x70;
+            break;
+        case TX_None:
+            default:
+            break;
+        }
+    }
+}
+
+DWORD CBIOSGetPortI2CInfo(void)
+{
+    BYTE i,bCRT = 0x0, bDVP1 = 0x0, bDVP2 = 0x0;
+    DWORD dwPortI2C = 0x0;
+
+    
+    for(i=0;i<(sizeof(PortConfig)/sizeof(PORT_CONFIG));i++)
+    {
+        
+        if(PortConfig[i].DeviceIndex!=0)
+        {
+            switch(PortConfig[i].PortID)
+            {
+                case CRT_PORT:
+                    bCRT = (BYTE)((PortConfig[i].TX_I2C_Port_Addr) & 0xFF);
+                    break;
+                case DVP1:
+                case DVP12:
+                    bDVP1 = (BYTE)((PortConfig[i].TX_I2C_Port_Addr) & 0xFF);
+                    break;
+                case DVP2:
+                    bDVP2 = (BYTE)((PortConfig[i].TX_I2C_Port_Addr) & 0xFF);
+                    break;
+                default:
+                    break;
+            }    
+        }
+    }
+
+    dwPortI2C = ((bDVP2 << 16)|(bDVP1 << 8)|bCRT);
+
+    return dwPortI2C;
+}
+
+void CBIOSSetOutFormat(WORD wAttribute)
+{
+    if(wAttribute & BIT6) 
+    {
+        SetSRReg(0x1E,BIT0,BIT0); 
+    }else
+    {
+        SetSRReg(0x1E,0,BIT0);   
+    }
+}
+
+void CBIOSSetDither()
+{
+    BYTE i,ucLCDIndex;
+    for(i=0;i<(sizeof(PortConfig)/sizeof(PORT_CONFIG));i++)
+    {
+        if(PortConfig[i].DeviceIndex==LCDIndex)
+        {
+            ucLCDIndex=i;
+            break;
+        }
+    }
+    if(PortConfig[ucLCDIndex].Attribute & TX_DIT)
+    {
+        SetSRReg(0x22,0,BIT0);
+    }else
+    {
+        SetSRReg(0x22,BIT0,BIT0);
+    }
+}
+
+void CBIOSSetOpenLDI(WORD wAttribute)
+{
+    if(wAttribute & OpenLDI)
+    {
+        SetSRReg(0x1E,BIT2,BIT2);   
     }
     else
     {
-        return false;
+        SetSRReg(0x1E,0,BIT2);       
     }
 }
 
-USHORT GetVESAMEMSize()
+WORD ConvertMStoCount(WORD wTDX)
 {
-    UCHAR bHWStrapping;
-    bHWStrapping = (GetCRReg(0xAA) & (BIT2+BIT1+BIT0));
+    WORD  wTmp1;
+    DWORD dwTmp2;
+    wTmp1= wTDX>>6;
+    wTDX<<=10;
+    dwTmp2= (wTmp1<<16) + wTDX;
+    return (WORD)(dwTmp2/293);
+}
+
+void CBIOSSetTD0(WORD wTD0)
+{
+    WORD wSetReg;
+    BYTE ucHighByte,ucLowByte;
+    wSetReg=ConvertMStoCount(wTD0);
+    ucHighByte=wSetReg>>8;
+    ucLowByte =(BYTE)wSetReg;
+    SetSRReg(0x12,ucLowByte ,0xFF);
+    SetSRReg(0x1A,ucHighByte,0x0F);
+}
+
+void CBIOSSetTD1(WORD wTD1)
+{
+    WORD wSetReg;
+    BYTE ucHighByte,ucLowByte;
+    wSetReg=ConvertMStoCount(wTD1);
+    ucHighByte=wSetReg>>4;
+    ucLowByte =(BYTE)wSetReg;
+    SetSRReg(0x13,ucLowByte ,0xFF);
+    SetSRReg(0x1A,ucHighByte,0xF0);
+}
+
+void CBIOSSetTD2(WORD wTD2)
+{
+    WORD wSetReg;
+    BYTE ucHighByte,ucLowByte;
+    wSetReg=ConvertMStoCount(wTD2);
+    ucHighByte=wSetReg>>8;
+    ucLowByte =(BYTE)wSetReg;
+    SetSRReg(0x14,ucLowByte ,0xFF);
+    SetSRReg(0x1B,ucHighByte,0x0F);
+}
+
+void CBIOSSetTD3(WORD wTD3)
+{
+    WORD wSetReg;
+    BYTE ucHighByte,ucLowByte;
+    wSetReg=ConvertMStoCount(wTD3);
+    ucHighByte=wSetReg>>4;
+    ucLowByte =(BYTE)wSetReg;
+    SetSRReg(0x15,ucLowByte ,0xFF);
+    SetSRReg(0x1B,ucHighByte,0xF0);
+}
+
+void CBIOSSetTD5(WORD wTD5)
+{
+    WORD wSetReg;
+    BYTE ucHighByte,ucLowByte;
+    wSetReg=ConvertMStoCount(wTD5);
+    ucHighByte=wSetReg>>4;
+    ucLowByte =(BYTE)wSetReg;
+    SetSRReg(0x17,ucLowByte ,0xFF);
+    SetSRReg(0x1C,ucHighByte,0xF0);
+}
+
+void CBIOSSetTD6(WORD wTD6)
+{
+    WORD wSetReg;
+    BYTE ucHighByte,ucLowByte;
+    wSetReg=ConvertMStoCount(wTD6);
+    ucHighByte=wSetReg>>8;
+    ucLowByte =(BYTE)wSetReg;
+    SetSRReg(0x18,ucLowByte ,0xFF);
+    SetSRReg(0x1D,ucHighByte,0x0F);
+}
+
+void CBIOSSetTD7(WORD wTD7)
+{
+    WORD wSetReg;
+    BYTE ucHighByte,ucLowByte;
+    wSetReg=ConvertMStoCount(wTD7);
+    ucHighByte=wSetReg>>8;
+    ucLowByte =(BYTE)wSetReg;
+    SetSRReg(0x19,ucLowByte ,0xFF);
+    SetSRReg(0x1D,ucHighByte,0xF0);
+}
+
+void LoadPowerSequenceTimer(void)
+{
+    BYTE i,ucLCDIndex;
+    for(i=0;i<(sizeof(PortConfig)/sizeof(PORT_CONFIG));i++)
+    {
+        if(PortConfig[i].DeviceIndex==LCDIndex)
+        {
+            ucLCDIndex=i;
+            break;
+        }
+    }
+    if(!(PortConfig[ucLCDIndex].Attribute & BIT2)) 
+    {
+        if(PortConfig[ucLCDIndex].PortID==DVP1 || PortConfig[ucLCDIndex].PortID==DVP12)
+        {
+            CBIOSSetTD0(LCDTable[0].pPanelTable.TD0);
+            CBIOSSetTD1(LCDTable[0].pPanelTable.TD1);
+            CBIOSSetTD2(LCDTable[0].pPanelTable.TD2);
+            CBIOSSetTD3(LCDTable[0].pPanelTable.TD3);
+            CBIOSSetTD5(LCDTable[0].pPanelTable.TD5);
+            CBIOSSetTD6(LCDTable[0].pPanelTable.TD6);
+            CBIOSSetTD7(LCDTable[0].pPanelTable.TD7);
+            if(LCDTable[0].pPanelTable.Timing.Attribute & SW_PS)
+            {
+                SetSRReg(0x11,BIT1,BIT1);
+            }else
+            {
+                SetSRReg(0x11,0,BIT1);
+            }
+        }
+    }
+    SetSRReg(0x32,0,BIT0);  
+}
+
+void CBIOSInitLCD()
+{
     
-    return (2 << (bHWStrapping+3));
+    Set_LCD_Panel_Size(LCDTable[0].H_Size, LCDTable[0].V_Size);
+    
+    LoadPowerSequenceTimer();
+    
+    CBIOSSetOutFormat(LCDTable[0].pPanelTable.Timing.Attribute);
+    
+    CBIOSSetDither();
+    
+    CBIOSSetOpenLDI(LCDTable[0].pPanelTable.Timing.Attribute);
+}
+
+void SetGPIOResetReg(BYTE bGPIOMask)
+{
+    BYTE ucTmpData;
+    DWORD i;
+    SetCRReg(0xDA,bGPIOMask,bGPIOMask);
+    SetCRReg(0xDB,0,bGPIOMask);
+    
+    for(i=0; i<300000; i++)
+        ucTmpData = GetCRReg(0);
+    SetCRReg(0xDB,bGPIOMask,bGPIOMask);
 }
 
 
-void SetTV_CVBS_CCRSLevel(UCHAR *Level)
+void CBIOSGetTMDSTxType(BYTE ucI2CPort)
 {
-    PORT_CONFIG *pDevicePortConfig = pPortConfig;
-    if (GetDevicePortConfig(TV_ID, &pDevicePortConfig))
-    {
-        xf86DrvMsgVerb(0, X_INFO, InfoLevel, "CCRSLevel Set = %x\n",*Level);
-        if(pDevicePortConfig->TX_Enc_ID == ENC_SAA7105)
-            SetSAA7105CCRSLevel(pDevicePortConfig->TX_I2C_Port,pDevicePortConfig->TX_I2C_Addr,*Level);
-    }    
+    TxEncDetect *pTmp = pTMDSTxTable;
+    BYTE ucTmpData = 0, ucTxID = 0;
+    
+    SetGPIOResetReg(GPIO2);
 
+    do{
+        
+        
+        CBIOSReadI2C(ucI2CPort, pTmp->ucTxAddr, pTmp->ucD_IDIndex, &ucTmpData);
+
+        
+        
+        if(ucTmpData == pTmp->ucD_IDData)
+        {
+            ucTxID = pTmp->ucTxIndex;
+            break;
+        }
+
+        pTmp++;
+        
+        
+        
+        if(pTmp->ucTxIndex == 0xFF)
+            ucTxID = TMDS_ID_EP932M;
+            
+    }while(!ucTxID);
+
+    
+    
+    WriteScratch(IDX_TMDS1_TX_ID, ucTxID);
 }
 
-UCHAR ucGetTV_CVBS_CCRSLevel(UCHAR *Level)
+
+
+void CBIOSSetTXType(PCBIOS_Extension pCBIOSExtension)
 {
-    PORT_CONFIG *pDevicePortConfig = pPortConfig;
-    if (GetDevicePortConfig(TV_ID, &pDevicePortConfig))
+    BYTE i;
+    for(i=0;i<(sizeof(PortConfig)/sizeof(PORT_CONFIG));i++)
     {
-        if(pDevicePortConfig->TX_Enc_ID == ENC_SAA7105)
-            GetSAA7105CCRSLevel(pDevicePortConfig->TX_I2C_Port,pDevicePortConfig->TX_I2C_Addr, Level);
+        switch(PortConfig[i].DeviceIndex)
+        {
+        case LCDIndex:
+            if (pCBIOSExtension->dwSupportDevices & B_LCD)
+                WriteScratch(IDX_LVDS1_TX_ID,PortConfig[i].TX_ENC_ID);
+            break;
+        case LCD2Index:
+            if (pCBIOSExtension->dwSupportDevices & B_LCD2)
+                WriteScratch(IDX_LVDS2_TX_ID,PortConfig[i].TX_ENC_ID);
+            break;
+        case TVIndex:
+            if (pCBIOSExtension->dwSupportDevices & B_TV)
+                WriteScratch(IDX_TV1_ENCODER_ID,PortConfig[i].TX_ENC_ID);
+            break;
+        case TV2Index:
+            if (pCBIOSExtension->dwSupportDevices & B_TV2)
+                WriteScratch(IDX_TV2_ENCODER_ID,PortConfig[i].TX_ENC_ID);
+            break;
+        case HDMIIndex:
+        case DVIIndex:
+            if (pCBIOSExtension->dwSupportDevices & (B_HDMI | B_DVI))
+                CBIOSGetTMDSTxType((BYTE)(PortConfig[i].TX_I2C_Port_Addr));
+            break;
+            
+        
+        
+        
+        default:
+            break;
+        }
     }
-    xf86DrvMsgVerb(0, X_INFO, InfoLevel, "CCRSLevel Get = %x\n",*Level);
+}
+
+
+void CBIOSGetSupportDevice(PCBIOS_Extension pCBIOSExtension)
+{
+    BYTE i;
+    pCBIOSExtension->dwSupportDevices = 0;
+
+    for(i=0;i<(sizeof(PortConfig)/sizeof(PORT_CONFIG));i++)
+    {
+        if (PortConfig[i].Attribute & Dev_Support)
+            pCBIOSExtension->dwSupportDevices |=  TransDevIDtoBit(PortConfig[i].DeviceIndex);
+    }
+    
+    
+    if(pCBIOSExtension->dwSupportDevices & B_HDMI)
+        pCBIOSExtension->dwSupportDevices |= B_DVI;
+}
+
+
+void CBIOSUpdateDevSupFlag(PCBIOS_Extension pCBIOSExtension)
+{
+    
+    if(pCBIOSExtension->dwSupportDevices & B_LCD)
+        pCBIOSExtension->bLCDSupport = TRUE;
+    if(pCBIOSExtension->dwSupportDevices & B_CRT)
+        pCBIOSExtension->bCRTSupport = TRUE;
+    if(pCBIOSExtension->dwSupportDevices & B_HDMI)
+        pCBIOSExtension->bHDMISupport = TRUE;
+    if(pCBIOSExtension->dwSupportDevices & B_DVI)
+        pCBIOSExtension->bDVISupport = TRUE;
+    if(pCBIOSExtension->dwSupportDevices & B_TV)
+        pCBIOSExtension->bTVSupport = TRUE;
+}
+
+
+void CBIOSInitPortConfig(BYTE* pjROMLinearAddr)
+{
+    BYTE i;
+    BYTE *ucTmpData = (BYTE*)(PortConfig);
+    WORD wVGAROMSIZE = 0;
+
+    
+    if (pjROMLinearAddr != NULL) 
+    {
+        for(wVGAROMSIZE=0; wVGAROMSIZE<0x8000; wVGAROMSIZE++)
+        {
+            if(*(pjROMLinearAddr + wVGAROMSIZE) =='P' &&
+               *(pjROMLinearAddr + wVGAROMSIZE + 1) =='C' &&
+               *(pjROMLinearAddr + wVGAROMSIZE + 2) =='F' &&
+               *(pjROMLinearAddr + wVGAROMSIZE + 3) =='G')
+                break;
+        }
+        if(wVGAROMSIZE==0x8000)
+            wVGAROMSIZE &=0;         
+    }
+    if(wVGAROMSIZE) 
+    {
+        pjROMLinearAddr = (BYTE*)((int)(pjROMLinearAddr) + wVGAROMSIZE + 4); 
+                                           
+        for(i=0;i<(sizeof(PortConfig)/sizeof(PORT_CONFIG));i++)
+        {
+            if(*(pjROMLinearAddr + i*sizeof(PORT_CONFIG)) == 0xFF)
+                break;
+        }
+        
+        memcpy(ucTmpData, pjROMLinearAddr, i*sizeof(PORT_CONFIG));
+    }
+}
+
+
+BYTE CBIOSCheckDeviceAvailable(BYTE NewDisplay1DeviceID)
+{
+    int i;
+    BYTE status = FALSE;
+    if(!NewDisplay1DeviceID)
+        return TRUE;
+    if(NewDisplay1DeviceID==DVIIndex)
+        NewDisplay1DeviceID = HDMIIndex; 
+    for(i=0;i<(sizeof(PortConfig)/sizeof(PORT_CONFIG));i++)
+    {
+        if((PortConfig[i].DeviceIndex == NewDisplay1DeviceID) &&
+           (PortConfig[i].Attribute & Dev_Support))
+        {
+            status = TRUE;
+            break;
+        }
+    }
+    return status;
+}
+
+
+
+void CBIOSInitLCDTable(BYTE* pjROMLinearAddr)
+{
+    WORD  wVGAROMSIZE=0, wDevAddress=0;
+    BYTE *ucTmpData = (BYTE*)(LCDTable);
+    for(wVGAROMSIZE=0; wVGAROMSIZE<0x8000; wVGAROMSIZE++)
+    {
+        if(*(pjROMLinearAddr + wVGAROMSIZE)     =='L' &&
+           *(pjROMLinearAddr + wVGAROMSIZE + 1) =='C' &&
+           *(pjROMLinearAddr + wVGAROMSIZE + 2) =='D' &&
+           *(pjROMLinearAddr + wVGAROMSIZE + 3) =='T' &&
+           *(pjROMLinearAddr + wVGAROMSIZE + 4) =='B' &&
+           *(pjROMLinearAddr + wVGAROMSIZE + 5) =='L')
+        {
+            break;
+        }
+    }
+    if(wVGAROMSIZE!=0x8000)
+    {
+        wDevAddress = ReadScratch(IDX_LCD1_TABLE_INDEX);
+        if(!wDevAddress) 
+        {
+            wDevAddress = *(pjROMLinearAddr + 
+                                wVGAROMSIZE + 
+                                          6 + 
+                       5*sizeof(PANEL_INFO) + 
+                                          2 + 
+                                          5); 
+        }
+        
+        
+        pjROMLinearAddr = (BYTE*)((int)(pjROMLinearAddr) +
+                                           wVGAROMSIZE +  
+                                                     6 +  
+                      (wDevAddress-1)*sizeof(PANEL_INFO));
+        
+        memcpy(ucTmpData, pjROMLinearAddr, sizeof(PANEL_INFO));
+        
+        LCDTable[0].pPanelTable.Timing.H_Total+=LCDTable[0].H_Size;
+        LCDTable[0].pPanelTable.Timing.H_Sync_End+=LCDTable[0].pPanelTable.Timing.H_Sync_Start;
+        LCDTable[0].pPanelTable.Timing.V_Total+=LCDTable[0].V_Size;
+        LCDTable[0].pPanelTable.Timing.V_Sync_End+=LCDTable[0].pPanelTable.Timing.V_Sync_Start;
+    }
+}
+
+
+void CBIOSInitHDMITable(BYTE* pjROMLinearAddr)
+{
+    WORD  wVGAROMSIZE;
+    
+    for(wVGAROMSIZE=0; wVGAROMSIZE<0x8000; wVGAROMSIZE++)
+    {
+        if(*(pjROMLinearAddr + wVGAROMSIZE)     =='T' &&
+           *(pjROMLinearAddr + wVGAROMSIZE + 1) =='X' &&
+           *(pjROMLinearAddr + wVGAROMSIZE + 2) =='T' &&
+           *(pjROMLinearAddr + wVGAROMSIZE + 3) =='B' &&
+           *(pjROMLinearAddr + wVGAROMSIZE + 4) =='L')
+        {
+            break;
+        }
+    }
+    
+    if(wVGAROMSIZE!=0x8000)
+    {
+        
+        
+        pTMDSTxTable = (TxEncDetect*)((int)(pjROMLinearAddr) +
+                                           wVGAROMSIZE +       
+                                                     5);       
+    }
+}
+
+void cbGetHDMIModeInfo(WORD* wHSize, WORD* wVSize, BYTE* bRRCnt, BYTE ucHDMIType)
+{
+    *wHSize = HDMITable[ucHDMIType].H_Size;
+    *wVSize = HDMITable[ucHDMIType].V_Size;
+    *bRRCnt = HDMITable[ucHDMIType].RRTableCount;
+}
+
+void cbSetHDMIModeInfo(WORD wHSize, WORD wVSize, BYTE ucHDMIType)
+{
+    HDMITable[ucHDMIType].H_Size = wHSize;
+    HDMITable[ucHDMIType].V_Size = wVSize;
+}
+
+void CBIOSGetHDMIPanelSize(BYTE ucHDMIType, WORD* wHSize, WORD* wVSize)
+{
+    *wHSize = HDMITable[ucHDMIType].H_Size;
+    *wVSize = HDMITable[ucHDMIType].V_Size;
+}
+
+void CBIOSGetVBIOSBuildDate(PCBIOS_Extension pCBIOSExtension)
+{
+    BYTE* pROMDevIDAddr;
+    BYTE ucTmpData[2], ucYear[4];
+
+    
+    pROMDevIDAddr = (BYTE*)(pCBIOSExtension->pjROMLinearAddr+ROM_Offset_Build_Year);
+    ucYear[0]= *pROMDevIDAddr;
+    ucYear[1]= *(pROMDevIDAddr+1);
+    ucYear[2]= *(pROMDevIDAddr+2);
+    ucYear[3]= *(pROMDevIDAddr+3);
+    pCBIOSExtension->wVBIOSBuildYear = (WORD)(strtoul((char *)ucYear,NULL,10));
+
+    
+    pROMDevIDAddr = (BYTE*)(pCBIOSExtension->pjROMLinearAddr+ROM_Offset_Build_Month);
+    ucTmpData[0] = *pROMDevIDAddr;
+    ucTmpData[1] = *(pROMDevIDAddr+1);
+    pCBIOSExtension->ucVBIOSBuildMonth = (BYTE)(strtoul((char *)ucTmpData,NULL,10));
+    
+    
+    pROMDevIDAddr = (BYTE*)(pCBIOSExtension->pjROMLinearAddr+ROM_Offset_Build_Date);
+    ucTmpData[0] = *pROMDevIDAddr;
+    ucTmpData[1] = *(pROMDevIDAddr+1);
+    pCBIOSExtension->ucVBIOSBuildDate = (BYTE)(strtoul((char *)ucTmpData,NULL,10));
+}
+
+void CBIOSGetVBIOSVersion(PCBIOS_Extension pCBIOSExtension)
+{
+    BYTE* pROMDevIDAddr = (BYTE*)(pCBIOSExtension->pjROMLinearAddr+ROM_Offset_Rev_Num);
+    BYTE ucTmpData[2];
+    ucTmpData[0] = *pROMDevIDAddr;
+    ucTmpData[1] = *(pROMDevIDAddr+1);
+    pCBIOSExtension->ulVBIOS_Version = strtoul((char *)ucTmpData,NULL, 10);
+}
+
+void CBIOSGetVBIOSRomDeviceID(PCBIOS_Extension pCBIOSExtension)
+{
+    WORD* pROMDevIDAddr = (WORD*)(pCBIOSExtension->pjROMLinearAddr+ROM_Offset_Dev_ID);
+    pCBIOSExtension->wVenderID = *pROMDevIDAddr;
+    pCBIOSExtension->wDeviceID = *(pROMDevIDAddr+1);
+}
+
+
+void CBIOSInitialDataFromVBIOS(PCBIOS_Extension pCBIOSExtension)
+{
+    pRelated_IOAddress = pCBIOSExtension->pjIOAddress;
+    
+    
+    CBIOSGetVBIOSVersion(pCBIOSExtension);
+    
+    CBIOSGetVBIOSBuildDate(pCBIOSExtension);
+    
+    CBIOSGetVBIOSRomDeviceID(pCBIOSExtension);
+    
+    CBIOSInitPortConfig(pCBIOSExtension->pjROMLinearAddr);
+    
+    CBIOSGetSupportDevice(pCBIOSExtension);
+    
+    CBIOSUpdateDevSupFlag(pCBIOSExtension);
+    
+    if(pCBIOSExtension->dwSupportDevices & B_LCD)
+    {
+        CBIOSInitLCDTable(pCBIOSExtension->pjROMLinearAddr);
+    }
+
+    if(pCBIOSExtension->dwSupportDevices & B_HDMI)
+    {
+        CBIOSInitHDMITable(pCBIOSExtension->pjROMLinearAddr);
+    }
+
+    CBIOSSetTXType(pCBIOSExtension);
+}
+
+void CBIOSInitialI2CReg(void)
+{
+    SetCRReg(0xB7, 0x00, 0xFF);
+    SetCRReg(0xB5, 0x00, 0xFF);
+    SetCRReg(0x39, 0x00, 0xFF);
+}
+
+
+BYTE DetectMonitor(BYTE I2CPort)
+{
+    BYTE RegData;
+    BYTE Status = 0;
+    
+    if (CBIOSReadI2C(I2CPort, 0xA0, 0x00, &RegData))
+    {
+        if (RegData == 0x00)
+        {
+            CBIOSReadI2C(I2CPort, 0xA0, 0x01, &RegData);
+
+            if (RegData == 0xFF)
+                Status = 1;
+            else
+                Status = 0;
+        }
+        else
+            Status = 0;
+    }
+    else
+        Status = 0;
+
+    return Status;
+}
+
+
+void WaitLong()
+{
+    while(!(InPort(COLOR_INPUT_STATUS1_READ) & BIT3));
+    while(InPort(COLOR_INPUT_STATUS1_READ) & BIT3);
+    while(!(InPort(COLOR_INPUT_STATUS1_READ) & BIT3));
+}
+
+
+BYTE SenseCRT()
+{
+    BYTE bConnect = 0;
+    
+    
+    
+    SetSRReg(0x4F, 0x80, 0xFF);
+    
+    
+    
+    WaitLong();
+    
+    
+    
+    bConnect = GetSRReg(0x3C) & BIT0;
+    
+    
+    
+    SetSRReg(0x4F, 0x00, 0xFF);
+
+    if (!bConnect)
+        bConnect = 0;
+    else
+        bConnect = B_CRT;
+
+    return(bConnect);
+}
+
+
+void SetVBERerurnStatus(WORD VBEReturnStatus, CBIOS_ARGUMENTS *pCBiosArguments)
+{
+    pCBiosArguments->AX = VBEReturnStatus;
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+CBStatus OEM_QueryBiosInfo (PCBIOS_Extension pCBIOSExtension)
+{
+    BYTE ucDDRRate;
+    WORD wDramSize;
+    CBIOS_ARGUMENTS *pBiosArguments = pCBIOSExtension->pCBiosArguments;
+        
+        
+        
+        
+    pBiosArguments->Ebx |= pCBIOSExtension->ulVBIOS_Version;
+    
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+    pBiosArguments->Ecx = BIT16;                 
+    wDramSize = (WORD)(GetCRReg(0xAA)&(BIT0 + BIT1 + BIT2));
+    wDramSize = 8 << wDramSize;                  
+    wDramSize <<= 6;                             
+    pBiosArguments->Ecx |= (DWORD)wDramSize;     
+    
+    ucDDRRate = GetCRReg(0xAB);
+    ucDDRRate &= BIT0;
+    pBiosArguments->Ecx |= (DWORD)ucDDRRate;
+        
+        
+        
+        
+        
+        
+    pBiosArguments->DX =  pCBIOSExtension->wVBIOSBuildYear;
+    pBiosArguments->Edx <<=16;
+    pBiosArguments->DL =  pCBIOSExtension->ucVBIOSBuildDate;
+    pBiosArguments->DH =  pCBIOSExtension->ucVBIOSBuildMonth;
+        
+        
+        
+    pBiosArguments->Esi |=  pCBIOSExtension->dwSupportDevices;
+        
+        
+        
+    pBiosArguments->Edi |=  pCBIOSExtension->pVideoPhysicialAddress;
+    SetVBERerurnStatus(VBEFunctionCallSuccessful, pBiosArguments);
     return TRUE;
 }
 
-void SetDeviceSupport()
-{
-    PORT_CONFIG *pDevicePortConfig = pPortConfig;
-    
-    if (GetDevicePortConfig(CRT_ID, &pDevicePortConfig))
-    {
-        xf86DrvMsgVerb(0, X_INFO, InfoLevel, "CRT supported\n");
-        bCRTSUPPORT = true;
-    }
-    
-    if (GetDevicePortConfig(LCD_ID, &pDevicePortConfig))
-    {
-        xf86DrvMsgVerb(0, X_INFO, InfoLevel, "LCD supported\n");
-        WriteScratch(IDX_LVDS1_TX_ID,pDevicePortConfig->TX_Enc_ID);
-        bLCDSUPPORT = true;        
-    }
-
-    if (GetDevicePortConfig(DVI_ID, &pDevicePortConfig))
-    {
-        xf86DrvMsgVerb(0, X_INFO, InfoLevel, "DVI supported\n");
-        WriteScratch(IDX_TMDS1_TX_ID,pDevicePortConfig->TX_Enc_ID);
-        bDVISUPPORT = true;        
-    }
-    
-    if (GetDevicePortConfig(TV_ID, &pDevicePortConfig))
-    {
-        xf86DrvMsgVerb(0, X_INFO, InfoLevel, "TV supported\n");
-        WriteScratch(IDX_TV1_ENCODER_ID,pDevicePortConfig->TX_Enc_ID);
-        if(pDevicePortConfig->TX_Enc_ID == ENC_SAA7105)
-            SetSAA7105InitReg(pDevicePortConfig->TX_I2C_Port,pDevicePortConfig->TX_I2C_Addr);
-        bTVSUPPORT = true;
-    }    
+CBStatus OEM_QueryBiosCaps (CBIOS_ARGUMENTS *pCBiosArguments)
+{ 
+    SetVBERerurnStatus(VBEFunctionCallSuccessful, pCBiosArguments); 
+    return TRUE;
 }
 
-CI_STATUS VBE_SetMode(CBIOS_Extension *pCBIOSExtension)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+CBStatus OEM_QueryExternalDeviceInfo (CBIOS_ARGUMENTS *pCBiosArguments)
 {
-    USHORT    wModeNum = pCBIOSExtension->pCBiosArguments->reg.x.BX & 0x01FF;
-    USHORT    wPitch = 0;
-    MODE_INFO   *pModeInfo = NULL;
-    UCHAR    bColorDepth = 0;
-    UCHAR    bCurDeviceID, bNewDeviceID;
-#if CBIOS_DEBUG
-    xf86DrvMsgVerb(0, X_INFO, DefaultLevel, "==Entry VBE_SetMode Mode number 0x%x== \n",wModeNum);
-#endif
-    if (wModeNum < 0x100)
-    {
-        SetVBERerurnStatus(VBEFunctionCallFail, pCBIOSExtension->pCBiosArguments);
-        return true;
-    }
+    BYTE ucI2CPort, ucAddr;
+    
+    pCBiosArguments->BL = ReadScratch(IDX_SCRATCH_20);   
+    pCBiosArguments->Ebx <<= 16;
 
-    bCurDeviceID = Get_DEV_ID(DISP1);
-    bNewDeviceID = Get_NEW_DEV_ID(DISP1);
+    pCBiosArguments->BH = ReadScratch(IDX_SCRATCH_21);   
 
-    if(!Get_MODE_INFO(wModeNum, &pModeInfo))
-    {
-        SetVBERerurnStatus(VBEFunctionCallFail, pCBIOSExtension->pCBiosArguments);
-    #if CBIOS_DEBUG
-        xf86DrvMsgVerb(0, X_INFO, DefaultLevel, "==Exit1 VBE_SetMode return 0x%x== \n",VBEFunctionCallFail);
-    #endif
-        return true;
-    }
-    
-    Set_VESA_MODE(wModeNum, DISP1);
-    
-    
-    SequencerOff(DISP1);
+    pCBiosArguments->BL = ReadScratch(IDX_SCRATCH_22);   
 
     
-    TurnOffScaler(DISP1);
+    pCBiosArguments->Ecx = BIT16;                        
 
     
-    TurnOffTVClock();
-    
-    if (bCurDeviceID != bNewDeviceID)
-    {
-        
-        ControlPwrSeqOff(bCurDeviceID);
-
-        
-
-        
-        TurnOffDigitalPort(bCurDeviceID);
-        
-        
-        Set_DEV_ID(bNewDeviceID, DISP1);
-    }
+    CBIOSGetDeviceI2CInformation(HDMIIndex, &ucI2CPort, &ucAddr);
+    pCBiosArguments->DH = ucI2CPort;    
+    CBIOSGetDeviceI2CInformation(TVIndex, &ucI2CPort, &ucAddr);
+    pCBiosArguments->DL = ucI2CPort;
+    pCBiosArguments->Edx <<= 16;
+    CBIOSGetDeviceI2CInformation(LCDIndex, &ucI2CPort, &ucAddr);
+    pCBiosArguments->DH = ucI2CPort;    
+    CBIOSGetDeviceI2CInformation(CRTIndex, &ucI2CPort, &ucAddr);
+    pCBiosArguments->DL = ucI2CPort;
 
     
-
-    
-    LoadDisplay1VESAModeInitRegs();
-
-    
-    LoadTiming(DISP1, wModeNum);
-
-    
-    GetModePitch(wModeNum, &wPitch);
-    SetPitch(DISP1, wPitch);
-
-    
-    xf86DrvMsgVerb(0, X_INFO, InfoLevel, " \n");
-    Get_MODE_INFO(wModeNum, &pModeInfo);
-    GetModeColorDepth(wModeNum, pModeInfo, &bColorDepth);
-    SetColorDepth(DISP1, bColorDepth);
-
-    
-
-    
-
-    
-
-    
-    xf86DrvMsgVerb(0, X_INFO, InfoLevel, " \n");
-    SetFIFO(DISP1);
-
-    
-    xf86DrvMsgVerb(0, X_INFO, InfoLevel, " \n");
-    ConfigDigitalPort(DISP1);
-
-    TurnOnDigitalPort(bNewDeviceID);
-
-    
-
-    
-    xf86DrvMsgVerb(0, X_INFO, InfoLevel, " \n");
-    ControlPwrSeqOn(bNewDeviceID);
-
-    
-    xf86DrvMsgVerb(0, X_INFO, InfoLevel, " \n");
-    SequencerOn(DISP1);
-    
-    SetVBERerurnStatus(VBEFunctionCallSuccessful, pCBIOSExtension->pCBiosArguments);
-    
-#if CBIOS_DEBUG
-    xf86DrvMsgVerb(0, X_INFO, DefaultLevel, "==Exit2 VBE_SetMode return 0x%x== \n",VBEFunctionCallSuccessful);
-#endif
-    return true;
-}
-
-CI_STATUS VBE_SetGetScanLineLength (CBIOS_ARGUMENTS *pCBiosArguments)
-{
-    USHORT    wModeNum;
-    MODE_INFO   *pModeInfo = NULL;
-    UCHAR    bColorDepth;
-    UCHAR    bDispalyPath;
-    ULONG   dwVESAMemSizeInBytes;
-    USHORT    wMaxPitchInBytes, wCurrentVDispEnd;
-    USHORT    VBEReturnStatus = VBEFunctionCallFail;
-    USHORT    wPitchToBeSet = pCBiosArguments->reg.x.CX; 
-    
-#if CBIOS_DEBUG
-    xf86DrvMsgVerb(0, X_INFO, DefaultLevel, "==Entry VBE_SetGetScanLineLength== \n");
-#endif
-    if (pCBiosArguments->reg.x.AX == 0x4f06)
-    {
-        bDispalyPath = DISP1;
-    }
-    else if ((pCBiosArguments->reg.x.AX == 0x4f14) && ((pCBiosArguments->reg.lh.BH == 0x87)||(pCBiosArguments->reg.lh.BH == 0x08)))
-    {
-        bDispalyPath = DISP2;
-    }
-    else
-    {
-        SetVBERerurnStatus(VBEFunctionCallFail, pCBiosArguments);
-    #if CBIOS_DEBUG
-        xf86DrvMsgVerb(0, X_INFO, DefaultLevel, "==Exit1 VBE_SetGetScanLineLength return 0x%x== \n",VBEFunctionCallFail);
-    #endif
-        return true;
-    }
-    
-    if (pCBiosArguments->reg.lh.BL <=3)
-    {
-        wModeNum = Get_VESA_MODE(bDispalyPath);
-        
-        Get_MODE_INFO(wModeNum, &pModeInfo);
-        
-        if (GetModeColorDepth(wModeNum, pModeInfo, &bColorDepth))
-        {
-            VBEReturnStatus = VBEFunctionCallNotSupported;
-
-            dwVESAMemSizeInBytes = ((ULONG)GetVESAMEMSize()) << 20;
-            
-            wCurrentVDispEnd = GetVDisplayEnd(bDispalyPath);
-            
-            
-            if (((ULONG)(dwVESAMemSizeInBytes / (ULONG)wCurrentVDispEnd) & 0xFFFF0000) == 0)
-            {
-                wMaxPitchInBytes = (USHORT)(dwVESAMemSizeInBytes / (ULONG)wCurrentVDispEnd) & 0xFFF8;
-            }
-            else
-            {
-                wMaxPitchInBytes = 0xFFF8;
-            }
-        #if CBIOS_DEBUG
-            xf86DrvMsgVerb(0, X_INFO, InfoLevel, "==VBE_SetGetScanLineLength Color Depth = 0x%x== \n",bColorDepth);
-            xf86DrvMsgVerb(0, X_INFO, InfoLevel, "==VBE_SetGetScanLineLength Mem Size = 0x%x== \n",dwVESAMemSizeInBytes);
-            xf86DrvMsgVerb(0, X_INFO, InfoLevel, "==VBE_SetGetScanLineLength Current Disp End = 0x%x== \n",wCurrentVDispEnd);
-            xf86DrvMsgVerb(0, X_INFO, InfoLevel, "==VBE_SetGetScanLineLength Max Pitch = 0x%x== \n",wMaxPitchInBytes);
-        #endif
-            if ((pCBiosArguments->reg.lh.BL == 0) || (pCBiosArguments->reg.lh.BL == 2))
-            {
-                if (pCBiosArguments->reg.lh.BL == 0)
-                {
-                    
-                    wPitchToBeSet <<= (bColorDepth >> 4);
-                }
-                
-                if (wPitchToBeSet <= wMaxPitchInBytes)
-                {
-                    SetPitch(bDispalyPath, wPitchToBeSet);
-                }
-                else
-                {
-                    SetVBERerurnStatus(VBEReturnStatus, pCBiosArguments);
-                    return true;
-                }
-            }
-
-            if (pCBiosArguments->reg.lh.BL == 3)
-            {
-                
-                pCBiosArguments->reg.x.BX = wMaxPitchInBytes;
-            }
-            else
-            {
-                
-                pCBiosArguments->reg.x.BX =GetPitch(bDispalyPath);
-            }
-
-            
-            
-            pCBiosArguments->reg.x.CX = pCBiosArguments->reg.x.BX >> (bColorDepth >> 4);
-            pCBiosArguments->reg.x.DX = (dwVESAMemSizeInBytes / (USHORT)pCBiosArguments->reg.x.BX);
-        }
-    }
-#if CBIOS_DEBUG
-    xf86DrvMsgVerb(0, X_INFO, DefaultLevel, "==Exit2 VBE_SetGetScanLineLength return 0x%x== \n",VBEReturnStatus);
-#endif
-    SetVBERerurnStatus(VBEReturnStatus, pCBiosArguments);
-    return true;
-}
-
-CI_STATUS OEM_QueryBiosInfo (CBIOS_ARGUMENTS *pCBiosArguments)
-{
-    USHORT    VBEReturnStatus = VBEFunctionCallFail;
-    char bProjCode;
-    int wCustomerCode;
-    char bRelVersion;
-    char szPrj[2], szMajor[3], szMinor[3] ;
-    int wYear;
-    char bMonth, bDay;
-    char szYear[5], szMonth[3], szDay[3];
-    char i,ucCRAA,ucCRAB;
-    
-
-#if CBIOS_DEBUG
-    xf86DrvMsgVerb(0, X_INFO, DefaultLevel, "==Entry OEM_QueryBiosInfo()== \n");
-#endif
-
-    
-
-    
-    
-    
-    if (BiosInfoData != NULL)
-    {
-        szPrj[1] = szMajor[2] = szMinor[2] = '\0';
-    	strncpy(szPrj, ((char *)BiosInfoData)+0x10, 1);
-    	strncpy(szMajor, ((char *)BiosInfoData)+0x12, 2);
-    	strncpy(szMinor, ((char *)BiosInfoData)+0x15, 2);
-
-    	
-    	bProjCode = atoi(szPrj) ;
-    	wCustomerCode = atoi(szMajor);
-    	bRelVersion = atoi(szMinor);
-        pCBiosArguments->reg.ex.EBX = (bProjCode<<24) | (wCustomerCode<<8) | bRelVersion;
-
-#if CBIOS_DEBUG
-    xf86DrvMsgVerb(0, X_INFO, InfoLevel, "Bios version : %d\n",pCBiosArguments->reg.ex.EBX);
-#endif
-    }
-
-
-    
-
-    
-    
-    ucCRAA = GetCRReg(0xAA);
-    pCBiosArguments->reg.ex.ECX = ucCRAA; 
-    pCBiosArguments->reg.ex.ECX <<= 6;          
-
-    
-    ucCRAB = GetCRReg(0xAB);
-    ucCRAB &= BIT0 + BIT1 + BIT2;                       
-    pCBiosArguments->reg.ex.ECX |= ucCRAB;
-
-    
-
-    
-    if (BiosInfoData != NULL)
-    {
-        szMonth[2] = szDay[2] = szYear[4] = '\0';
-        strncpy(szMonth, ((char *)BiosInfoData)+0x47, 2);
-        strncpy(szDay, ((char *)BiosInfoData)+0x4a, 2);
-        strncpy(szYear, ((char *)BiosInfoData)+0x56, 4);
-
-        wYear = atoi(szYear);
-        bMonth = atoi(szMonth);
-        bDay = atoi(szDay);
-        pCBiosArguments->reg.ex.EDX = (wYear<<16) | (bMonth<8) | bDay;
-    
-#if CBIOS_DEBUG
-    xf86DrvMsgVerb(0, X_INFO, InfoLevel, "Bios date : %d\n",pCBiosArguments->reg.ex.EDX);
-#endif
-    }
-
-    
-    pCBiosArguments->reg.x.SI = 0;
-    if(bCRTSUPPORT)
-    {
-        pCBiosArguments->reg.x.SI |= B_CRT;
-    }
-    if(bLCDSUPPORT)
-    {
-        pCBiosArguments->reg.x.SI |= B_LCD;
-    }
-    if(bTVSUPPORT)
-    {
-        pCBiosArguments->reg.x.SI |= B_TV;
-    }
-    if(bDVISUPPORT)
-    {
-        pCBiosArguments->reg.x.SI |= B_DVI;
-    }
-    
-    
-
-    VBEReturnStatus = VBEFunctionCallSuccessful;
-    SetVBERerurnStatus(VBEReturnStatus, pCBiosArguments);
-#if CBIOS_DEBUG
-    xf86DrvMsgVerb(0, X_INFO, DefaultLevel, "==Exit OEM_QueryBiosInfo()== \n");
-#endif
-    return true;
-}
-CI_STATUS OEM_QueryBiosCaps (CBIOS_ARGUMENTS *pCBiosArguments)
-{
-    
-#if CBIOS_DEBUG
-    xf86DrvMsgVerb(0, X_INFO, DefaultLevel, "==Entry OEM_QueryBiosCaps()== \n");
-#endif
-
-
-#if CBIOS_DEBUG
-    xf86DrvMsgVerb(0, X_INFO, DefaultLevel, "==Exit OEM_QueryBiosCaps()== \n");
-#endif
-    return true;
-}
-
-CI_STATUS OEM_QueryExternalDeviceInfo (CBIOS_ARGUMENTS *pCBiosArguments)
-{
-#if CBIOS_DEBUG
-    xf86DrvMsgVerb(0, X_INFO, DefaultLevel, "==Entry OEM_QueryExternalDeviceInfo()== \n");
-#endif
-
-    pCBiosArguments->reg.lh.BL = ReadScratch(IDX_SCRATCH_20);
-    pCBiosArguments->reg.ex.EBX <<= 16;
-
-    pCBiosArguments->reg.lh.BH = ReadScratch(IDX_SCRATCH_21);
-
-    pCBiosArguments->reg.lh.BL = ReadScratch(IDX_SCRATCH_22);
-
-    pCBiosArguments->reg.ex.ECX = BIT16;
-
-    pCBiosArguments->reg.x.DX = 0xFFFF;
+    pCBiosArguments->Edi = CBIOSGetPortI2CInfo();
 
     SetVBERerurnStatus(VBEFunctionCallSuccessful, pCBiosArguments);
-#if CBIOS_DEBUG
-    xf86DrvMsgVerb(0, X_INFO, DefaultLevel, "==Exit OEM_QueryExternalDeviceInfo()== \n");
-#endif
-    return true;
+    
+    return TRUE;
 }
 
-CI_STATUS OEM_QueryDisplayPathInfo (CBIOS_ARGUMENTS *pCBiosArguments)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+CBStatus OEM_QueryDisplayPathInfo (PCBIOS_Extension pCBIOSExtension)
 {
-    UCHAR ScratchTempData;
-#if CBIOS_DEBUG
-    xf86DrvMsgVerb(0, X_INFO, DefaultLevel, "==Entry OEM_QueryDisplayPathInfo()== \n");
-#endif
-    pCBiosArguments->reg.ex.EBX = 0;
+    BYTE ScratchTempData, ucDeviceIndex;
+    CBIOS_ARGUMENTS *pCBiosArguments = pCBIOSExtension->pCBiosArguments;
+    
+    ucDeviceIndex = Get_DEV_ID(DISP1);
+    pCBiosArguments->BL = GetDevicePort(ucDeviceIndex);
+    pCBiosArguments->BL <<= 2;
 
-    pCBiosArguments->reg.lh.BL |= Get_NEW_DEV_ID(DISP1);
-
-    pCBiosArguments->reg.ex.EBX <<= 2;
     ScratchTempData = GetSRReg(0x58);               
     if (ScratchTempData & BIT0)
     {
-        ScratchTempData &= (BIT2 + BIT1);             
+        ScratchTempData &= BIT2 + BIT1;             
         ScratchTempData >>= 1;
-        pCBiosArguments->reg.lh.BL |= ScratchTempData;
+        pCBiosArguments->BL |= ScratchTempData;
     }
-
-    if (bDS_SUPPORT)
+    
+    if(ReadScratch(IDX_DS_ENABLE))                  
     {
-        ScratchTempData = GetSRReg(0x70) & BIT7;
-        ScratchTempData >>= 7;
-        pCBiosArguments->reg.lh.BL |= ScratchTempData;
-        ScratchTempData = GetSRReg(0x74) & BIT7;
-        ScratchTempData >>= 6;
-        pCBiosArguments->reg.lh.BL |= ScratchTempData;
+        if(GetSRReg(0x70)&BIT7)    
+            pCBiosArguments->BL |= BIT0;            
+            
+        if(GetSRReg(0x70)&BIT7)    
+            pCBiosArguments->BL |= BIT1;            
     }
+    pCBiosArguments->BL <<= 4;
+    pCBiosArguments->BL |= ucDeviceIndex;
+
+    pCBiosArguments->Ebx <<= 7;
+    pCBiosArguments->BL |= Get_RRATE_ID(DISP1);
     
-    pCBiosArguments->reg.ex.EBX <<= 4;
-    pCBiosArguments->reg.lh.BL |= Get_DEV_ID(DISP1);
-
-    pCBiosArguments->reg.ex.EBX <<= 7;
-    pCBiosArguments->reg.lh.BL |= Get_RRATE_ID(DISP1);
+    pCBiosArguments->Ebx <<= 9;   
+    pCBiosArguments->BX |= Get_VESA_MODE(DISP1);
     
-    pCBiosArguments->reg.ex.EBX <<= 9;   
-    pCBiosArguments->reg.x.BX |= Get_VESA_MODE(DISP1);
     
-
-    pCBiosArguments->reg.ex.ECX = 0;
-
-    pCBiosArguments->reg.lh.CL |= Get_NEW_DEV_ID(DISP1);
-
-    pCBiosArguments->reg.ex.ECX <<= 2;
+    ucDeviceIndex = Get_DEV_ID(DISP2);
+    pCBiosArguments->CL = GetDevicePort(ucDeviceIndex);
+    pCBiosArguments->CL <<= 2;
     ScratchTempData = GetSRReg(0x50);               
     if (ScratchTempData & BIT0)
     {
-        ScratchTempData &= (BIT2 + BIT1);             
+        ScratchTempData &= BIT2 + BIT1;             
         ScratchTempData >>= 1;
-        pCBiosArguments->reg.lh.BL |= ScratchTempData;
+        pCBiosArguments->CL |= ScratchTempData;
     }
-    
-    pCBiosArguments->reg.ex.ECX <<= 4;
-    pCBiosArguments->reg.lh.CL |= Get_DEV_ID(DISP2);
+    pCBiosArguments->CL <<= 4;
+    pCBiosArguments->CL |= ucDeviceIndex;
 
-    pCBiosArguments->reg.ex.ECX <<= 7;
-    pCBiosArguments->reg.lh.CL |= Get_RRATE_ID(DISP2);
+    pCBiosArguments->Ecx <<= 7;
+    pCBiosArguments->CL |= Get_RRATE_ID(DISP2);
     
-    pCBiosArguments->reg.ex.ECX <<= 9;   
-    pCBiosArguments->reg.x.CX |= Get_VESA_MODE(DISP2);
+    pCBiosArguments->Ecx <<= 9;   
+    pCBiosArguments->CX |= Get_VESA_MODE(DISP2);
     
     SetVBERerurnStatus(VBEFunctionCallSuccessful, pCBiosArguments);
-#if CBIOS_DEBUG
-    xf86DrvMsgVerb(0, X_INFO, DefaultLevel, "==Exit OEM_QueryDisplayPathInfo()== \n");
-#endif
-    return true;
-
+    return TRUE;
 }
 
-CI_STATUS OEM_QueryDeviceConnectStatus (CBIOS_ARGUMENTS *pCBiosArguments)
+
+CBStatus OEM_QueryDeviceConnectStatus (PCBIOS_Extension pCBIOSExtension)
 {
-    UCHAR *pucPCIDataStruct = (UCHAR*)PCIDataStruct;
+    BYTE    QuickCheck;
+    CBIOS_ARGUMENTS *pBiosArguments = pCBIOSExtension->pCBiosArguments;
+    pBiosArguments->BX = 0;
+
     
-#if CBIOS_DEBUG
-    xf86DrvMsgVerb(0, X_INFO, DefaultLevel, "==Entry OEM_QueryDeviceConnectStatus()== \n");
-#endif
-    pCBiosArguments->reg.x.BX = 0;
     
-    if (*(USHORT*)(pucPCIDataStruct + OFF_DID) == 0x2010)
+    
+    QuickCheck = (BYTE)pBiosArguments->CX;
+
+    if (QuickCheck & QUERYCRT)
     {
-        SetSRReg(0x4f, 0x82, 0xFF);
-        LongWait();
-        if (GetSRReg(0x3c) & BIT0)
+        
+        if (pCBIOSExtension->dwSupportDevices & B_CRT)
         {
-            pCBiosArguments->reg.x.BX |= B_CRT;   
+            pBiosArguments->BX |= SenseCRT();
+        }
+    }
+    else if (QuickCheck & QUERYHDMI)
+    {
+        
+        
+        if ((pCBIOSExtension->dwSupportDevices & B_HDMI) ||
+            (pCBIOSExtension->dwSupportDevices & B_DVI))
+        {
+            pBiosArguments->BX |= QueryHDMIConnectStatus(QuickCheck);
         }
     }
     else
     {
         
-    }
-    
-    if (bLCDSUPPORT)
-    {
-        pCBiosArguments->reg.x.BX |= B_LCD;
-    }
-
-    if (bDVISUPPORT)
-    {
-        if (*(USHORT*)(((UCHAR*)PCIDataStruct) + OFF_DID) == 0x2010)
-        {
-            if (GetSRReg(0x3c) & BIT1)
-            {
-                pCBiosArguments->reg.x.BX |= B_DVI;   
-            }
-        }
-        else
-        {
-            
-        }
-    }
-
-    if (bTVSUPPORT)
-    {
         
-        pCBiosArguments->reg.x.BX |= B_TV;
+        if ((pCBIOSExtension->dwSupportDevices & B_HDMI) ||
+            (pCBIOSExtension->dwSupportDevices & B_DVI))
+        {
+            pBiosArguments->BX |= QueryHDMIConnectStatus(QuickCheck);
+        }
+
+        
+        if (pCBIOSExtension->dwSupportDevices & B_TV)
+        {
+            pBiosArguments->BX |= SenseTV();
+        }    
+
+        
+        if (pCBIOSExtension->dwSupportDevices & B_LCD)
+        {
+            pBiosArguments->BX |= B_LCD;
+        }
+
+        
+        if (pCBIOSExtension->dwSupportDevices & B_CRT)
+        {
+            pBiosArguments->BX |= SenseCRT();
+        }
+
+        
     }
     
-    SetVBERerurnStatus(VBEFunctionCallSuccessful, pCBiosArguments);
-#if CBIOS_DEBUG
-    xf86DrvMsgVerb(0, X_INFO, DefaultLevel, "==Exit OEM_QueryDeviceConnectStatus()== \n");
-#endif
-    return true;
+    SetVBERerurnStatus(VBEFunctionCallSuccessful, pBiosArguments);
+    return TRUE;
 }
 
-CI_STATUS OEM_QuerySupportedMode (CBIOS_ARGUMENTS *pCBiosArguments)
+CBStatus OEM_QuerySupportedMode (CBIOS_ARGUMENTS *pCBiosArguments)
 {
-    MODE_INFO   *pModeInfo;
-    RRATE_TABLE *pRRateTable;
-    int RRateTableIndex = 0;
+    int VESATableIndex = 0, VESATableSIZE = sizeof(VESATable)/sizeof(MODE_INFO);
+    int RRateTableIndex = 0, RRateTableSize;
     int ModeNumIndex;
-    USHORT wModeNum;
-    USHORT wSerialNumber;
+    WORD ModeNum, SerialNumber;
     
-#if CBIOS_DEBUG
-    xf86DrvMsgVerb(0, X_INFO, DefaultLevel, "==Enter OEM_QuerySupportedMode()== \n");
-#endif
-    wSerialNumber = pCBiosArguments->reg.x.CX;
-    pModeInfo     = (MODE_INFO*)pVESATable;
+    SerialNumber = pCBiosArguments->CX;
     
-    while (pModeInfo->H_Size != 0xFFFF)
+    for (VESATableIndex = 0; VESATableIndex < VESATableSIZE; VESATableIndex++)
     {
-#if CBIOS_DEBUG
-        xf86DrvMsgVerb(0, X_INFO, InternalLevel, "pModeInfo->H_Size = %d \n", pModeInfo->H_Size);
-        xf86DrvMsgVerb(0, X_INFO, InternalLevel, "pModeInfo->V_Size = %d \n", pModeInfo->V_Size);
-        xf86DrvMsgVerb(0, X_INFO, InternalLevel, "sizeof(RRATE_TABLE) = %d \n", sizeof(RRATE_TABLE));
-#endif
+    
+        RRateTableSize = VESATable[VESATableIndex].RRTableCount;
+        
         for (ModeNumIndex = 0; ModeNumIndex < 3; ModeNumIndex++)
         {
             switch (ModeNumIndex)
             {
                 case 0:
-                    wModeNum = pModeInfo->Mode_ID_8bpp;
-                        xf86DrvMsgVerb(0, X_INFO, InternalLevel, "case 0: wModeNum = 0x%x \n", wModeNum);
+                    ModeNum = VESATable[VESATableIndex].Mode_ID_8bpp;
                     break;
                 case 1:
-                    wModeNum = pModeInfo->Mode_ID_16bpp;
-                        xf86DrvMsgVerb(0, X_INFO, InternalLevel, "case 1: wModeNum = 0x%x \n", wModeNum);
+                    ModeNum = VESATable[VESATableIndex].Mode_ID_16bpp;
                     break;
                 case 2:
-                    wModeNum = pModeInfo->Mode_ID_32bpp;
-                        xf86DrvMsgVerb(0, X_INFO, InternalLevel, "case 2: wModeNum = 0x%x \n", wModeNum);
+                    ModeNum = VESATable[VESATableIndex].Mode_ID_32bpp;
                     break;
             }
-
-            pRRateTable = (RRATE_TABLE*)((int)pModeInfo + sizeof(MODE_INFO));
-
-            for (RRateTableIndex = 0; RRateTableIndex < pModeInfo->RRTableCount; RRateTableIndex++, pRRateTable++)
+            
+            for (RRateTableIndex = 0; RRateTableIndex < RRateTableSize; RRateTableIndex++)
             {
-
-                xf86DrvMsgVerb(0, X_INFO, 5, "pRRateTable = 0x%x \n", pRRateTable);
-
-                if ((pRRateTable->Attribute & DISABLE) == 0)
+                if ( !(VESATable[VESATableIndex].pRRTable[RRateTableIndex].Attribute & DISABLE) )
                 {
-                    if (wSerialNumber == 0)
+                    if (SerialNumber == 0)
                     {
                         
-                        pCBiosArguments->reg.x.BX = wModeNum;
-                        xf86DrvMsgVerb(0, X_INFO, InternalLevel, "mode num = 0x%x \n", pCBiosArguments->reg.x.BX);
-
-                        
-                        GetModeColorDepth(wModeNum, pModeInfo, &pCBiosArguments->reg.lh.CL);
-                        xf86DrvMsgVerb(0, X_INFO, InternalLevel, "color depth = %d \n", pCBiosArguments->reg.lh.CL);
+                        pCBiosArguments->BX = ModeNum;
                         
                         
-                        pCBiosArguments->reg.lh.CH = pRRateTable->RRate_ID;
-                        xf86DrvMsgVerb(0, X_INFO, InternalLevel, "RRate ID = %d \n", pCBiosArguments->reg.lh.CH);
+                        GetModeColorDepth(ModeNum, &VESATable[VESATableIndex], &pCBiosArguments->CL);
                         
                         
-                        pCBiosArguments->reg.ex.EDX = (((ULONG)pModeInfo->V_Size) << 16) | (ULONG)pModeInfo->H_Size;
-                        xf86DrvMsgVerb(0, X_INFO, InternalLevel, "H x V = %d x %d \n", pCBiosArguments->reg.x.DX, pCBiosArguments->reg.ex.EDX>>16);
+                        pCBiosArguments->CH = VESATable[VESATableIndex].pRRTable[RRateTableIndex].RRate_ID;
                         
                         
-                        pCBiosArguments->reg.x.SI = pRRateTable->Attribute;
+                        pCBiosArguments->Edx = VESATable[VESATableIndex].V_Size << 16 | VESATable[VESATableIndex].H_Size;
                         
-                        
-                        pCBiosArguments->reg.ex.EDI = pRRateTable->Clock;
-                        xf86DrvMsgVerb(0, X_INFO, InternalLevel, "dot clk = %dkhz \n", pCBiosArguments->reg.ex.EDI);
+                        pCBiosArguments->Edi = VESATable[VESATableIndex].pRRTable[RRateTableIndex].Clock;
+                        pCBiosArguments->Esi = VESATable[VESATableIndex].pRRTable[RRateTableIndex].V_Total << 16 | VESATable[VESATableIndex].pRRTable[RRateTableIndex].H_Total;
 
                         SetVBERerurnStatus (VBEFunctionCallSuccessful, pCBiosArguments);
 
-                    #if CBIOS_DEBUG
-                        xf86DrvMsgVerb(0, X_INFO, DefaultLevel, "  Exit1 OEM_QuerySupportedMode() return 0x%x== \n", VBEFunctionCallSuccessful);
-                    #endif
-                        return true;
+                        return TRUE;
                     }
                     else
                     {
-                        wSerialNumber--;
+                        SerialNumber--;
                     }
                 }
             }
         }
-        pModeInfo = (MODE_INFO*)((int)pModeInfo + sizeof(MODE_INFO) + pModeInfo->RRTableCount*sizeof(RRATE_TABLE));
     }
 
-    pModeInfo = (MODE_INFO*)(&CInt10VESATable);
-    xf86DrvMsgVerb(0, X_INFO, InternalLevel, "*pModeInfo = %X \n", *pModeInfo);
+    SetVBERerurnStatus (VBEFunctionCallFail, pCBiosArguments);
+    return TRUE;
     
-    while (pModeInfo->H_Size != 0xFFFF)
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+CBStatus OEM_QueryLCDPanelSizeMode (CBIOS_ARGUMENTS *pCBiosArguments)
+{
+    BYTE ucInData = pCBiosArguments->CL;
+    if(ucInData < 3)
     {
-#if CBIOS_DEBUG
-        xf86DrvMsgVerb(0, X_INFO, InternalLevel, "pModeInfo->H_Size = %d \n", pModeInfo->H_Size);
-        xf86DrvMsgVerb(0, X_INFO, InternalLevel, "pModeInfo->V_Size = %d \n", pModeInfo->V_Size);
-        xf86DrvMsgVerb(0, X_INFO, InternalLevel, "sizeof(RRATE_TABLE) = %d \n", sizeof(RRATE_TABLE));
-#endif
-        for (ModeNumIndex = 0; ModeNumIndex < 3; ModeNumIndex++)
+        if(ucInData == 2)       
         {
-            switch (ModeNumIndex)
-            {
-                case 0:
-                    wModeNum = pModeInfo->Mode_ID_8bpp;
-                        xf86DrvMsgVerb(0, X_INFO, InternalLevel, "case 0: wModeNum = 0x%x \n", wModeNum);
-                    break;
-                case 1:
-                    wModeNum = pModeInfo->Mode_ID_16bpp;
-                        xf86DrvMsgVerb(0, X_INFO, InternalLevel, "case 1: wModeNum = 0x%x \n", wModeNum);
-                    break;
-                case 2:
-                    wModeNum = pModeInfo->Mode_ID_32bpp;
-                        xf86DrvMsgVerb(0, X_INFO, InternalLevel, "case 2: wModeNum = 0x%x \n", wModeNum);
-                    break;
-            }
-
-            pRRateTable = (RRATE_TABLE*)((int)pModeInfo + sizeof(MODE_INFO));
-
-            for (RRateTableIndex = 0; RRateTableIndex < pModeInfo->RRTableCount; RRateTableIndex++, pRRateTable++)
-            {
-
-                xf86DrvMsgVerb(0, X_INFO, 5, "pRRateTable = 0x%x \n", pRRateTable);
-
-                if ((pRRateTable->Attribute & DISABLE) == 0)
-                {
-                    if (wSerialNumber == 0)
-                    {
-                        
-                        pCBiosArguments->reg.x.BX = wModeNum;
-                        xf86DrvMsgVerb(0, X_INFO, InternalLevel, "mode num = 0x%x \n", pCBiosArguments->reg.x.BX);
-
-                        
-                        GetModeColorDepth(wModeNum, pModeInfo, &pCBiosArguments->reg.lh.CL);
-                        xf86DrvMsgVerb(0, X_INFO, InternalLevel, "color depth = %d \n", pCBiosArguments->reg.lh.CL);
-                        
-                        
-                        pCBiosArguments->reg.lh.CH = pRRateTable->RRate_ID;
-                        xf86DrvMsgVerb(0, X_INFO, InternalLevel, "RRate ID = %d \n", pCBiosArguments->reg.lh.CH);
-                        
-                        
-                        pCBiosArguments->reg.ex.EDX = (((ULONG)pModeInfo->V_Size) << 16) | (ULONG)pModeInfo->H_Size;
-                        xf86DrvMsgVerb(0, X_INFO, InternalLevel, "H x V = %d x %d \n", pCBiosArguments->reg.x.DX, pCBiosArguments->reg.ex.EDX>>16);
-                        
-                        
-                        pCBiosArguments->reg.x.SI = pRRateTable->Attribute;
-                        
-                        
-                        pCBiosArguments->reg.ex.EDI = pRRateTable->Clock;
-                        xf86DrvMsgVerb(0, X_INFO, InternalLevel, "dot clk = %dkhz \n", pCBiosArguments->reg.ex.EDI);
-
-                        SetVBERerurnStatus (VBEFunctionCallSuccessful, pCBiosArguments);
-
-                    #if CBIOS_DEBUG
-                        xf86DrvMsgVerb(0, X_INFO, DefaultLevel, "  Exit1 OEM_QuerySupportedMode() return 0x%x== \n", VBEFunctionCallSuccessful);
-                    #endif
-                        return true;
-                    }
-                    else
-                    {
-                        wSerialNumber--;
-                    }
-                }
-            }
+            pCBiosArguments->BX = LCDTable[0].Mode_ID_32bpp;
+            pCBiosArguments->CL = 32;
         }
-        pModeInfo = (MODE_INFO*)((int)pModeInfo + sizeof(MODE_INFO) + pModeInfo->RRTableCount*sizeof(RRATE_TABLE));
-    }        
-
-    SetVBERerurnStatus (VBEFunctionCallFail, pCBiosArguments);
-#if CBIOS_DEBUG
-    xf86DrvMsgVerb(0, X_INFO, DefaultLevel, "  Exit2 OEM_QuerySupportedMode() return 0x%x== \n", VBEFunctionCallFail);
-#endif    
-    return true;
-
-}
-
-CI_STATUS OEM_QueryLCDPanelSizeMode (CBIOS_ARGUMENTS *pCBiosArguments)
-{
-    MODE_INFO   *pModeInfo;
-    PANEL_TABLE *pPanelTable;
-    UCHAR        bColorDepth = pCBiosArguments->reg.lh.CL;
-    USHORT        wModeNum;
-#if CBIOS_DEBUG
-    xf86DrvMsgVerb(0, X_INFO, DefaultLevel, "==Enter OEM_QueryLCDPanelSizeMode()== \n");
-#endif
-
-    SetVBERerurnStatus (VBEFunctionCallFail, pCBiosArguments);
-    
-    if (!bLCDSUPPORT)
-        return true;
-        
-    if (!GetModePointerFromLCDTable(LCD_ID, &pModeInfo, &pPanelTable))
-        return true;
-
-    switch (bColorDepth)
-    {
-        case 0:
-            wModeNum = pModeInfo->Mode_ID_8bpp;
-            pCBiosArguments->reg.lh.CL = 8;
-            break;
-        case 1:
-            wModeNum = pModeInfo->Mode_ID_16bpp;
-            pCBiosArguments->reg.lh.CL = 16;
-            break;
-        case 2:
-            wModeNum = pModeInfo->Mode_ID_32bpp;
-            pCBiosArguments->reg.lh.CL = 32;
-            break;
-        default:
-            SetVBERerurnStatus (VBEFunctionCallFail, pCBiosArguments);
-#if CBIOS_DEBUG
-            xf86DrvMsgVerb(0, X_INFO, DefaultLevel, "==Exit2 OEM_QueryLCDPanelSizeMode() return 0x%x== \n", VBEFunctionCallFail);
-#endif    
-            return true;
+        else if(ucInData == 1)  
+        {
+            pCBiosArguments->BX = LCDTable[0].Mode_ID_16bpp;
+            pCBiosArguments->CL = 16;
+        }
+        else                    
+        {
+            pCBiosArguments->BX = LCDTable[0].Mode_ID_8bpp;
+            pCBiosArguments->CL = 8;
+        }
+        pCBiosArguments->CH  = LCDTable[0].pPanelTable.Timing.RRate_ID;
+        pCBiosArguments->Edx = Get_LCD_Panel_Size();
+        SetVBERerurnStatus(VBEFunctionCallSuccessful, pCBiosArguments);
     }
-        
-    
-    pCBiosArguments->reg.x.BX = wModeNum;
-    
-    
-    pCBiosArguments->reg.lh.CH = pPanelTable->Timing.RRate_ID;
-    
-    
-    pCBiosArguments->reg.ex.EDX = (ULONG)pModeInfo->H_Size  | ((ULONG)pModeInfo->V_Size) << 16;
-    
-    
-    pCBiosArguments->reg.x.SI = pPanelTable->Timing.Attribute;
-    
-    
-    pCBiosArguments->reg.ex.EDI = pPanelTable->Timing.Clock;
-    
-    SetVBERerurnStatus (VBEFunctionCallSuccessful, pCBiosArguments);
-#if CBIOS_DEBUG
-    xf86DrvMsgVerb(0, X_INFO, DefaultLevel, "==Exit1 OEM_QueryLCDPanelSizeMode() return 0x%x== \n", VBEFunctionCallSuccessful);
-#endif
-    return true;
-}
-
-CI_STATUS OEM_QueryLCDPWMLevel(CBIOS_ARGUMENTS *pCBiosArguments)
-{
-#if CBIOS_DEBUG
-    xf86DrvMsgVerb(0, X_INFO, DefaultLevel, "==Entry OEM_QueryLCDPWMLevel()== \n");
-#endif
-    SetVBERerurnStatus (VBEFunctionCallFail, pCBiosArguments);
-    
-    if (!bLCDSUPPORT)
-        return true;
-
-    if ((GetSRReg(0x30)&0x03) == 0x03 )
-        pCBiosArguments->reg.lh.BL = GetSRReg(0x30);
     else
-        pCBiosArguments->reg.lh.BL = 0;
-        
-    SetVBERerurnStatus (VBEFunctionCallSuccessful, pCBiosArguments);
-    
-    return true;
-}
-
-CI_STATUS OEM_QueryTVConfiguration (CBIOS_ARGUMENTS *pCBiosArguments)
-{
-    
-    pCBiosArguments->reg.lh.BH = Get_TV_ConnectorType();
-    pCBiosArguments->reg.lh.BL = Get_TV_Type();
-    SetVBERerurnStatus(VBEFunctionCallSuccessful, pCBiosArguments);
-    return true;
-}
-CI_STATUS OEM_QueryTV2Configuration (CBIOS_ARGUMENTS *pCBiosArguments)
-{
-    return true;
-}
-CI_STATUS OEM_QueryHDTVConfiguration (CBIOS_ARGUMENTS *pCBiosArguments)
-{
-    return true;
-}
-CI_STATUS OEM_QueryHDTV2Configuration (CBIOS_ARGUMENTS *pCBiosArguments)
-{
-    return true;
-}
-CI_STATUS OEM_QueryHDMIConfiguration (CBIOS_ARGUMENTS *pCBiosArguments)
-{
-    return true;
-}
-CI_STATUS OEM_QueryHDMI2Configuration (CBIOS_ARGUMENTS *pCBiosArguments)
-{
-    return true;
-}
-CI_STATUS OEM_SetActiveDisplayDevice (CBIOS_ARGUMENTS *pCBiosArguments)
-{
-    UCHAR bDeviceIndex1 = Get_DEV_ID(DISP1);
-    UCHAR bDeviceIndex2 = Get_DEV_ID(DISP2);
-    UCHAR bNewDeviceIndex1 = pCBiosArguments->reg.lh.CL & 0x0F;
-    UCHAR bNewDeviceIndex2 = (pCBiosArguments->reg.lh.CL >> 4) & 0x0F;
-    
-#if CBIOS_DEBUG
-    xf86DrvMsgVerb(0, X_INFO, DefaultLevel, "==Entry OEM_SetActiveDisplayDevice()== \n");
-#endif
-
-    
-    if ((!CheckForNewDeviceAvailable(bNewDeviceIndex1)&& (bNewDeviceIndex1!=0)) || (!CheckForNewDeviceAvailable(bNewDeviceIndex2)&& (bNewDeviceIndex2!=0)))
     {
         SetVBERerurnStatus(VBEFunctionCallFail, pCBiosArguments);
-    #if CBIOS_DEBUG
-        xf86DrvMsgVerb(0, X_INFO, DefaultLevel, "==Exit1 OEM_SetActiveDisplayDevice() return 0x%x== \n", VBEFunctionCallFail);
-    #endif
-        return true;
     }
+    return TRUE;
+}
+CBStatus OEM_QueryLCD2PanelSizeMode (CBIOS_ARGUMENTS *pCBiosArguments)
+{
+    DWORD dwLCDPanelSize;
+
+    dwLCDPanelSize = Get_LCD2_Panel_Size();
     
-    if(CheckForDSTNPanel(bNewDeviceIndex1) || CheckForDSTNPanel(bNewDeviceIndex2))
+    if (dwLCDPanelSize)
     {
-        bNewDeviceIndex1 = 0;
+        pCBiosArguments->Ebx = dwLCDPanelSize; 
+                                               
+        SetVBERerurnStatus(VBEFunctionCallSuccessful, pCBiosArguments);
+    }
+    else
+    {
+        SetVBERerurnStatus(VBEFunctionCallFail, pCBiosArguments);
+    }
+    return TRUE;
+}
+
+CBStatus OEM_QueryTVConfiguration (CBIOS_ARGUMENTS *pCBiosArguments)
+{
+    pCBiosArguments->BL = ReadScratch(IDX_SCRATCH_05);
+    SetVBERerurnStatus(VBEFunctionCallSuccessful, pCBiosArguments);
+    return TRUE;
+}
+
+CBStatus OEM_SetSetTVFunction(CBIOS_ARGUMENTS *pCBiosArguments)
+{
+    PCBIOSTVFun_Disp_Info pCBTVFun = (PCBIOSTVFun_Disp_Info)pCBiosArguments->Ecx;
+    BYTE bChange = pCBTVFun->bChange;
+    if(bChange & DiffCCRS)
+        SetTVCCRSLevel(pCBTVFun->ucCCRSLevel);
+    if(bChange & DiffVScaler)
+        CBIOSSetFS473VScalingLevel(pCBTVFun);
+    if(bChange & DiffHPos)
+        SetFS473HPosition(pCBTVFun->ucHPosition);
+    if(bChange & DiffVPos)
+        SetFS473VPosition(pCBTVFun->ucVPosition);
+    if(bChange & DiffHScaler)
+        SetFS473HSCaler(pCBTVFun);
+        
+    SetVBERerurnStatus(VBEFunctionCallSuccessful, pCBiosArguments);
+    return TRUE;
+}
+
+CBStatus OEM_QueryTV2Configuration (CBIOS_ARGUMENTS *pCBiosArguments)
+{
+    pCBiosArguments->BL = ReadScratch(IDX_SCRATCH_06);
+    SetVBERerurnStatus(VBEFunctionCallSuccessful, pCBiosArguments);
+    return TRUE;
+}
+
+CBStatus OEM_QueryHDMISupportedMode (CBIOS_ARGUMENTS *pCBiosArguments)
+{
+    int VESATableIndex = 0, VESATableSIZE = sizeof(HDMITable)/sizeof(MODE_INFO);
+    int RRateTableIndex = 0, RRateTableSize;
+    int ModeNumIndex;
+    WORD ModeNum, SerialNumber;
+    
+    SerialNumber = pCBiosArguments->CX;
+    
+    for (VESATableIndex = 0; VESATableIndex < VESATableSIZE; VESATableIndex++)
+    {
+    
+        RRateTableSize = HDMITable[VESATableIndex].RRTableCount;
+        
+        for (ModeNumIndex = 0; ModeNumIndex < 3; ModeNumIndex++)
+        {
+            switch (ModeNumIndex)
+            {
+                case 0:
+                    ModeNum = HDMITable[VESATableIndex].Mode_ID_8bpp;
+                    break;
+                case 1:
+                    ModeNum = HDMITable[VESATableIndex].Mode_ID_16bpp;
+                    break;
+                case 2:
+                    ModeNum = HDMITable[VESATableIndex].Mode_ID_32bpp;
+                    break;
+            }
+            
+            for (RRateTableIndex = 0; RRateTableIndex < RRateTableSize; RRateTableIndex++)
+            {
+                if ( !(HDMITable[VESATableIndex].pRRTable[RRateTableIndex].Attribute & DISABLE) )
+                {
+                    if (SerialNumber == 0)
+                    {
+                        
+                        pCBiosArguments->BX = ModeNum;
+                        
+                        
+                        GetModeColorDepth(ModeNum, &HDMITable[VESATableIndex], &pCBiosArguments->CL);
+                        
+                        
+                        pCBiosArguments->CH = HDMITable[VESATableIndex].pRRTable[RRateTableIndex].RRate_ID;
+                        
+                        
+                        pCBiosArguments->Edx = HDMITable[VESATableIndex].V_Size << 16 | HDMITable[VESATableIndex].H_Size;
+                        
+                        SetVBERerurnStatus (VBEFunctionCallSuccessful, pCBiosArguments);
+
+                        return TRUE;
+                    }
+                    else
+                    {
+                        SerialNumber--;
+                    }
+                }
+            }
+        }
     }
 
-    if (bDeviceIndex1 != bNewDeviceIndex1)
+    SetVBERerurnStatus (VBEFunctionCallFail, pCBiosArguments);
+    return TRUE;
+    
+}
+
+CBStatus OEM_SetActiveDisplayDevice (CBIOS_ARGUMENTS *pCBiosArguments)
+{
+    BYTE Display1DeviceID, NewDisplay1DeviceID;
+    BYTE Display2DeviceID, NewDisplay2DeviceID;
+    Display1DeviceID = Get_DEV_ID(DISP1);
+    Display2DeviceID = Get_DEV_ID(DISP2);
+    NewDisplay1DeviceID = pCBiosArguments->CL & 0x0F;
+    NewDisplay2DeviceID = pCBiosArguments->CL >> 4;
+    
+    
+    if(!NewDisplay1DeviceID &&
+       !NewDisplay2DeviceID)
+        return FALSE;
+    
+    
+    if(CBIOSCheckDeviceAvailable(NewDisplay1DeviceID))
     {
-        if (bNewDeviceIndex1 == 0)
+        
+        if (NewDisplay1DeviceID != Display1DeviceID)
         {
             DisableDisplayPathAndDevice(DISP1);
-            Set_DEV_ID(bNewDeviceIndex1, DISP1);
-        }
-        Set_NEW_DEV_ID(bNewDeviceIndex1, DISP1);
-    }
 
-    if (bDeviceIndex2 != bNewDeviceIndex2)
+            if (!NewDisplay1DeviceID) 
+            {
+                Set_DEV_ID(0, DISP1);
+            }
+            Set_NEW_DEV_ID(NewDisplay1DeviceID, DISP1);
+        }
+    }
+    
+    
+    if(CBIOSCheckDeviceAvailable(NewDisplay2DeviceID))
     {
-        if (bNewDeviceIndex2 == 0)
+        
+        if (NewDisplay2DeviceID != Display2DeviceID)
         {
             DisableDisplayPathAndDevice(DISP2);
-            Set_DEV_ID(bNewDeviceIndex2, DISP2);
+
+            if (!NewDisplay2DeviceID)
+            {
+                Set_DEV_ID(0, DISP2);
+            }
+            Set_NEW_DEV_ID(NewDisplay2DeviceID, DISP2);
         }
-        Set_NEW_DEV_ID(bNewDeviceIndex2, DISP2);
     }
 
     SetVBERerurnStatus(VBEFunctionCallSuccessful, pCBiosArguments);
-#if CBIOS_DEBUG
-    xf86DrvMsgVerb(0, X_INFO, DefaultLevel, "==Exit2 OEM_SetActiveDisplayDevice() return 0x%x== \n", VBEFunctionCallSuccessful);
-#endif
-    return true;
+    return TRUE;
 }
-CI_STATUS OEM_SetVESAModeForDisplay2 (CBIOS_Extension *pCBIOSExtension)
+CBStatus OEM_SetVESAModeForDisplay2(CBIOS_Extension *pCBIOSExtension)
 {
-    USHORT    wModeNum = pCBIOSExtension->pCBiosArguments->reg.x.CX & 0x01FF;
-    USHORT    wPitch = 0;
-    MODE_INFO   *pModeInfo = NULL;
-    UCHAR    bColorDepth = 0;
-    UCHAR    bCurDeviceID, bNewDeviceID;
-
-#if CBIOS_DEBUG
-    xf86DrvMsgVerb(0, X_INFO, DefaultLevel, "==Entry OEM_SetVESAModeForDisplay2()== \n");
-#endif
-
-    if (wModeNum < 0x100)
-    {
-        SetVBERerurnStatus(VBEFunctionCallFail, pCBIOSExtension->pCBiosArguments);
-    #if CBIOS_DEBUG
-        xf86DrvMsgVerb(0, X_INFO, DefaultLevel, "==Exit1 OEM_SetVESAModeForDisplay2() return 0x%x== \n", VBEFunctionCallFail);
-    #endif
-        return true;
-    }
+    WORD    ModeNum = pCBIOSExtension->pCBiosArguments->CX & 0x01FF;
+    CBIOSEDID_DETAILED_TIMING *pEDIDDetailedTiming = (CBIOSEDID_DETAILED_TIMING*)pCBIOSExtension->pCBiosArguments->Esi;
+    WORD    Pitch = 0, wEDIDPolarity = 0;    
+    MODE_INFO *pModeInfo = NULL;
+    BYTE    ColorDepth = 0;
+    WORD    VBEReturnStatus = VBEFunctionCallFail;
+    BYTE ucDeviceID, ucDevicePort; 
     
-    bCurDeviceID = Get_DEV_ID(DISP2);
-    bNewDeviceID = Get_NEW_DEV_ID(DISP2);
-
-    
-    if(!Get_MODE_INFO(wModeNum, &pModeInfo))
-    {
-        SetVBERerurnStatus(VBEFunctionCallFail, pCBIOSExtension->pCBiosArguments);
-    #if CBIOS_DEBUG
-        xf86DrvMsgVerb(0, X_INFO, DefaultLevel, "==Exit2 OEM_SetVESAModeForDisplay2() return 0x%x== \n", VBEFunctionCallFail);
-    #endif
-        return true;
-    }
-    
-    Set_VESA_MODE(wModeNum, DISP2);
-    
-    
-    SequencerOff(DISP2);
-
-    
-    TurnOffScaler(DISP2);
-
-    if (bCurDeviceID != bNewDeviceID)
+    if (ModeNum <= 0x13)
     {
         
-        ControlPwrSeqOff(bCurDeviceID);
-
-        
-
-        
-        TurnOffDigitalPort(bCurDeviceID);
-
-        
-        Set_DEV_ID(bNewDeviceID, DISP2);
-    }
-    
-    
-    
-    
-    LoadTiming(DISP2, wModeNum);
-
-    
-    GetModePitch(wModeNum, &wPitch);
-    SetPitch(DISP2, wPitch);
-
-    
-    Get_MODE_INFO(wModeNum, &pModeInfo);
-    GetModeColorDepth(wModeNum, pModeInfo, &bColorDepth);
-    SetColorDepth(DISP2, bColorDepth);
-
-    
-
-    
-
-    
-    if(!(pCBIOSExtension->pCBiosArguments->reg.x.CX & BIT15))
-    {
-        ClearFrameBuffer(DISP2,(ULONG*)(pCBIOSExtension->VideoVirtualAddress),pModeInfo,bColorDepth);
-    }
-
-    
-    SetFIFO(DISP2);
-
-    
-    ConfigDigitalPort(DISP2);
-
-    TurnOnDigitalPort(bNewDeviceID);
-
-    
-
-    
-    ControlPwrSeqOn(bNewDeviceID);
-    
-    SequencerOn(DISP2);
-    
-    SetVBERerurnStatus(VBEFunctionCallSuccessful, pCBIOSExtension->pCBiosArguments);
-    
-#if CBIOS_DEBUG
-    xf86DrvMsgVerb(0, X_INFO, DefaultLevel, "==Exit3 OEM_SetVESAModeForDisplay2() return 0x%x== \n", VBEFunctionCallSuccessful);
-#endif
-    return true;
-}
-
-CI_STATUS OEM_SetDevicePowerState (CBIOS_ARGUMENTS *pCBiosArguments)
-{
-    UCHAR display1DeviceID, display2DeviceID, TargetDevice, DMPSState;
-    USHORT VBEReturnStatus = VBEFunctionCallFail;
-    
-#if CBIOS_DEBUG
-    xf86DrvMsgVerb(0, X_INFO, DefaultLevel, "==Entry OEM_SetDevicePowerState()== \n");
-#endif
-
-    TargetDevice = pCBiosArguments->reg.lh.CL & 0x0F;
-    DMPSState = pCBiosArguments->reg.lh.CL & (BIT1+BIT0);
-    display1DeviceID = Get_DEV_ID(DISP1);
-    display2DeviceID = Get_DEV_ID(DISP2);
-
-    if (display1DeviceID == TargetDevice)
-    {
-        SetDPMS(DMPSState, DISP1);
         VBEReturnStatus = VBEFunctionCallSuccessful;
     }
-    else if (display2DeviceID == TargetDevice)
-    {
-        SetDPMS(DMPSState, DISP2);
-        VBEReturnStatus = VBEFunctionCallSuccessful;
-    }
-
-    SetVBERerurnStatus(VBEReturnStatus, pCBiosArguments);
-    
-#if CBIOS_DEBUG
-    xf86DrvMsgVerb(0, X_INFO, DefaultLevel, "==Exit OEM_SetDevicePowerState() return 0x%x== \n", VBEFunctionCallSuccessful);
-#endif
-    return true;
-}
-
-CI_STATUS OEM_SetRefreshRate (CBIOS_ARGUMENTS *pCBiosArguments)
-{
-    UCHAR bRRateID, bDisplayPath;
-    bRRateID = pCBiosArguments->reg.lh.CL & 0x7F;
-    
-#if CBIOS_DEBUG
-    xf86DrvMsgVerb(0, X_INFO, DefaultLevel, "==Entry OEM_SetRefreshRate()== \n");
-#endif
-
-    if ( pCBiosArguments->reg.x.BX == SetDisplay1RefreshRate)
-        bDisplayPath = DISP1;
     else
-        bDisplayPath = DISP2;
+    {
+        if (CheckForModeAvailable(ModeNum))
+        {
+            Set_VESA_MODE(ModeNum, DISP2);
+            ucDeviceID = Get_DEV_ID(DISP1);
+            
+            
+            
+            
+            
+            
 
-    Set_RRATE_ID(bRRateID, bDisplayPath);
+            if(ucDeviceID != Get_NEW_DEV_ID(DISP2))
+            {
+                
+                    
+                
+                    
+                Set_DEV_ID(Get_NEW_DEV_ID(DISP2), DISP2);
+            }
 
-    SetVBERerurnStatus(VBEFunctionCallSuccessful, pCBiosArguments);
+            
+            ucDeviceID = Get_DEV_ID(DISP2);
+            ucDevicePort = GetDevicePort(ucDeviceID);
+
+            
+
+            
+
+            if(pEDIDDetailedTiming)
+            {
+                
+                VESAEDIDTable[0].H_Size = pEDIDDetailedTiming->usHorDispEnd;
+                VESAEDIDTable[0].V_Size = pEDIDDetailedTiming->usVerDispEnd;
+
+                VESAEDIDTable[0].pRRTable->Clock = (ULONG)(pEDIDDetailedTiming->usPixelClock) * 10;
+                
+                VESAEDIDTable[0].pRRTable->H_Sync_End = 
+                               pEDIDDetailedTiming->usHorDispEnd +
+                               (USHORT)pEDIDDetailedTiming->ucHorBorder +
+                               pEDIDDetailedTiming->usHorSyncStart +
+                               pEDIDDetailedTiming->usHorSyncTime;
+
+                VESAEDIDTable[0].pRRTable->H_Sync_Start = 
+                                pEDIDDetailedTiming->usHorDispEnd + 
+                                (USHORT)pEDIDDetailedTiming->ucHorBorder +
+                                pEDIDDetailedTiming->usHorSyncStart;
+
+                VESAEDIDTable[0].pRRTable->H_Total = 
+                                 pEDIDDetailedTiming->usHorDispEnd + 
+                                 pEDIDDetailedTiming->usHorBlankingTime +
+                                 (USHORT)pEDIDDetailedTiming->ucHorBorder * 2;
+                
+                VESAEDIDTable[0].pRRTable->RRate_ID = RR60;
+
+                VESAEDIDTable[0].pRRTable->V_Sync_End = 
+                                pEDIDDetailedTiming->usVerDispEnd +
+                                (USHORT)pEDIDDetailedTiming->ucVerBorder +
+                                pEDIDDetailedTiming->usVerSyncStart +
+                                pEDIDDetailedTiming->usVerSyncTime;
+
+                VESAEDIDTable[0].pRRTable->V_Sync_Start = 
+                                pEDIDDetailedTiming->usVerDispEnd + 
+                                (USHORT)pEDIDDetailedTiming->ucVerBorder +
+                                pEDIDDetailedTiming->usVerSyncStart;
+
+                VESAEDIDTable[0].pRRTable->V_Total = 
+                                 pEDIDDetailedTiming->usVerDispEnd + 
+                                 pEDIDDetailedTiming->usVerBlankingTime +
+                                 (USHORT)pEDIDDetailedTiming->ucVerBorder * 2;
+
+                if ((pEDIDDetailedTiming->ucFlags & (BIT4+BIT3)) == 0x18)
+                {                   
+                    wEDIDPolarity |= pEDIDDetailedTiming->ucFlags;
+                    wEDIDPolarity = ~(wEDIDPolarity);
+                    VESAEDIDTable[0].pRRTable->Attribute = wEDIDPolarity;
+                }
+                else
+                {
+                    VESAEDIDTable[0].pRRTable->Attribute = (NHS|PVS);
+                }
+                
+            }            
+            
+            LoadTiming(pCBIOSExtension, DISP2, ModeNum);
+
+            GetModePitch(DISP2, ModeNum, &Pitch);
+
+            SetPitch(DISP2, Pitch);
+            switch(Get_DEV_ID(DISP2))
+            {
+                case LCDIndex:
+                case LCD2Index:
+                     if(!Get_MODE_INFO_From_LCD_Table(ModeNum,&pModeInfo))
+                         Get_MODE_INFO_From_VESA_Table(ModeNum,&pModeInfo);
+                    break;
+                case HDMIIndex:
+                case HDMI2Index:
+                    if(!Get_MODE_INFO_From_HDMI_Table(ModeNum,&pModeInfo))
+                         Get_MODE_INFO_From_VESA_Table(ModeNum,&pModeInfo);
+                    break;
+               default: 
+                    Get_MODE_INFO_From_VESA_Table(ModeNum,&pModeInfo);
+                    break;
+            }
+
+            GetModeColorDepth(ModeNum, pModeInfo, &ColorDepth);
+
+            SetColorDepth(DISP2, ColorDepth);
+
+            
+
+            
+
+            
+            if(!(pCBIOSExtension->pCBiosArguments->CX & BIT15))
+            {
+                ClearFrameBuffer(DISP2, pCBIOSExtension->pVideoVirtualAddress, (DWORD)pModeInfo->H_Size, (DWORD)pModeInfo->V_Size, ColorDepth);
+            }
+            
+            SetFIFO(DISP2);
+
+            ConfigDigitalPort(DISP2);
+
+            TurnOnDigitalPort(DISP2);
+
+            
+
+            
+            TurnOnTxEncReg(DISP2,ucDevicePort);
+            
+            TurnOffDVPMask(ucDevicePort);
+
+            SequencerOn(DISP2);
+
+            VBEReturnStatus = VBEFunctionCallSuccessful;
+        }
+    }
+        
+    SetVBERerurnStatus(VBEReturnStatus, pCBIOSExtension->pCBiosArguments);
+    return TRUE;
+}
+
+CBStatus OEM_SetDevicePowerState (CBIOS_ARGUMENTS *pCBiosArguments)
+{
     
-#if CBIOS_DEBUG
-    xf86DrvMsgVerb(0, X_INFO, DefaultLevel, "==Exit OEM_SetRefreshRate() return 0x%x== \n", VBEFunctionCallSuccessful);
-#endif
-    return true;
-}
-
-CI_STATUS OEM_SetLCDPWMLevel (CBIOS_ARGUMENTS *pCBiosArguments)
-{
-    SetSRReg(0x2F,7,0xFF);
-    SetSRReg(0x30,pCBiosArguments->reg.lh.CL,0xFF);
-    return true;
-}
-
-CI_STATUS OEM_SetTVConfiguration (CBIOS_ARGUMENTS *pCBiosArguments)
-{
-    Set_TV_Confiuration(pCBiosArguments->reg.lh.CL);
-    SetVBERerurnStatus(VBEFunctionCallSuccessful, pCBiosArguments);
-    return true;
-}
-CI_STATUS OEM_SetTV2Configuration (CBIOS_ARGUMENTS *pCBiosArguments)
-{
-    return true;
-}
-CI_STATUS OEM_SetHDTVConnectType (CBIOS_ARGUMENTS *pCBiosArguments)
-{
-    return true;
-}
-CI_STATUS OEM_SetHDTV2ConnectType (CBIOS_ARGUMENTS *pCBiosArguments)
-{
-    return true;
-}
-CI_STATUS OEM_SetHDMIType (CBIOS_ARGUMENTS *pCBiosArguments)
-{
-    return true;
-}
-CI_STATUS OEM_SetHDMIOutputSignal (CBIOS_ARGUMENTS *pCBiosArguments)
-{
-    return true;
-}
-CI_STATUS OEM_SetHDMI2OutputSignal (CBIOS_ARGUMENTS *pCBiosArguments)
-{
-    return true;
-}
-
-CI_STATUS OEM_VideoPOST (CBIOS_ARGUMENTS *pCBiosArguments)
-{
-    UCHAR i = 0,btemp = 0x0,btemp1 = 0x0;
-    CI_STATUS bDDRII400 = true;
-    UCHAR *pucPOSTInItRegs = POSTInItRegs;
-    UCHAR *pucDDRII400Tbl = DDRII400Tbl;
-    UCHAR *pucDDRII533Tbl = DDRII533Tbl;
-    UCHAR *pucExtendRegs2 = ExtendRegs2;
-
-#if CBIOS_DEBUG
-    xf86DrvMsgVerb(0, X_INFO, DefaultLevel, "==Entry OEM_VideoPOST()== \n");
-#endif
-
+    BYTE display1DeviceID, display2DeviceID, TargetDevice, DMPSState;
+    WORD VBEReturnStatus = VBEFunctionCallFail;
     
-    btemp = InPort(RIO_VGA_ENABLE); 
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+    
+    TargetDevice = pCBiosArguments->CL & 0x0F;
+    
+        
+        
+        
+        
+    
+    DMPSState = pCBiosArguments->DX & (BIT1+BIT0);
+    
+    if(DMPSState<=DeviceOFF)
+    {
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        display1DeviceID = Get_DEV_ID(DISP1);
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        display2DeviceID = Get_DEV_ID(DISP2);
+        
+        if(display1DeviceID == TargetDevice)
+        {
+            
+                
+                
+                
+            SetDPMS(DMPSState, DISP1);
+            
+            switch(display1DeviceID)
+            {
+            
+            case LCDIndex:
+                
+                    
+                    
+                    
+                if(DMPSState)
+                    PowerSequenceOff();
+                else
+                    
+                    PowerSequenceOn();
+                break;
+            
+            case TVIndex:
+                
+                    
+                    
+                    
+                        
+                        
+                SetTVDACPower(DMPSState);
+                break;
+            
+            case DVIIndex:
+            case HDMIIndex:
+                
+                
+                    
+                    
+                    
+                if(DMPSState)
+                    TurnOffDigitalPort(DISP1);
+                else
+                    
+                    TurnOnDigitalPort(DISP1);
+                
+                break;
+            default:
+                break;
+            }
+            
+            VBEReturnStatus = VBEFunctionCallSuccessful;
+        }
+        
+        else if(display2DeviceID == TargetDevice)
+        {
+            
+                
+                
+                
+            SetDPMS(DMPSState, DISP2);
+            
+            switch(display1DeviceID)
+            {
+            
+            case LCDIndex:
+                
+                    
+                    
+                    
+                if(DMPSState)
+                    PowerSequenceOff();
+                else
+                    
+                    PowerSequenceOn();
+                break;
+            
+            case TVIndex:
+                
+                    
+                    
+                    
+                        
+                        
+                SetTVDACPower(DMPSState);
+                break;
+            
+            case DVIIndex:
+            case HDMIIndex:
+                
+                
+                    
+                    
+                    
+                if(DMPSState)
+                    TurnOffDigitalPort(DISP2);
+                else
+                    
+                    TurnOnDigitalPort(DISP2);
+                
+                break;
+            default:
+                break;
+            }
+            
+            VBEReturnStatus = VBEFunctionCallSuccessful;
+        }
+    }else
+        
+        VBEReturnStatus = VBEFunctionCallFail;
+    SetVBERerurnStatus(VBEReturnStatus, pCBiosArguments);
+    return TRUE;
+}
+
+CBStatus OEM_SetDisplay2Pitch(CBIOS_ARGUMENTS *pCBiosArguments)
+{
+    WORD    VBEReturnStatus = VBEFunctionCallFail;
+    WORD    wPitch;
+
+    wPitch = pCBiosArguments->CX;
+    SetPitch(DISP2, wPitch);
+    VBEReturnStatus = VBEFunctionCallSuccessful;
+    
+    SetVBERerurnStatus(VBEReturnStatus, pCBiosArguments);
+    return TRUE;
+}
+
+CBStatus OEM_SetRefreshRate(CBIOS_ARGUMENTS *pCBiosArguments)
+{
+    BYTE RRateID, DisplayPath;
+
+    RRateID = pCBiosArguments->CL & 0x7F;
+
+    if (pCBiosArguments->BX == SetDisplay1RefreshRate)
+        DisplayPath = DISP1;
+    else
+        DisplayPath = DISP2;
+
+    Set_RRATE_ID(RRateID, DisplayPath);
+    
+    SetVBERerurnStatus(VBEFunctionCallSuccessful, pCBiosArguments);
+    return TRUE;
+}
+
+CBStatus OEM_SetSetTVConfiguration(CBIOS_ARGUMENTS *pCBiosArguments)
+{
+    Set_TV_TYPE(pCBiosArguments->CL);
+    Set_TV_CONNECTION_TYPE(pCBiosArguments->CH);
+    return TRUE;
+}
+CBStatus OEM_SetTV2Configuration (CBIOS_ARGUMENTS *pCBiosArguments)
+{
+    return TRUE;
+}
+
+CBStatus OEM_SetHDMIType(CBIOS_ARGUMENTS *pCBiosArguments)
+{
+    Set_HDMI_TYPE(pCBiosArguments->CL);
+    SetVBERerurnStatus(VBEFunctionCallSuccessful, pCBiosArguments);
+    return TRUE;
+}
+CBStatus OEM_SetHDMIOutputSignal(CBIOS_ARGUMENTS *pCBiosArguments)
+{
+    Set_HDMI_Output_Signal(pCBiosArguments->CL);
+    SetVBERerurnStatus(VBEFunctionCallSuccessful, pCBiosArguments);
+    return TRUE;
+}
+
+CBStatus OEM_VideoPOST (PCBIOS_Extension pCBIOSExtension)
+{
+    BYTE i=0, btemp=0;
+    
+    
+    
+    
+    
+    btemp = InIOPort(VGA_ENABLE); 
     btemp |= 1;
-    OutPort(RIO_VGA_ENABLE,btemp);
+    OutIOPort(VGA_ENABLE,btemp);
 
     
-    btemp = InPort(MISC_READ); 
+    btemp = InIOPort(MISC_READ); 
     btemp |= 3;
-    OutPort(MISC_WRITE,btemp);
+    OutIOPort(MISC_WRITE,btemp);
     
     
-    SetCRReg(0x80, 0xA8, 0xFF);
+    OutIOPort(COLOR_CRTC_INDEX,0x80);
+    OutIOPort(COLOR_CRTC_DATA,0xA8);
+
+    
+    OutIOPort(COLOR_CRTC_INDEX,0xA1);
+    btemp = InIOPort(COLOR_CRTC_DATA);
+    btemp |= 4;
+    OutIOPort(COLOR_CRTC_DATA,btemp);
     
     
     for(i = 0x81;i < 0x9F;i++)
-    {
         SetCRReg(i, 0x00, 0xFF);
-    }
-
-    
-    
-    btemp = GetCRReg(0xAB);
-    if((btemp & 0x3) == 0x3)
-    {
-        bDDRII400 = false;
-    }
-
-    if(bDDRII400)
-    {
-        
-        SetCRReg(0xD9, 0x00, 0x80);
-        SetCRReg(0xD8, 0x9B, 0xFF);
-    }
-    else
-    {
-        
-        SetCRReg(0xD9, 0x80, 0x80);
-        SetCRReg(0xD8, 0x78, 0xFF);
-    }
     
     
     
@@ -3697,128 +4261,384 @@ CI_STATUS OEM_VideoPOST (CBIOS_ARGUMENTS *pCBiosArguments)
     
 
     
-    SerialLoadTable(&pucPOSTInItRegs, 0, 0);
+    SerialLoadTable(ExtendRegs);
 
     
-    Set_NEW_DEV_ID(0, DISP1);
+    SetCRReg(0xDF, 0x00, BIT2);
 
-    if(bDDRII400)
+    
+    
+    Set_NEW_DEV_ID(CRTIndex, DISP1);
+
+    CBIOSInitialI2CReg();
+    
+    CBIOSGetSupportDevice(pCBIOSExtension);
+
+    CBIOSUpdateDevSupFlag(pCBIOSExtension);
+
+    
+    if(pCBIOSExtension->dwSupportDevices & B_LCD)
+    {
+        CBIOSInitLCD(); 
+    }
+
+    if(pCBIOSExtension->dwSupportDevices & B_TV)
+    {
+        CBIOSInitTV(); 
+    }
+
+    if(pCBIOSExtension->dwSupportDevices & (B_HDMI|B_DVI))
     {
         
-        SerialLoadTable(&pucDDRII400Tbl, 0, 0);
+        
+        CBIOSSetTXType(pCBIOSExtension);
+    }
+
+    SetVBERerurnStatus(VBEFunctionCallSuccessful, pCBIOSExtension->pCBiosArguments);
+
+    return TRUE;
+}
+
+CBStatus OEM_VSetEDIDInModeTable(CBIOS_Extension *pCBIOSExtension)
+{
+    CBIOSEDID_DETAILED_TIMING *pEDIDDetailedTiming = (CBIOSEDID_DETAILED_TIMING*)pCBIOSExtension->pCBiosArguments->Ecx;
+
+    if(!pCBIOSExtension->pCBiosArguments->Ecx)
+    {
+        CBIOSDebugPrint((0, "CBIOS: Invalided EDID pointer !!\n"));
+        return FALSE;
+    }
+    
+    VESAEDIDTable[0].H_Size = pEDIDDetailedTiming->usHorDispEnd;
+    VESAEDIDTable[0].V_Size = pEDIDDetailedTiming->usVerDispEnd;
+
+    VESAEDIDTable[0].pRRTable->Clock = (ULONG)(pEDIDDetailedTiming->usPixelClock) * 10;
+    
+    VESAEDIDTable[0].pRRTable->H_Sync_End = 
+                   pEDIDDetailedTiming->usHorDispEnd +
+                   (USHORT)pEDIDDetailedTiming->ucHorBorder +
+                   pEDIDDetailedTiming->usHorSyncStart +
+                   pEDIDDetailedTiming->usHorSyncTime;
+
+    VESAEDIDTable[0].pRRTable->H_Sync_Start = 
+                    pEDIDDetailedTiming->usHorDispEnd + 
+                    (USHORT)pEDIDDetailedTiming->ucHorBorder +
+                    pEDIDDetailedTiming->usHorSyncStart;
+
+    VESAEDIDTable[0].pRRTable->H_Total = 
+                     pEDIDDetailedTiming->usHorDispEnd + 
+                     pEDIDDetailedTiming->usHorBlankingTime +
+                     (USHORT)pEDIDDetailedTiming->ucHorBorder * 2;
+    
+    VESAEDIDTable[0].pRRTable->RRate_ID = RR60;
+
+    VESAEDIDTable[0].pRRTable->V_Sync_End = 
+                    pEDIDDetailedTiming->usVerDispEnd +
+                    (USHORT)pEDIDDetailedTiming->ucVerBorder +
+                    pEDIDDetailedTiming->usVerSyncStart +
+                    pEDIDDetailedTiming->usVerSyncTime;
+
+    VESAEDIDTable[0].pRRTable->V_Sync_Start = 
+                    pEDIDDetailedTiming->usVerDispEnd + 
+                    (USHORT)pEDIDDetailedTiming->ucVerBorder +
+                    pEDIDDetailedTiming->usVerSyncStart;
+
+    VESAEDIDTable[0].pRRTable->V_Total = 
+                     pEDIDDetailedTiming->usVerDispEnd + 
+                     pEDIDDetailedTiming->usVerBlankingTime +
+                     (USHORT)pEDIDDetailedTiming->ucVerBorder * 2;
+
+    if ((pEDIDDetailedTiming->ucFlags & (BIT4+BIT3)) == 0x18)
+    {                   
+        VESAEDIDTable[0].pRRTable->Attribute = (WORD)(~(pEDIDDetailedTiming->ucFlags));
     }
     else
     {
-        
-        SerialLoadTable(&pucDDRII533Tbl, 0, 0);    
+        VESAEDIDTable[0].pRRTable->Attribute = (NHS|PVS);
     }
-
     
-    do{
-        btemp = GetCRReg(0x5D);
-        btemp &= 0x80;
-        btemp1 = GetCRReg(0x5E);
-        btemp1 &= 0x01;
-    }while((btemp != 0x80)||(btemp1 != 0x01));
-
-    
-    SerialLoadTable(&pucExtendRegs2, 0, 0);
-    
-#if CBIOS_DEBUG
-    xf86DrvMsgVerb(0, X_INFO, DefaultLevel, "==Exit OEM_VideoPOST()== \n");
-#endif
-    return true;
+    return TRUE;
 }
 
-void* SearchString(char *pcKeyWord, UCHAR *from)
+CBStatus VBE_SetMode(CBIOS_Extension *pCBIOSExtension)
 {
-    int i, lenKeyWord;
-
-    lenKeyWord = strlen(pcKeyWord);
-    for(i = 0; i < BIOS_ROM_SIZE; i++)
+    WORD    ModeNum = pCBIOSExtension->pCBiosArguments->BX & 0x01FF;
+    CBStatus    bUserSpecifiedTiming = ((pCBIOSExtension->pCBiosArguments->BX & BIT11) ? TRUE : FALSE);
+    CBIOSEDID_DETAILED_TIMING *pEDIDDetailedTiming = (CBIOSEDID_DETAILED_TIMING*)pCBIOSExtension->pCBiosArguments->Esi;
+    WORD    Pitch = 0, wEDIDPolarity=0;
+    USHORT  usModeWidth, usModeHeight;
+    MODE_INFO *pModeInfo = NULL;
+    BYTE    ColorDepth = 0, bTemp = 0;
+    WORD    VBEReturnStatus = VBEFunctionCallFail;
+    BYTE    ucDeviceID, ucDevicePort;
+        
+    if (ModeNum <= 0x13) 
     {
-        if ((*pcKeyWord == *(from+i)) && !memcmp(pcKeyWord, from+i, lenKeyWord))
+        VBEReturnStatus = VBEFunctionCallSuccessful;
+        CBIOSDebugPrint((0, "CBIOS: Invalided mode, Mode Num = %Xh\n", ModeNum));
+    }else
+    {
+        if (CheckForModeAvailable(ModeNum)||bUserSpecifiedTiming)
         {
-            return from+i;
+            Set_VESA_MODE(ModeNum, DISP1);
+            ucDeviceID = Get_DEV_ID(DISP1);
+            
+            
+            
+            
+            TurnOffScaler(DISP1);
+
+            
+            
+            
+            if(Get_DEV_ID(DISP1) != Get_NEW_DEV_ID(DISP1))
+            {
+                
+
+                
+                
+                
+                
+                Set_DEV_ID(Get_NEW_DEV_ID(DISP1), DISP1);
+            }
+
+            
+            ucDeviceID = Get_DEV_ID(DISP1);
+            ucDevicePort = GetDevicePort(ucDeviceID);
+
+            
+            LoadDisplay1VESAModeInitRegs();
+            
+            if(pEDIDDetailedTiming)
+            {
+                CBIOSDebugPrint((0, "CBIOS: Updating %d x %d EDID mode\n", pEDIDDetailedTiming->usHorDispEnd, pEDIDDetailedTiming->usVerDispEnd));
+                
+                VESAEDIDTable[0].H_Size = pEDIDDetailedTiming->usHorDispEnd;
+                VESAEDIDTable[0].V_Size = pEDIDDetailedTiming->usVerDispEnd;
+
+                VESAEDIDTable[0].pRRTable->Clock = (ULONG)(pEDIDDetailedTiming->usPixelClock) * 10;
+                
+                VESAEDIDTable[0].pRRTable->H_Sync_End = 
+                               pEDIDDetailedTiming->usHorDispEnd +
+                               (USHORT)pEDIDDetailedTiming->ucHorBorder +
+                               pEDIDDetailedTiming->usHorSyncStart +
+                               pEDIDDetailedTiming->usHorSyncTime;
+
+                VESAEDIDTable[0].pRRTable->H_Sync_Start = 
+                                pEDIDDetailedTiming->usHorDispEnd + 
+                                (USHORT)pEDIDDetailedTiming->ucHorBorder +
+                                pEDIDDetailedTiming->usHorSyncStart;
+
+                VESAEDIDTable[0].pRRTable->H_Total = 
+                                 pEDIDDetailedTiming->usHorDispEnd + 
+                                 pEDIDDetailedTiming->usHorBlankingTime +
+                                 (USHORT)pEDIDDetailedTiming->ucHorBorder * 2;
+                
+                VESAEDIDTable[0].pRRTable->RRate_ID = RR60;
+
+                VESAEDIDTable[0].pRRTable->V_Sync_End = 
+                                pEDIDDetailedTiming->usVerDispEnd +
+                                (USHORT)pEDIDDetailedTiming->ucVerBorder +
+                                pEDIDDetailedTiming->usVerSyncStart +
+                                pEDIDDetailedTiming->usVerSyncTime;
+
+                VESAEDIDTable[0].pRRTable->V_Sync_Start = 
+                                pEDIDDetailedTiming->usVerDispEnd + 
+                                (USHORT)pEDIDDetailedTiming->ucVerBorder +
+                                pEDIDDetailedTiming->usVerSyncStart;
+
+                VESAEDIDTable[0].pRRTable->V_Total = 
+                                 pEDIDDetailedTiming->usVerDispEnd + 
+                                 pEDIDDetailedTiming->usVerBlankingTime +
+                                 (USHORT)pEDIDDetailedTiming->ucVerBorder * 2;
+
+                if ((pEDIDDetailedTiming->ucFlags & (BIT4+BIT3)) == 0x18)
+                {                   
+                    bTemp = (~(pEDIDDetailedTiming->ucFlags));
+                    wEDIDPolarity = (WORD)bTemp;
+                    VESAEDIDTable[0].pRRTable->Attribute = wEDIDPolarity;
+                }
+                else
+                {
+                    VESAEDIDTable[0].pRRTable->Attribute = (NHS|PVS);
+                }
+
+            }
+
+            LoadTiming(pCBIOSExtension, DISP1, ModeNum);
+            
+            if(bUserSpecifiedTiming)
+            {
+                ColorDepth = pCBIOSExtension->pCBiosArguments->CL;
+                usModeWidth = VESAEDIDTable[0].H_Size;
+                usModeHeight = VESAEDIDTable[0].V_Size;
+                Pitch = (usModeWidth * ((USHORT)ColorDepth/8) + 7) & 0xFFF8;
+            }
+            else
+            {
+                GetModePitch(DISP1, ModeNum, &Pitch);
+
+                switch(ucDeviceID)
+                {
+                    case LCDIndex:
+                    case LCD2Index:
+                        if(!Get_MODE_INFO_From_LCD_Table(ModeNum,&pModeInfo))
+                             Get_MODE_INFO_From_VESA_Table(ModeNum,&pModeInfo);
+                        break;
+                    case HDMIIndex:
+                    case HDMI2Index:
+                        if(!Get_MODE_INFO_From_HDMI_Table(ModeNum,&pModeInfo))
+                             Get_MODE_INFO_From_VESA_Table(ModeNum,&pModeInfo);
+                        break;
+                    default: 
+                        Get_MODE_INFO_From_VESA_Table(ModeNum,&pModeInfo);
+                        break;
+                }
+
+                GetModeColorDepth(ModeNum, pModeInfo, &ColorDepth);
+
+                usModeWidth = pModeInfo->H_Size;
+                usModeHeight = pModeInfo->V_Size;
+            }
+            
+            SetPitch(DISP1, Pitch);
+
+            SetColorDepth(DISP1, ColorDepth);
+
+            
+            if(!(pCBIOSExtension->pCBiosArguments->BX & BIT15))
+            {
+                ClearFrameBuffer(DISP1, pCBIOSExtension->pVideoVirtualAddress, usModeWidth, usModeHeight, ColorDepth);
+            }
+            
+            SetFIFO(DISP1);
+
+            ConfigDigitalPort(DISP1);
+            
+            TurnOnDigitalPort(DISP1);
+
+            
+            
+            TurnOnTxEncReg(DISP1,ucDevicePort);
+
+            TurnOffDVPMask(ucDevicePort);
+            
+            SequencerOn(DISP1);
+
+            VBEReturnStatus = VBEFunctionCallSuccessful;
         }
     }
-
-    return NULL;
+    
+    SetVBERerurnStatus(VBEReturnStatus, pCBIOSExtension->pCBiosArguments);
+    return TRUE;
 }
 
-void ParseTable(char* pcKeyWord, UCHAR *from, UCHAR **pointer)
+CBStatus VBE_SetPitch(CBIOS_Extension *CBIOSExtension)
 {
-    *pointer = (UCHAR*)SearchString(pcKeyWord, from);
-    *pointer += strlen(pcKeyWord);
-}
+    WORD    VBEReturnStatus = VBEFunctionCallFail;
+    WORD    wPitch;
 
-CI_STATUS OEM_CINT10DataInit (CBIOS_ARGUMENTS *pCBiosArguments)
-{
-    xf86DrvMsgVerb(0, X_INFO, InfoLevel, "BIOS virtual = %x", pCBiosArguments->reg.ex.ECX);
     
-    ParseTable("PCFG", (UCHAR*)pCBiosArguments->reg.ex.ECX, (UCHAR**)(&pPortConfig));
-    xf86DrvMsgVerb(0, X_INFO, InfoLevel, "Port Config = %x", pPortConfig);
-    
-    ParseTable("VPIT", (UCHAR*)pCBiosArguments->reg.ex.ECX, (UCHAR**)(&pVESATable));
-    xf86DrvMsgVerb(0, X_INFO, InfoLevel, "VESA Table = %x", pVESATable);
-    
-    ParseTable("LCDTBL", (UCHAR*)pCBiosArguments->reg.ex.ECX, (UCHAR**)(&pLCDTable));
-    xf86DrvMsgVerb(0, X_INFO, InfoLevel, "LCD Table = %x", pLCDTable);
-
-    ParseTable("PCIR", (UCHAR*)pCBiosArguments->reg.ex.ECX, (UCHAR**)(&PCIDataStruct));
-    xf86DrvMsgVerb(0, X_INFO, InfoLevel, "PCI Data Struct = %x", PCIDataStruct);
-
-    BiosInfoData = (UCHAR*)pCBiosArguments->reg.ex.ECX;
-    xf86DrvMsgVerb(0, X_INFO, InfoLevel, "Bios info data (header) = %x", BiosInfoData);
-
-    ParseTable("D1INIT", (UCHAR*)pCBiosArguments->reg.ex.ECX, (UCHAR**)(&Display1VESAModeInitRegs));
-    xf86DrvMsgVerb(0, X_INFO, InfoLevel, "Display1 VESA Mode Init Regs = %x", Display1VESAModeInitRegs);
-
-    SetDeviceSupport();
-
-    if (*(USHORT*)(PCIDataStruct + OFF_DID) == 0x2012)
+    if(CBIOSExtension->pCBiosArguments->BL == 0x02)
     {
-        bDS_SUPPORT = true;
+        wPitch = CBIOSExtension->pCBiosArguments->CX;
+        SetPitch(DISP1, wPitch);
+        VBEReturnStatus = VBEFunctionCallSuccessful;
     }
     
-#if 0 
-    ParseTable("??????", &ExtendRegs);  
-    ParseTable("??????", &ExtendRegs2); 
-    ParseTable("??????", &DDRII400Tbl); 
-    ParseTable("??????", &DDRII533Tbl); 
-#endif
-    SetVBERerurnStatus(VBEFunctionCallSuccessful, pCBiosArguments);
+    SetVBERerurnStatus(VBEReturnStatus, CBIOSExtension->pCBiosArguments);
+    return TRUE;
 }
 
-CI_STATUS CInt10(CBIOS_Extension *pCBIOSExtension)
-{
-    CI_STATUS CInt10_Status = false;
-#if CBIOS_DEBUG
-    xf86DrvMsgVerb(0, X_INFO, DefaultLevel, "==Enter CInt10(EAX = %x, EBX = %x, ECX = %x, EDX = %x, ESI = %x, EDI = %x)==\n",
-                   pCBIOSExtension->pCBiosArguments->reg.ex.EAX, pCBIOSExtension->pCBiosArguments->reg.ex.EBX,
-                   pCBIOSExtension->pCBiosArguments->reg.ex.ECX, pCBIOSExtension->pCBiosArguments->reg.ex.EDX,
-                   pCBIOSExtension->pCBiosArguments->reg.ex.ESI, pCBIOSExtension->pCBiosArguments->reg.ex.EDI);
-#endif
 
+
+
+
+
+
+
+
+
+
+
+CBStatus VBE_AccessEDID(CBIOS_Extension *CBIOSExtension)
+{
+    BYTE bConnectStatus = FALSE, bValue = 0;
+    BYTE bI2C_PORT;
+    BYTE *bpEDIDBuffer,*bpEDIDOriBuffer;
+    DWORD dwEDIDBufferSize, dwCheckSum = 0, i = 0;
+
+    bpEDIDOriBuffer = (BYTE*)(CBIOSExtension->pCBiosArguments->Ebx);
+    bpEDIDBuffer = bpEDIDOriBuffer;
+    dwEDIDBufferSize = CBIOSExtension->pCBiosArguments->Ecx;
+    bI2C_PORT = (BYTE)(CBIOSExtension->pCBiosArguments->Edx);
 
     
-    Relocate_IOAddress = pCBIOSExtension->IOAddress;
+    CBIOSReadI2C(bI2C_PORT, MonitorEDID,(BYTE)0x12,&bValue);
 
-    switch(pCBIOSExtension->pCBiosArguments->reg.x.AX)
+    if(bValue > 0x1)
     {
-        case VBESetMode:
+        for(i = 0;i < dwEDIDBufferSize;i++)
+        {    
+            CBIOSReadI2C(bI2C_PORT, MonitorEDID,(BYTE)i,&bValue);
+            dwCheckSum += bValue;
+            *(bpEDIDBuffer++) = bValue;
+        }
+    }
+    else
+    {    
+        
+        for(i = 0;i < 128;i++)
+        {    
+            CBIOSReadI2C(bI2C_PORT, MonitorEDID,(BYTE)i,&bValue);
+            dwCheckSum += bValue;
+            *(bpEDIDBuffer++) = bValue;
+        }
+
+        for(i = 128;i < dwEDIDBufferSize;i++)
+        {    
+            CBIOSReadI2C(bI2C_PORT, MonitorEDID,(BYTE)i,&bValue);
+            *(bpEDIDBuffer++) = bValue;
+        }
+
+    }
+    
+    
+    if((dwCheckSum & 0xFF) == 0x0)
+    {
+        bConnectStatus = TRUE;
+    }
+    else
+    {
+        memset((void*)(bpEDIDOriBuffer), 0, sizeof(BYTE) * dwEDIDBufferSize);
+    }
+       
+    return bConnectStatus;
+}
+
+CBStatus CInt10(CBIOS_Extension *pCBIOSExtension)
+{
+    CBStatus CInt10_Status = FALSE;
+
+    
+    pRelated_IOAddress = pCBIOSExtension->pjIOAddress;
+    
+    switch(pCBIOSExtension->pCBiosArguments->AX)
+    {
+        case VBEFunction02:            
             CInt10_Status = VBE_SetMode(pCBIOSExtension);
             break;
-
-        case VBESetGetScanLineLength:
-            CInt10_Status = VBE_SetGetScanLineLength(pCBIOSExtension->pCBiosArguments);
+        case VBEFunction06:            
+            CInt10_Status = VBE_SetPitch(pCBIOSExtension);
             break;
-            
-        case OEMFunction:
-            switch(pCBIOSExtension->pCBiosArguments->reg.x.BX)
+        case VBEFunction15:            
+            CInt10_Status = VBE_AccessEDID(pCBIOSExtension);
+            break;
+        case OEMFunction:              
+            switch(pCBIOSExtension->pCBiosArguments->BX)
             {
                 case QueryBiosInfo:             
-                    CInt10_Status = OEM_QueryBiosInfo(pCBIOSExtension->pCBiosArguments);
+                    CInt10_Status = OEM_QueryBiosInfo(pCBIOSExtension);
                     break;
                 case QueryBiosCaps:             
                     CInt10_Status = OEM_QueryBiosCaps(pCBIOSExtension->pCBiosArguments);
@@ -3827,95 +4647,66 @@ CI_STATUS CInt10(CBIOS_Extension *pCBIOSExtension)
                     CInt10_Status = OEM_QueryExternalDeviceInfo(pCBIOSExtension->pCBiosArguments);
                     break;
                 case QueryDisplayPathInfo:      
-                    CInt10_Status = OEM_QueryDisplayPathInfo(pCBIOSExtension->pCBiosArguments);
+                    CInt10_Status = OEM_QueryDisplayPathInfo(pCBIOSExtension);
                     break;
                 case QueryDeviceConnectStatus:  
-                    CInt10_Status = OEM_QueryDeviceConnectStatus(pCBIOSExtension->pCBiosArguments);
+                    CInt10_Status = OEM_QueryDeviceConnectStatus(pCBIOSExtension);
                     break;
                 case QuerySupportedMode:        
                     CInt10_Status = OEM_QuerySupportedMode(pCBIOSExtension->pCBiosArguments);
                     break;
-                case QueryLCDPanelSizeMode:      
+                case QueryLCDPanelSizeMode:     
                     CInt10_Status = OEM_QueryLCDPanelSizeMode(pCBIOSExtension->pCBiosArguments);
                     break;
-                case QueryLCDPWMLevel:           
-                    CInt10_Status = OEM_QueryLCDPWMLevel(pCBIOSExtension->pCBiosArguments);
+                case QueryLCD2PanelSizeMode:    
+                    CInt10_Status = OEM_QueryLCD2PanelSizeMode(pCBIOSExtension->pCBiosArguments);
                     break;
-                case QueryTVConfiguration:       
+                case QueryTVConfiguration:      
                     CInt10_Status = OEM_QueryTVConfiguration(pCBIOSExtension->pCBiosArguments);
                     break;
-                case QueryTV2Configuration:
+                case QueryHDMISupportMode:      
+                    CInt10_Status = OEM_QueryHDMISupportedMode(pCBIOSExtension->pCBiosArguments);
                     break;
-                case QueryHDTVConfiguration:
-                    break;
-                case QueryHDTV2Configuration:
-                    break;
-                case QueryHDMIConfiguration:
-                    break;
-                case QueryHDMI2Configuration:
-                    break;
-                case QueryDisplay2Pitch:
-                case GetDisplay2MaxPitch:
-                    CInt10_Status = VBE_SetGetScanLineLength(pCBIOSExtension->pCBiosArguments);
-                    break;
-
                 case SetActiveDisplayDevice:    
                     CInt10_Status = OEM_SetActiveDisplayDevice(pCBIOSExtension->pCBiosArguments);
                     break;
-                case SetVESAModeForDisplay2:
+                case SetVESAModeForDisplay2:    
                     CInt10_Status = OEM_SetVESAModeForDisplay2(pCBIOSExtension);
                     break;
                 case SetDevicePowerState:       
                     CInt10_Status = OEM_SetDevicePowerState(pCBIOSExtension->pCBiosArguments);
                     break;
+                case SetDisplay2Pitch:          
+                    CInt10_Status = OEM_SetDisplay2Pitch(pCBIOSExtension->pCBiosArguments);
+                    break;
                 case SetDisplay1RefreshRate:    
                 case SetDisplay2RefreshRate:    
                     CInt10_Status = OEM_SetRefreshRate(pCBIOSExtension->pCBiosArguments);
                     break;
-                case SetLCDPWMLevel:            
-                    CInt10_Status = OEM_SetLCDPWMLevel(pCBIOSExtension->pCBiosArguments);
-                    break;
                 case SetTVConfiguration:        
-                    CInt10_Status = OEM_SetTVConfiguration(pCBIOSExtension->pCBiosArguments);
+                    CInt10_Status = OEM_SetSetTVConfiguration(pCBIOSExtension->pCBiosArguments);
                     break;
-                case SetHDTVConnectType:
+                case SetTVFunction:             
+                    CInt10_Status = OEM_SetSetTVFunction(pCBIOSExtension->pCBiosArguments);
                     break;
-                case SetHDTV2ConnectType:
+                case SetHDMIType:               
+                    CInt10_Status = OEM_SetHDMIType(pCBIOSExtension->pCBiosArguments);
                     break;
-                case SetHDMIType:
+                case SetHDMIOutputSignal:       
+                    CInt10_Status = OEM_SetHDMIOutputSignal(pCBIOSExtension->pCBiosArguments);
                     break;
-                case SetHDMI2Type:
+                case SetVideoPOST:              
+                    CInt10_Status = OEM_VideoPOST(pCBIOSExtension);
                     break;
-                case SetHDMIOutputSignal:
-                    break;
-                case SetHDMI2OutputSignal:
-                    break;
-                case SetDisplay2PitchInPixels:
-                case SetDisplay2PitchInBytes:
-                    CInt10_Status = VBE_SetGetScanLineLength(pCBIOSExtension->pCBiosArguments);
-                    break;
-                case SetVideoPOST:
-                    CInt10_Status = OEM_VideoPOST(pCBIOSExtension->pCBiosArguments);
-                    break;
-                case CINT10DataInit:
-                    CInt10_Status = OEM_CINT10DataInit(pCBIOSExtension->pCBiosArguments);
+                case SetEDIDInModeTable:        
+                    CInt10_Status = OEM_VSetEDIDInModeTable(pCBIOSExtension);
                     break;
                 default:
-                    pCBIOSExtension->pCBiosArguments->reg.x.AX = 0x014F;
+                    pCBIOSExtension->pCBiosArguments->AX = 0x014F;
                     break;
             }
             break;
-
-        default:
-            break;
     }
-#if CBIOS_DEBUG
-    xf86DrvMsgVerb(0, X_INFO, DefaultLevel, "==Exit CInt10(EAX = %x, EBX = %x, ECX = %x, EDX = %x, ESI = %x, EDI = %x)== \n",
-                   pCBIOSExtension->pCBiosArguments->reg.ex.EAX, pCBIOSExtension->pCBiosArguments->reg.ex.EBX,
-                   pCBIOSExtension->pCBiosArguments->reg.ex.ECX, pCBIOSExtension->pCBiosArguments->reg.ex.EDX,
-                   pCBIOSExtension->pCBiosArguments->reg.ex.ESI, pCBIOSExtension->pCBiosArguments->reg.ex.EDI);
-#endif
-    
     return CInt10_Status;
 } 
 

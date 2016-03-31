@@ -1,155 +1,83 @@
-/*
+/* 
  * Copyright (C) 2009 RDC Semiconductor Co.,Ltd
- * All Rights Reserved.
  *
- * Permission is hereby granted, free of charge, to any person obtaining a
- * copy of this software and associated documentation files (the
- * "Software"), to deal in the Software without restriction, including
- * without limitation the rights to use, copy, modify, merge, publish,
- * distribute, sub license, and/or sell copies of the Software, and to
- * permit persons to whom the Software is furnished to do so, subject to
- * the following conditions:
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
- * The above copyright notice and this permission notice (including the
- * next paragraph) shall be included in all copies or substantial portions
- * of the Software.
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
  *
- * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS
- * OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
- * MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NON-INFRINGEMENT.
- * IN NO EVENT SHALL PRECISION INSIGHT AND/OR ITS SUPPLIERS BE LIABLE FOR
- * ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,
- * TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE
- * SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+ * You should have received a copy of the GNU General Public License
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  * For technical support : 
  *     <rdc_xorg@rdc.com.tw>
  */
- 
+#include "BiosDef.h"
 
-
-#define     CBIOS_DEBUG             0
-
-
-#define VBEFunctionCallSuccessful   0x004F
-#define VBEFunctionCallFail         0x014F
-#define VBEFunctionCallNotSupported 0x024F
-#define VBEFunctionCallInvalid      0x034F
-
-
-
-#define VBESetMode                  0x4F02 
-#define VBESetGetScanLineLength     0x4F06
-#define OEMFunction                 0x4F14
-
-#define QueryBiosInfo               0x0000 
-#define QueryBiosCaps               0x0001
-#define QueryExternalDeviceInfo     0x0100
-#define QueryDisplayPathInfo        0x0200
-#define QueryDeviceConnectStatus    0x0201
-#define QuerySupportedMode          0x0202
-#define QueryLCDPanelSizeMode       0x0203
-#define QueryLCDPWMLevel            0x0301
-#define QueryTVConfiguration        0x0400
-#define QueryTV2Configuration       0x0480
-#define QueryHDTVConfiguration      0x0500
-#define QueryHDTV2Configuration     0x0580
-#define QueryHDMIConfiguration      0x0600
-#define QueryHDMI2Configuration     0x0680
-#define QueryDisplay2Pitch          0x0801
-#define GetDisplay2MaxPitch         0x0803
-
-
-#define SetActiveDisplayDevice      0x8200
-#define SetVESAModeForDisplay2      0x8202
-#define SetDevicePowerState         0x8203
-#define SetDisplay1RefreshRate      0x8301
-#define SetLCDPWMLevel              0x8302
-#define SetDisplay2RefreshRate      0x8381
-#define SetTVConfiguration          0x8400
-#define SetTV2Configuration         0x8480
-#define SetHDTVConnectType          0x8501
-#define SetHDTV2ConnectType         0x8581
-#define SetHDMIType                 0x8600
-#define SetHDMI2Type                0x8680
-#define SetHDMIOutputSignal         0x8601
-#define SetHDMI2OutputSignal        0x8681
-#define SetDisplay2PitchInPixels    0x8700
-#define SetDisplay2PitchInBytes     0x8782
-
-#define SetVideoPOST                0xF100
-#define CINT10DataInit              0xF101
-
-
-#define DISABLE              0x0001             
-#define NHS                  0x0002             
-#define PHS                  0
-#define NVS                  0x0004             
-#define PVS                  0
-#define HB                   0x0008             
-#define VB                   0x0010             
-#define RBK                  0x0020             
-#define ROT                  0x0040             
-#define EN_DIT               0x0080             
-#define MSB                  0x0100             
-#define _2_CH                0x0200             
-#define SW_PS                0x0400             
-
-
-#define BIOS_ROM_SIZE           32*1024
-
-
-typedef enum _CINT10STATUS {
-    false = 0,
-    true = 1
-} CI_STATUS;
+#ifndef _CINT10_H_
+#define _CINT10_H_
 
 typedef struct _CBIOS_ARGUMENTS {
     union
     {
-        struct EX
+        struct
         {
-            unsigned long   EAX;
-            unsigned long   EBX;
-            unsigned long   ECX;
-            unsigned long   EDX;
-            unsigned long   ESI;
-            unsigned long   EDI;
-        }ex;
+            DWORD   Eax;
+            DWORD   Ebx;
+            DWORD   Ecx;
+            DWORD   Edx;
+            DWORD   Esi;
+            DWORD   Edi;
+        };
 
-        struct X
+        struct
         {
-            unsigned short  AX;
-            unsigned short  dummy1;
-            unsigned short  BX;
-            unsigned short  dummy2;
-            unsigned short  CX;
-            unsigned short  dummy3;
-            unsigned short  DX;
-            unsigned short  dummy4;
-            unsigned short  SI;
-            unsigned short  dummy5;
-            unsigned short  DI;
-        }x;
+            WORD    AX;
+            WORD    dummy1;
+            WORD    BX;
+            WORD    dummy2;
+            WORD    CX;
+            WORD    dummy3;
+            WORD    DX;
+            WORD    dummy4;
+            WORD    SI;
+            WORD    dummy5;
+            WORD    DI;
+        };
 
-        struct LH
+        struct
         {
-            unsigned char   AL;
-            unsigned char   AH;
-            unsigned short  dummy6;
-            unsigned char   BL;
-            unsigned char   BH;
-            unsigned short  dummy7;
-            unsigned char   CL;
-            unsigned char   CH;
-            unsigned short  dummy8;
-            unsigned char   DL;
-            unsigned char   DH;
-            unsigned short  dummy9;
-        }lh;
-    }reg;
+            BYTE    AL;
+            BYTE    AH;
+            WORD    dummy6;
+            BYTE    BL;
+            BYTE    BH;
+            WORD    dummy7;
+            BYTE    CL;
+            BYTE    CH;
+            WORD    dummy8;
+            BYTE    DL;
+            BYTE    DH;
+            BYTE    dummy9;
+        };
+    };
 
 } CBIOS_ARGUMENTS;
+
+typedef struct _PLL_Info {
+    BYTE NS;
+    BYTE MS;
+    BYTE RS;
+}PLL_Info;
+
+
+typedef PLL_Info (*PFN_CBIOS_TransVGAPLL)    (DWORD);
+typedef void     (*PFN_CBIOS_SetVGAPLLReg)   (BYTE, PLL_Info);
 
 typedef struct _CBIOS_Extension {
 
@@ -157,9 +85,149 @@ typedef struct _CBIOS_Extension {
     CBIOS_ARGUMENTS *pCBiosArguments;
 
     
-    unsigned long   VideoVirtualAddress;
-    unsigned short  IOAddress;
-}CBIOS_Extension;
+    DWORD *pVideoVirtualAddress;         
+    DWORD pVideoPhysicialAddress;        
+    BYTE* pjIOAddress;                   
+    BYTE* pjROMLinearAddr;               
+    WORD wVenderID;
+    WORD wDeviceID;
+    DWORD ulVBIOS_Version;
+    WORD  wVBIOSBuildYear;
+    BYTE ucVBIOSBuildMonth;
+    BYTE ucVBIOSBuildDate;
+    DWORD dwSupportDevices;
+    
+    BYTE ucDisp1DevIndex;
+    BYTE ucDisp2DevIndex;
+    BYTE bPLLFromTVEnc;
+    BYTE bDuoView;                      
+    BYTE bEDIDValid;
+    WORD DisplayOneModeH;
+    WORD DisplayOneModeV;
+    WORD wCRTDefaultH;
+    WORD wCRTDefaultV;
+    
+    BYTE bLCDSupport;
+    BYTE bCRTSupport;
+    BYTE bHDMISupport;
+    BYTE bDVISupport;
+    BYTE bTVSupport;
+    
+    PFN_CBIOS_TransVGAPLL pfnCBIOS_TransVGAPLL;
+    PFN_CBIOS_SetVGAPLLReg pfnCBIOS_SetVGAPLLReg;
+} CBIOS_Extension,*PCBIOS_Extension;
 
-extern CI_STATUS CInt10(CBIOS_Extension *pCBIOSExtension);
+typedef struct _CBIOSEDID_DETAILED_TIMING {
+    BYTE    bValid;                         
+    USHORT  usPixelClock;                   
 
+    USHORT  usHorDispEnd;                   
+    USHORT  usHorBlankingTime;              
+    USHORT  usHorSyncStart;                 
+    USHORT  usHorSyncTime;                  
+    BYTE   ucHorBorder;                     
+    
+    USHORT  usVerDispEnd;                   
+    USHORT  usVerBlankingTime;              
+    USHORT  usVerSyncStart;                 
+    USHORT  usVerSyncTime;                  
+    BYTE   ucVerBorder;                     
+    BYTE   ucFlags;                         
+} CBIOSEDID_DETAILED_TIMING, *PCBIOSEDID_DETAILED_TIMING;
+
+typedef struct _CBIOSTVFun_Disp_Info
+{
+    BYTE    ucCCRSLevel;        
+    BYTE    ucHPosition;        
+    BYTE    ucVPosition;        
+    int     iHScaler;           
+    BYTE    ucVScaler;          
+    BYTE    bTVType;            
+    BYTE    bChange;            
+    BYTE    bEnableHPanning;    
+    WORD    wTVOut_HSize;       
+    WORD    wModeHres;          
+} CBIOSTVFun_Disp_Info,*PCBIOSTVFun_Disp_Info;
+
+
+#pragma   pack(push)
+#pragma   pack(1)
+
+typedef struct _RRATE_TABLE {
+    DWORD   Clock;          
+    BYTE    RRate_ID;
+    WORD    Attribute;
+    WORD    H_Total;
+    WORD    H_Sync_Start;
+    WORD    H_Sync_End;
+    WORD    V_Total;
+    WORD    V_Sync_Start;
+    WORD    V_Sync_End;
+} RRATE_TABLE;
+
+typedef struct _MODE_INFO{
+    WORD    H_Size;
+    WORD    V_Size;
+    WORD    Mode_ID_8bpp;
+    WORD    Mode_ID_16bpp;
+    WORD    Mode_ID_32bpp;
+    RRATE_TABLE *pRRTable;
+    BYTE    RRTableCount;
+} MODE_INFO;
+
+typedef struct _PANEL_TABLE {
+    WORD    TD0;
+    WORD    TD1;
+    WORD    TD2;
+    WORD    TD3;
+    WORD    TD5;
+    WORD    TD6;
+    WORD    TD7;
+    BYTE    PWM_Clock;
+    WORD    Reserved1;
+    WORD    Reserved2;
+    RRATE_TABLE Timing;
+} PANEL_TABLE;
+
+typedef struct _PANEL_INFO{
+    WORD    H_Size;
+    WORD    V_Size;
+    WORD    Mode_ID_8bpp;
+    WORD    Mode_ID_16bpp;
+    WORD    Mode_ID_32bpp;
+    BYTE    PanelTableCount;
+    PANEL_TABLE pPanelTable;
+} PANEL_INFO;
+
+typedef struct _REG_OP {
+    BYTE    RegGroup;
+    BYTE    RegMask;
+    BYTE    RegIndex;
+    BYTE    RegShiftBit;
+} REG_OP;
+
+typedef struct _REG_PACKAGE {
+    BYTE    RegGroup;
+    BYTE    RegIndex;
+    BYTE    RegValue;
+    BYTE    RegMask;
+} REG_PACKAGE;
+
+typedef struct _PORT_CONFIG {
+    BYTE    DeviceIndex;
+    BYTE    PortID;
+    BYTE    TX_ENC_ID;
+    WORD    TX_I2C_Port_Addr;
+    BYTE    Attribute;  
+} PORT_CONFIG;
+
+typedef struct _TxEncDetect
+{
+    BYTE    ucTxIndex;
+    BYTE    ucTxAddr;
+    BYTE    ucD_IDIndex;
+    BYTE    ucD_IDData;
+} TxEncDetect;
+#pragma   pack(pop)
+
+#endif
