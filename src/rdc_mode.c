@@ -1,31 +1,23 @@
-/*
+/* 
  * Copyright (C) 2009 RDC Semiconductor Co.,Ltd
- * All Rights Reserved.
  *
- * Permission is hereby granted, free of charge, to any person obtaining a
- * copy of this software and associated documentation files (the
- * "Software"), to deal in the Software without restriction, including
- * without limitation the rights to use, copy, modify, merge, publish,
- * distribute, sub license, and/or sell copies of the Software, and to
- * permit persons to whom the Software is furnished to do so, subject to
- * the following conditions:
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
- * The above copyright notice and this permission notice (including the
- * next paragraph) shall be included in all copies or substantial portions
- * of the Software.
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
  *
- * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS
- * OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
- * MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NON-INFRINGEMENT.
- * IN NO EVENT SHALL PRECISION INSIGHT AND/OR ITS SUPPLIERS BE LIABLE FOR
- * ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,
- * TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE
- * SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+ * You should have received a copy of the GNU General Public License
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  * For technical support : 
  *     <rdc_xorg@rdc.com.tw>
  */
- 
+
  
 #ifdef HAVE_CONFIG_H
 #include <config.h>
@@ -35,7 +27,6 @@
 #include "xf86_OSproc.h"
 #include "xf86cmap.h"
 #include "compiler.h"
-//#include "mibstore.h"
 #include "vgaHW.h"
 #include "mipointer.h"
 #include "micmap.h"
@@ -53,7 +44,9 @@
 #include "xf86fbman.h"
 
 
-//#include "xaa.h"
+#ifdef HAVE_XAA
+#include "xaa.h"
+#endif
 #include "xaarop.h"
 
 
@@ -61,6 +54,7 @@
 
 
 #include "rdc.h"
+#include "rdc_mode.h"
 
 RRateInfo RefreshRateMap[] = { {60.0f,  FALSE, 0},
                                {50.0f,  TRUE,  1},
@@ -82,9 +76,7 @@ RRateInfo RefreshRateMap[] = { {60.0f,  FALSE, 0},
 extern void vRDCOpenKey(ScrnInfoPtr pScrn);
 extern Bool bRDCRegInit(ScrnInfoPtr pScrn);
 
-#ifdef HWC
 extern Bool bInitHWC(ScrnInfoPtr pScrn, RDCRecPtr pRDC);
-#endif
 
 
 Bool RDCSetMode(ScrnInfoPtr pScrn, DisplayModePtr mode);
@@ -93,15 +85,14 @@ float fDifference(float Value1, float Value2);
 DisplayModePtr RDCBuildModePool(ScrnInfoPtr pScrn);
 Bool BTranslateIndexToRefreshRate(UCHAR ucRRateIndex, float *fRefreshRate);
 char* pcConvertResolutionToString(ULONG ulResolution);
-DisplayModePtr SearchDisplayModeRecPtr(DisplayModePtr pModePoolHead, CBIOS_ARGUMENTS CBiosArguments);
+DisplayModePtr SearchDisplayModeRecPtr(DisplayModePtr pModePoolHead, CBIOS_ARGUMENTS *pCBiosArguments);
 
 Bool
 RDCSetMode(ScrnInfoPtr pScrn, DisplayModePtr mode)
 {
     RDCRecPtr pRDC;
     MODE_PRIVATE *pModePrivate;
-    CBIOS_ARGUMENTS CBiosArguments;
-    CBIOS_Extension CBiosExtension;
+    CBIOS_ARGUMENTS *pCBiosArguments;
     USHORT usVESAMode;
     
     pRDC = RDCPTR(pScrn);
@@ -111,29 +102,40 @@ RDCSetMode(ScrnInfoPtr pScrn, DisplayModePtr mode)
 
     vRDCOpenKey(pScrn);
     bRDCRegInit(pScrn);
-
-    CBiosExtension.pCBiosArguments = &CBiosArguments;
-    CBiosExtension.IOAddress = (USHORT)(pRDC->RelocateIO);
-    CBiosExtension.VideoVirtualAddress = (ULONG)(pRDC->FBVirtualAddr);
+    
+    pCBiosArguments = pRDC->pCBIOSExtension->pCBiosArguments;
+    
+    
+    xf86DrvMsgVerb(pScrn->scrnIndex, X_INFO, DefaultLevel, " Set Display1 Refresh Rate \n");
 
     
-    CBiosArguments.reg.x.AX = OEMFunction;
-    CBiosArguments.reg.x.BX = SetDisplay1RefreshRate;
-    CBiosArguments.reg.lh.CL = pModePrivate->ucRRate_ID;
-    CInt10(&CBiosExtension);
+    memset(pCBiosArguments, 0, sizeof(CBIOS_ARGUMENTS));
+    pCBiosArguments->AX = OEMFunction;
+    pCBiosArguments->BX = SetDisplay1RefreshRate;
+    pCBiosArguments->CL = pModePrivate->ucRRate_ID;
+    
+    CInt10(pRDC->pCBIOSExtension);
 
     usVESAMode = usGetVbeModeNum(pScrn, mode);
+    xf86DrvMsgVerb(pScrn->scrnIndex, X_INFO, DefaultLevel, " RDCSetMode() Set VESA Mode 0x%x== \n",usVESAMode);
+    
+    memset(pCBiosArguments, 0, sizeof(CBIOS_ARGUMENTS));
+    pCBiosArguments->AX = VBEFunction02;
+    pCBiosArguments->BX = (0x4000 | usVESAMode);
+    
+    CInt10(pRDC->pCBIOSExtension);
     
     
-    CBiosArguments.reg.x.AX = VBESetMode;
-    CBiosArguments.reg.x.BX = (0x4000 | usVESAMode);
-    CInt10(&CBiosExtension);
+    memset(pCBiosArguments, 0, sizeof(CBIOS_ARGUMENTS));
+    pCBiosArguments->AX = VBEFunction06;
+    
+    pCBiosArguments->BL = 0x02;
+    
+    
+    pCBiosArguments->CX = (USHORT)((ALIGN_TO_UB_32(pScrn->displayWidth*pScrn->bitsPerPixel)) >> 3);
 
     
-    CBiosArguments.reg.x.AX = VBESetGetScanLineLength;
-    CBiosArguments.reg.lh.BL = 0x00;
-    CBiosArguments.reg.x.CX = (USHORT)(pScrn->displayWidth);
-    CInt10(&CBiosExtension);
+    CInt10(pRDC->pCBIOSExtension);
 
     
 
@@ -155,20 +157,54 @@ USHORT usGetVbeModeNum(ScrnInfoPtr pScrn, DisplayModePtr mode)
     xf86DrvMsgVerb(pScrn->scrnIndex, X_INFO, InfoLevel, "==Display Width=0x%x, Height=0x%x, Color Depth=0x%x==\n",
                mode->HDisplay,mode->VDisplay,pScrn->bitsPerPixel);
 
-
-    switch (ucColorDepth)
+    
+    if (pRDC->DeviceInfo.ucNewDeviceID == TVIndex && pRDC->bEnableTVPanning)
     {
+        WORD wHSize = pRDC->TVEncoderInfo[0].TVOut_HSize;
+        switch (ucColorDepth)
+        {
         case 8:
-            usVESAModeNum = pModePrivate->Mode_ID_8bpp;
+            if(wHSize == 640)
+                usVESAModeNum = 0x101;
+            else if(wHSize == 800)
+                usVESAModeNum = 0x103;
+            else
+                usVESAModeNum = 0x105;
             break;
-
         case 16:
-            usVESAModeNum = pModePrivate->Mode_ID_16bpp;
+            if(wHSize == 640)
+                usVESAModeNum = 0x111;
+            else if(wHSize == 800)
+                usVESAModeNum = 0x114;
+            else
+                usVESAModeNum = 0x117;
             break;
-
         case 32:
-            usVESAModeNum = pModePrivate->Mode_ID_32bpp;
+            if(wHSize == 640)
+                usVESAModeNum = 0x112;
+            else if(wHSize == 800)
+                usVESAModeNum = 0x115;
+            else
+                usVESAModeNum = 0x118;
             break;
+        }
+
+    }else
+    {
+        switch (ucColorDepth)
+        {
+            case 8:
+                usVESAModeNum = pModePrivate->Mode_ID_8bpp;
+                break;
+
+            case 16:
+                usVESAModeNum = pModePrivate->Mode_ID_16bpp;
+                break;
+
+            case 32:
+                usVESAModeNum = pModePrivate->Mode_ID_32bpp;
+                break;
+        }
     }
 
     xf86DrvMsgVerb(pScrn->scrnIndex, X_INFO, DefaultLevel, "==Exit usGetVbeModeNum() return VESA Mode = 0x%x==\n", usVESAModeNum);
@@ -180,36 +216,62 @@ DisplayModePtr RDCBuildModePool(ScrnInfoPtr pScrn)
 {
     DisplayModePtr pMode = NULL, pModePoolHead = NULL, pModePoolTail = NULL;
     
-    CBIOS_ARGUMENTS CBiosArguments;
-    CBIOS_Extension CBiosExtension;
+    CBIOS_ARGUMENTS *pCBiosArguments;
     RDCRecPtr pRDC = RDCPTR(pScrn);
     MODE_PRIVATE *pModePrivate;
     USHORT usSerialNum = 0;
     USHORT wLCDHorSize, wLCDVerSize;
     USHORT wVESAModeHorSize, wVESAModeVerSize;
     BYTE bColorDepth; 
+    BYTE bEnoughMem;
+    ULONG   ulModeMemSize;
+    
+    pRDC->ulMaxPitch = pRDC->ulMaxHeight = 0;
 
     xf86DrvMsgVerb(pScrn->scrnIndex, X_INFO, DefaultLevel, "==Enter RDCBuildModePool()== \n");
 
-    CBiosExtension.pCBiosArguments = &CBiosArguments;
-    CBiosExtension.IOAddress = (USHORT)(pRDC->RelocateIO);
-    CBiosExtension.VideoVirtualAddress = (ULONG)(pRDC->FBVirtualAddr);
+    
+    pCBiosArguments = pRDC->pCBIOSExtension->pCBiosArguments;
 
     do {
-        xf86DrvMsgVerb(pScrn->scrnIndex, X_INFO, 5, "Mode serial Num 0x%x\n",usSerialNum);
-
-        CBiosArguments.reg.x.AX = OEMFunction;
-        CBiosArguments.reg.x.BX = QuerySupportedMode;
-        CBiosArguments.reg.x.CX = usSerialNum++;
-        CInt10(&CBiosExtension);
-
-        wVESAModeHorSize = (USHORT)(CBiosArguments.reg.ex.EDX & 0x0000FFFF);
-        wVESAModeVerSize = (USHORT)(CBiosArguments.reg.ex.EDX >> 16);
+        xf86DrvMsgVerb(pScrn->scrnIndex, X_INFO, InfoLevel, "Mode serial Num 0x%x\n",usSerialNum);
 
         
-        if (CBiosArguments.reg.x.AX == VBEFunctionCallSuccessful)
+        memset(pCBiosArguments, 0, sizeof(CBIOS_ARGUMENTS));
+        pCBiosArguments->AX = OEMFunction;
+        pCBiosArguments->BX = QuerySupportedMode;
+        pCBiosArguments->CX = usSerialNum++;
+        
+        CInt10(pRDC->pCBIOSExtension);
+
+        wVESAModeHorSize = (USHORT)(pCBiosArguments->Edx & 0x0000FFFF);
+        wVESAModeVerSize = (USHORT)(pCBiosArguments->Edx >> 16);
+
+        
+        bEnoughMem = FALSE;
+        
+        
+        if (pScrn->bitsPerPixel == pCBiosArguments->CL)
         {
-            pMode = SearchDisplayModeRecPtr(pModePoolHead, CBiosArguments);
+            
+            
+            if (wVESAModeHorSize > pRDC->ulMaxPitch)
+                pRDC->ulMaxPitch = wVESAModeHorSize;
+                
+            if (wVESAModeVerSize > pRDC->ulMaxHeight)
+                pRDC->ulMaxHeight = wVESAModeVerSize;
+
+            ulModeMemSize = ALIGN_TO_UB_32(pRDC->ulMaxPitch * pCBiosArguments->CL >> 3);
+            ulModeMemSize = ulModeMemSize * pRDC->ulMaxHeight;
+            
+            if (pRDC->AvailableFBsize > ulModeMemSize)
+                bEnoughMem = TRUE;
+        }
+
+        
+        if (pCBiosArguments->AX == VBEFunctionCallSuccessful)
+        {
+            pMode = SearchDisplayModeRecPtr(pModePoolHead, pCBiosArguments);
 
             if (pMode == NULL)
             {
@@ -228,7 +290,7 @@ DisplayModePtr RDCBuildModePool(ScrnInfoPtr pScrn)
                 
                 pModePoolTail->next = NULL;
 
-                pModePoolTail->name = pcConvertResolutionToString(CBiosArguments.reg.ex.EDX);
+                pModePoolTail->name = pcConvertResolutionToString(pCBiosArguments->Edx);
 
                 pModePoolTail->status = MODE_OK;
                 pModePoolTail->type = M_T_BUILTIN;
@@ -240,48 +302,53 @@ DisplayModePtr RDCBuildModePool(ScrnInfoPtr pScrn)
                 pModePrivate = MODE_PRIVATE_PTR(pModePoolTail);
 
                 
-                pModePoolTail->Clock = pModePoolTail->SynthClock = CBiosArguments.reg.ex.EDI;
+                pModePoolTail->Clock = pModePoolTail->SynthClock = pCBiosArguments->Edi;
                 pModePoolTail->HDisplay = pModePoolTail->CrtcHDisplay = wVESAModeHorSize;
                 pModePoolTail->VDisplay = pModePoolTail->CrtcVDisplay = wVESAModeVerSize;
-                BTranslateIndexToRefreshRate(CBiosArguments.reg.lh.CH, &(pModePoolTail->VRefresh));
+                pModePoolTail->HTotal = (int)(pCBiosArguments->Esi & 0x0000FFFF);
+                pModePoolTail->VTotal = (int)(pCBiosArguments->Esi >> 16);
+ 
+                BTranslateIndexToRefreshRate(pCBiosArguments->CH, &(pModePoolTail->VRefresh));
                 
-                pModePoolTail->PrivFlags = (int)CBiosArguments.reg.x.SI;
-                pModePrivate->ucRRate_ID = CBiosArguments.reg.lh.CH;
+                pModePoolTail->PrivFlags = (int)pCBiosArguments->SI;
+                pModePrivate->ucRRate_ID = pCBiosArguments->CH;
             }
             else
             {
                 pModePrivate = MODE_PRIVATE_PTR(pMode);
             }
             
-            switch (CBiosArguments.reg.lh.CL)
+            switch (pCBiosArguments->CL)
             {
                 case 8:
-                    pModePrivate->Mode_ID_8bpp = CBiosArguments.reg.x.BX;
-                    xf86DrvMsgVerb(pScrn->scrnIndex, X_INFO, 5, "pModePrivate->Mode_ID_8bpp = 0x%x\n",pModePrivate->Mode_ID_8bpp);
+                    pModePrivate->Mode_ID_8bpp = pCBiosArguments->BX;
+                    xf86DrvMsgVerb(pScrn->scrnIndex, X_INFO, InfoLevel, "pModePrivate->Mode_ID_8bpp = 0x%x\n",pModePrivate->Mode_ID_8bpp);
                     break;
                 case 16:
-                    pModePrivate->Mode_ID_16bpp = CBiosArguments.reg.x.BX;
-                    xf86DrvMsgVerb(pScrn->scrnIndex, X_INFO, 5, "pModePrivate->Mode_ID_16bpp = 0x%x\n",pModePrivate->Mode_ID_16bpp);
+                    pModePrivate->Mode_ID_16bpp = pCBiosArguments->BX;
+                    xf86DrvMsgVerb(pScrn->scrnIndex, X_INFO, InfoLevel, "pModePrivate->Mode_ID_16bpp = 0x%x\n",pModePrivate->Mode_ID_16bpp);
                     break;
                 case 32:
-                    pModePrivate->Mode_ID_32bpp = CBiosArguments.reg.x.BX;
-                    xf86DrvMsgVerb(pScrn->scrnIndex, X_INFO, 5, "pModePrivate->Mode_ID_32bpp = 0x%x\n",pModePrivate->Mode_ID_32bpp);
+                    pModePrivate->Mode_ID_32bpp = pCBiosArguments->BX;
+                    xf86DrvMsgVerb(pScrn->scrnIndex, X_INFO, InfoLevel, "pModePrivate->Mode_ID_32bpp = 0x%x\n",pModePrivate->Mode_ID_32bpp);
                     break;
             }
         }
-    } while (CBiosArguments.reg.x.AX == VBEFunctionCallSuccessful);
+    } while (pCBiosArguments->AX == VBEFunctionCallSuccessful);
 
     
         for (bColorDepth = 0; bColorDepth < 3; bColorDepth++)
         {
-            CBiosArguments.reg.x.AX = OEMFunction;
-            CBiosArguments.reg.x.BX = QueryLCDPanelSizeMode;
-            CBiosArguments.reg.x.CX = bColorDepth;
-            CInt10(&CBiosExtension);
-
-            if (CBiosArguments.reg.x.AX == VBEFunctionCallSuccessful)
+            
+            memset(pCBiosArguments, 0, sizeof(CBIOS_ARGUMENTS));
+            pCBiosArguments->AX = OEMFunction;
+            pCBiosArguments->BX = QueryLCDPanelSizeMode;
+            pCBiosArguments->CX = bColorDepth;
+            
+            CInt10(pRDC->pCBIOSExtension);
+            if(pCBiosArguments->AX == VBEFunctionCallSuccessful)
             {
-                pMode = SearchDisplayModeRecPtr(pModePoolHead, CBiosArguments);
+                pMode = SearchDisplayModeRecPtr(pModePoolHead, pCBiosArguments);
 
                 if (pMode == NULL)
                 {
@@ -300,7 +367,7 @@ DisplayModePtr RDCBuildModePool(ScrnInfoPtr pScrn)
                     
                     pModePoolTail->next = NULL;
 
-                    pModePoolTail->name = pcConvertResolutionToString(CBiosArguments.reg.ex.EDX);
+                    pModePoolTail->name = pcConvertResolutionToString(pCBiosArguments->Edx);
 
                     pModePoolTail->status = MODE_OK;
                     pModePoolTail->type = M_T_BUILTIN;
@@ -312,30 +379,33 @@ DisplayModePtr RDCBuildModePool(ScrnInfoPtr pScrn)
                     pModePrivate = MODE_PRIVATE_PTR(pModePoolTail);
 
                     
-                    pModePoolTail->Clock = pModePoolTail->SynthClock = CBiosArguments.reg.ex.EDI;
-                    pModePoolTail->HDisplay = pModePoolTail->CrtcHDisplay = (CBiosArguments.reg.ex.EDX & 0x0000FFFF);
-                    pModePoolTail->VDisplay = pModePoolTail->CrtcVDisplay = (CBiosArguments.reg.ex.EDX >> 16);
-                    BTranslateIndexToRefreshRate(CBiosArguments.reg.lh.CH, &(pModePoolTail->VRefresh));
+                    pModePoolTail->Clock = pModePoolTail->SynthClock = pCBiosArguments->Edi;
+                    pModePoolTail->HDisplay = pModePoolTail->CrtcHDisplay = (pCBiosArguments->Edx & 0x0000FFFF);
+                    pModePoolTail->VDisplay = pModePoolTail->CrtcVDisplay = (pCBiosArguments->Edx >> 16);
+                    BTranslateIndexToRefreshRate(pCBiosArguments->CH, &(pModePoolTail->VRefresh));
                     
-                    pModePoolTail->PrivFlags = (int)CBiosArguments.reg.x.SI | LCD_TIMING;
-                    pModePrivate->ucRRate_ID = CBiosArguments.reg.lh.CH;
+                    pModePoolTail->PrivFlags = (int)pCBiosArguments->SI | LCD_TIMING;
+                    pModePrivate->ucRRate_ID = pCBiosArguments->CH;
                 }
                 else
                 {
                     pModePrivate = MODE_PRIVATE_PTR(pMode);
                 }
-                
-                switch (CBiosArguments.reg.lh.CL)
+
+                if (pModePoolTail->PrivFlags & LCD_TIMING)
                 {
-                    case 8:
-                        pModePrivate->Mode_ID_8bpp = CBiosArguments.reg.x.BX;
-                        break;
-                    case 16:
-                        pModePrivate->Mode_ID_16bpp = CBiosArguments.reg.x.BX;
-                        break;
-                    case 32:
-                        pModePrivate->Mode_ID_32bpp = CBiosArguments.reg.x.BX;
-                        break;
+                    switch (pCBiosArguments->CL)
+                    {
+                        case 8:
+                            pModePrivate->Mode_ID_8bpp  = pCBiosArguments->BX;
+                            break;
+                        case 16:
+                            pModePrivate->Mode_ID_16bpp = pCBiosArguments->BX;
+                            break;
+                        case 32:
+                            pModePrivate->Mode_ID_32bpp = pCBiosArguments->BX;
+                            break;
+                    }
                 }
                 
             }
@@ -419,22 +489,23 @@ char* pcConvertResolutionToString(ULONG ulResolution)
     return pcResolution;
 }
 
-DisplayModePtr SearchDisplayModeRecPtr(DisplayModePtr pModePoolHead, CBIOS_ARGUMENTS CBiosArguments)
+DisplayModePtr SearchDisplayModeRecPtr(DisplayModePtr pModePoolHead, CBIOS_ARGUMENTS *pCBiosArguments)
 {
     DisplayModePtr pMode = pModePoolHead;
     MODE_PRIVATE *pModePrivate;
     
-    xf86DrvMsgVerb(0, X_INFO, InternalLevel, "==Enter SearchDisplayModeRecPtr(CH = 0x%02X, EDX = 0x%08X, SI = 0x%X, EDI = %d)== \n", CBiosArguments.reg.lh.CH, CBiosArguments.reg.ex.EDX, CBiosArguments.reg.x.SI, CBiosArguments.reg.ex.EDI);
+    xf86DrvMsgVerb(0, X_INFO, InternalLevel, "==Enter SearchDisplayModeRecPtr(CH = 0x%02X, EDX = 0x%08X, SI = 0x%X, EDI = %d)== \n",
+        pCBiosArguments->CH, pCBiosArguments->Edx, pCBiosArguments->SI, pCBiosArguments->Edi);
     
     while(pMode != NULL)
     {
         pModePrivate = MODE_PRIVATE_PTR(pMode);
         
-        if ((pModePrivate->ucRRate_ID == CBiosArguments.reg.lh.CH) &&
-            (pMode->HDisplay == (int)(CBiosArguments.reg.ex.EDX & 0x0000FFFF)) &&
-            (pMode->VDisplay == (int)(CBiosArguments.reg.ex.EDX >>16)) &&
-            ((pMode->PrivFlags & 0xFFFF) == (int)CBiosArguments.reg.x.SI) &&
-            (pMode->Clock == CBiosArguments.reg.ex.EDI))
+        if ((pModePrivate->ucRRate_ID == pCBiosArguments->CH) &&
+            (pMode->HDisplay == (int)(pCBiosArguments->Edx & 0x0000FFFF)) &&
+            (pMode->VDisplay == (int)(pCBiosArguments->Edx >>16)) &&
+            ((pMode->PrivFlags & 0xFFFF) == (int)pCBiosArguments->SI) &&
+            (pMode->Clock == pCBiosArguments->Edi))
         {
             xf86DrvMsgVerb(0, X_INFO, InternalLevel, "==Exit1 SearchDisplayModeRecPtr()== \n");
             return pMode;
