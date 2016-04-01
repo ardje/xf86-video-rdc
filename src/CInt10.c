@@ -57,13 +57,13 @@ __inline BYTE InIOPort(WORD Index)
     return temp;                                                 
 }
 
-void ResetATTR()
+RDC_EXPORT void ResetATTR()
 {
     InPort(COLOR_INPUT_STATUS1_READ);
     InPort(MONO_INPUT_STATUS1_READ);
 }
 
-void EnableATTR()
+RDC_EXPORT void EnableATTR()
 {
     ResetATTR();
     OutPort(ATTR_DATA_WRITE, 0x20);
@@ -71,7 +71,7 @@ void EnableATTR()
 }
 
 
-void SetCRReg(BYTE bRegIndex, BYTE bRegValue, BYTE bMask)
+RDC_EXPORT void SetCRReg(BYTE bRegIndex, BYTE bRegValue, BYTE bMask)
 {
     BYTE btemp = 0x0,btemp1 = 0x0;
     
@@ -94,7 +94,7 @@ void SetCRReg(BYTE bRegIndex, BYTE bRegValue, BYTE bMask)
 }
 
 
-BYTE GetCRReg(BYTE bRegIndex)
+RDC_EXPORT BYTE GetCRReg(BYTE bRegIndex)
 {
     BYTE btemp = 0x0;
     
@@ -105,7 +105,7 @@ BYTE GetCRReg(BYTE bRegIndex)
 }
 
 
-void SetSRReg(BYTE bRegIndex, BYTE bRegValue, BYTE bMask)
+RDC_EXPORT void SetSRReg(BYTE bRegIndex, BYTE bRegValue, BYTE bMask)
 {
     BYTE btemp = 0x0,btemp1 = 0x0;
     
@@ -128,7 +128,7 @@ void SetSRReg(BYTE bRegIndex, BYTE bRegValue, BYTE bMask)
 }
 
 
-BYTE GetSRReg(BYTE bRegIndex)
+RDC_EXPORT BYTE GetSRReg(BYTE bRegIndex)
 {
     BYTE btemp = 0x0;
     
@@ -138,7 +138,7 @@ BYTE GetSRReg(BYTE bRegIndex)
     return btemp;
 }
 
-void SetARReg(BYTE index,BYTE value)
+RDC_EXPORT void SetARReg(BYTE index,BYTE value)
 {
     ResetATTR();
 
@@ -149,7 +149,7 @@ void SetARReg(BYTE index,BYTE value)
     OutPort(ATTR_DATA_WRITE,BIT5);
 }
 
-BYTE GetARReg(BYTE index)
+RDC_EXPORT BYTE GetARReg(BYTE index)
 {
     BYTE bTmp;
     InPort(COLOR_INPUT_STATUS1_READ);
@@ -161,7 +161,7 @@ BYTE GetARReg(BYTE index)
 }
 
 
-void SetGRReg(BYTE bRegIndex, BYTE bRegValue, BYTE bMask)
+RDC_EXPORT void SetGRReg(BYTE bRegIndex, BYTE bRegValue, BYTE bMask)
 {
     BYTE btemp = 0x0,btemp1 = 0x0;
     
@@ -183,13 +183,13 @@ void SetGRReg(BYTE bRegIndex, BYTE bRegValue, BYTE bMask)
     return;
 }
 
-void SetMSReg(BYTE bRegValue)
+RDC_EXPORT void SetMSReg(BYTE bRegValue)
 {
     OutPort(MISC_WRITE,bRegValue);
 }
 
 
-WORD ReadRegFromHW(REG_OP *pRegOp)
+RDC_EXPORT WORD ReadRegFromHW(REG_OP *pRegOp)
 {
     WORD wValue = 0x0;
     BYTE    btemp = 0x0, bMasktemp = 0x0;
@@ -234,7 +234,7 @@ WORD ReadRegFromHW(REG_OP *pRegOp)
 }
 
 
-void WriteRegToHW(REG_OP *pRegOp, WORD value)
+RDC_EXPORT void WriteRegToHW(REG_OP *pRegOp, WORD value)
 {
     BYTE btemp, btemp1;
     BYTE bCount;
@@ -290,7 +290,7 @@ void WriteRegToHW(REG_OP *pRegOp, WORD value)
 }
 
 
-BYTE AlignDataToLSB(BYTE Data, BYTE Mask)
+RDC_EXPORT BYTE AlignDataToLSB(BYTE Data, BYTE Mask)
 {
     Data &= Mask;
     
@@ -304,7 +304,7 @@ BYTE AlignDataToLSB(BYTE Data, BYTE Mask)
 }
 
 
-BYTE AlignDataToMask(BYTE Data, BYTE Mask)
+RDC_EXPORT BYTE AlignDataToMask(BYTE Data, BYTE Mask)
 {
     
     
@@ -318,7 +318,7 @@ BYTE AlignDataToMask(BYTE Data, BYTE Mask)
 }
 
 
-BYTE ReadScratch(WORD IndexMask)
+RDC_EXPORT BYTE ReadScratch(WORD IndexMask)
 {
     BYTE Index = (BYTE)(IndexMask >> 8);
     BYTE Mask = (BYTE)IndexMask;
@@ -333,7 +333,7 @@ BYTE ReadScratch(WORD IndexMask)
 }
 
 
-void WriteScratch(WORD IndexMask, BYTE Data)
+RDC_EXPORT void WriteScratch(WORD IndexMask, BYTE Data)
 {
     BYTE Index = (BYTE)(IndexMask >> 8);
     BYTE Mask = (BYTE)IndexMask;
@@ -344,12 +344,12 @@ void WriteScratch(WORD IndexMask, BYTE Data)
     SetCRReg(Index, Data, Mask);
 }
 
-BYTE Get_DEV_ID(BYTE DisplayPath)
+RDC_EXPORT BYTE Get_DEV_ID(BYTE DisplayPath)
 {
     return ((DisplayPath == DISP1) ? ReadScratch(IDX_IGA1_DEV_ID) : ReadScratch(IDX_IGA2_DEV_ID));
 }
 
-void Set_DEV_ID(BYTE DeviceID, BYTE DisplayPath)
+RDC_EXPORT void Set_DEV_ID(BYTE DeviceID, BYTE DisplayPath)
 {
     if (DisplayPath == DISP1)
         WriteScratch(IDX_IGA1_DEV_ID, DeviceID);
@@ -357,12 +357,12 @@ void Set_DEV_ID(BYTE DeviceID, BYTE DisplayPath)
         WriteScratch(IDX_IGA2_DEV_ID, DeviceID);
 }
 
-BYTE Get_NEW_DEV_ID(BYTE DisplayPath)
+RDC_EXPORT BYTE Get_NEW_DEV_ID(BYTE DisplayPath)
 {
     return ((DisplayPath == DISP1) ? ReadScratch(IDX_NEW_IGA1_DEV_ID) : ReadScratch(IDX_NEW_IGA2_DEV_ID));
 }
 
-void Set_NEW_DEV_ID(BYTE DeviceID, BYTE DisplayPath)
+RDC_EXPORT void Set_NEW_DEV_ID(BYTE DeviceID, BYTE DisplayPath)
 {
     if (DisplayPath == DISP1)
         WriteScratch(IDX_NEW_IGA1_DEV_ID, DeviceID);
@@ -370,7 +370,7 @@ void Set_NEW_DEV_ID(BYTE DeviceID, BYTE DisplayPath)
         WriteScratch(IDX_NEW_IGA2_DEV_ID, DeviceID);
 }
 
-DWORD Get_LCD_Panel_Size()
+RDC_EXPORT DWORD Get_LCD_Panel_Size()
 {
     DWORD dwLCDPanelSize=0;
     BYTE  ucHigh,ucLow;
@@ -383,7 +383,7 @@ DWORD Get_LCD_Panel_Size()
     return dwLCDPanelSize;
 }
 
-void  Set_LCD_Panel_Size(DWORD dwHres,DWORD dwVres)
+RDC_EXPORT void  Set_LCD_Panel_Size(DWORD dwHres,DWORD dwVres)
 {
     BYTE  ucHigh,ucLow;
     ucLow = (BYTE)dwHres;
@@ -396,7 +396,7 @@ void  Set_LCD_Panel_Size(DWORD dwHres,DWORD dwVres)
     WriteScratch(IDX_LCD_V_SIZE_OVERFLOW,ucHigh);
 }
 
-DWORD Get_LCD2_Panel_Size()
+RDC_EXPORT DWORD Get_LCD2_Panel_Size()
 {
     DWORD dwLCD2PanelSize=0;
     BYTE  ucHigh,ucLow;
@@ -409,7 +409,7 @@ DWORD Get_LCD2_Panel_Size()
     return dwLCD2PanelSize;
 }
 
-void  Set_LCD2_Panel_Size(DWORD dwHres,DWORD dwVres)
+RDC_EXPORT void  Set_LCD2_Panel_Size(DWORD dwHres,DWORD dwVres)
 {
     BYTE  ucHigh,ucLow;
     ucLow = (BYTE)dwHres;
@@ -422,12 +422,12 @@ void  Set_LCD2_Panel_Size(DWORD dwHres,DWORD dwVres)
     WriteScratch(IDX_LCD2_V_SIZE_OVERFLOW,ucHigh);
 }
 
-BYTE Get_RRATE_ID(BYTE DisplayPath)
+RDC_EXPORT BYTE Get_RRATE_ID(BYTE DisplayPath)
 {
     return ((DisplayPath == DISP1) ? ReadScratch(IDX_IGA1_RRATE_ID) : ReadScratch(IDX_IGA2_RRATE_ID));
 }
 
-void Set_RRATE_ID(BYTE RRateID, BYTE DisplayPath)
+RDC_EXPORT void Set_RRATE_ID(BYTE RRateID, BYTE DisplayPath)
 {
     if (DisplayPath == DISP1)
         WriteScratch(IDX_IGA1_RRATE_ID, RRateID);
@@ -435,7 +435,7 @@ void Set_RRATE_ID(BYTE RRateID, BYTE DisplayPath)
         WriteScratch(IDX_IGA2_RRATE_ID, RRateID);
 }
 
-WORD Get_VESA_MODE(BYTE DisplayPath)
+RDC_EXPORT WORD Get_VESA_MODE(BYTE DisplayPath)
 {
     BYTE VESAMode, VESAModeOver;
 
@@ -453,7 +453,7 @@ WORD Get_VESA_MODE(BYTE DisplayPath)
     return  ((WORD)VESAModeOver) << 8 | (WORD)VESAMode;
 }
 
-void Set_VESA_MODE(WORD ModeNum, BYTE DisplayPath)
+RDC_EXPORT void Set_VESA_MODE(WORD ModeNum, BYTE DisplayPath)
 {
     if (DisplayPath == DISP1)
     {
@@ -467,64 +467,64 @@ void Set_VESA_MODE(WORD ModeNum, BYTE DisplayPath)
     }
 }
 
-BYTE Get_LVDS_TX_ID()
+RDC_EXPORT BYTE Get_LVDS_TX_ID()
 {
     return ReadScratch(IDX_LVDS1_TX_ID);
 }
 
-void Set12BitDVP()
+RDC_EXPORT void Set12BitDVP()
 {
     SetSRReg(0x1E, 0x0, BIT3);
 }
 
-void Set24BitDVP()
+RDC_EXPORT void Set24BitDVP()
 {
     SetSRReg(0x1E, BIT3, BIT3);
 }
 
-void TurnOnCRTPad()
+RDC_EXPORT void TurnOnCRTPad()
 {
     SetCRReg(0xA8, 0x00, BIT7);
 }
 
-void TurnOffCRTPad()
+RDC_EXPORT void TurnOffCRTPad()
 {
     SetCRReg(0xA8, 0x80, BIT7);
 }
 
-void TurnOnDVP1Pad()
+RDC_EXPORT void TurnOnDVP1Pad()
 {
     SetCRReg(0xA3, 0x80, BIT7);
 }
 
-void TurnOffDVP1Pad()
+RDC_EXPORT void TurnOffDVP1Pad()
 {
     SetCRReg(0xA3, 0x00, BIT7);
 }
 
-void TurnOnDVP2Pad()
+RDC_EXPORT void TurnOnDVP2Pad()
 {
     SetCRReg(0xA3, 0x40, BIT6);
 }
 
-void TurnOffDVP2Pad()
+RDC_EXPORT void TurnOffDVP2Pad()
 {
     SetCRReg(0xA3, 0x00, BIT6);
 }
 
-void TurnOnDVP12Pad()
+RDC_EXPORT void TurnOnDVP12Pad()
 {
     TurnOnDVP1Pad();
     TurnOnDVP2Pad();
 }
 
-void TurnOffDVP12Pad()
+RDC_EXPORT void TurnOffDVP12Pad()
 {
     TurnOffDVP1Pad();
     TurnOffDVP2Pad();
 }
 
-void SequencerOn(BYTE DisplayPath)
+RDC_EXPORT void SequencerOn(BYTE DisplayPath)
 {
     if (DisplayPath == DISP1)
         SetSRReg(0x01, 0, BIT5);
@@ -532,7 +532,7 @@ void SequencerOn(BYTE DisplayPath)
         SetCRReg(0x33, 0, BIT0);
 }
 
-void SequencerOff(BYTE DisplayPath)
+RDC_EXPORT void SequencerOff(BYTE DisplayPath)
 {
     if (DisplayPath == DISP1)
         SetSRReg(0x01, BIT5, BIT5);
@@ -541,7 +541,7 @@ void SequencerOff(BYTE DisplayPath)
 }
 
 
-void WaitPowerSequenceDone()
+RDC_EXPORT void WaitPowerSequenceDone()
 {
     BYTE SR32;
      
@@ -551,7 +551,7 @@ void WaitPowerSequenceDone()
     while(SR32 == GetSRReg(0x32));
 }
 
-void PowerSequenceOn()
+RDC_EXPORT void PowerSequenceOn()
 {
     
     if (!(GetSRReg(0x11) & BIT0))
@@ -567,7 +567,7 @@ void PowerSequenceOn()
     }
 }
 
-void PowerSequenceOff()
+RDC_EXPORT void PowerSequenceOff()
 {
     
     if (GetSRReg(0x11) & BIT0)
@@ -583,37 +583,37 @@ void PowerSequenceOff()
     }
 }
 
-void TurnOnCRTMask()
+RDC_EXPORT void TurnOnCRTMask()
 {
     SetSRReg(0x31, BIT4, BIT4);
 }
 
-void TurnOffCRTMask()
+RDC_EXPORT void TurnOffCRTMask()
 {
     SetSRReg(0x31, 0, BIT4);
 }
 
-void TurnOnDVP1Mask()
+RDC_EXPORT void TurnOnDVP1Mask()
 {
     SetSRReg(0x31, 3, 3);
 }
 
-void TurnOffDVP1Mask()
+RDC_EXPORT void TurnOffDVP1Mask()
 {
     SetSRReg(0x31, 0, 3);
 }
 
-void TurnOnDVP2Mask()
+RDC_EXPORT void TurnOnDVP2Mask()
 {
     SetSRReg(0x31, 0xc, 0xc);
 }
 
-void TurnOffDVP2Mask()
+RDC_EXPORT void TurnOffDVP2Mask()
 {
     SetSRReg(0x31, 0, 0xc);
 }
 
-void TurnOnDVPMask(BYTE bDigitalDevice)
+RDC_EXPORT void TurnOnDVPMask(BYTE bDigitalDevice)
 {    
     switch (bDigitalDevice)
     {
@@ -636,7 +636,7 @@ void TurnOnDVPMask(BYTE bDigitalDevice)
     }
 }
 
-void TurnOffDVPMask(BYTE bDigitalDevice)
+RDC_EXPORT void TurnOffDVPMask(BYTE bDigitalDevice)
 {
     switch (bDigitalDevice)
     {
@@ -660,7 +660,7 @@ void TurnOffDVPMask(BYTE bDigitalDevice)
 
 }
 
-void UnLockTiming(BYTE DisplayPath)
+RDC_EXPORT void UnLockTiming(BYTE DisplayPath)
 {
     if (DisplayPath == DISP1)
         SetSRReg(0x65, 0, 0xFF);
@@ -668,7 +668,7 @@ void UnLockTiming(BYTE DisplayPath)
         SetSRReg(0x68, 0, 0xFF);
 }
 
-void LockTiming(BYTE DisplayPath)
+RDC_EXPORT void LockTiming(BYTE DisplayPath)
 {
     if (DisplayPath == DISP1)
         SetSRReg(0x65, 0xFF, 0xFF);
@@ -677,7 +677,7 @@ void LockTiming(BYTE DisplayPath)
 }
 
 
-void SetHTotal(BYTE DisplayPath, WORD Value)
+RDC_EXPORT void SetHTotal(BYTE DisplayPath, WORD Value)
 {
     
     Value -= 40;
@@ -695,7 +695,7 @@ void SetHTotal(BYTE DisplayPath, WORD Value)
 }
 
 
-void SetHDisplayEnd(BYTE DisplayPath, WORD Value)
+RDC_EXPORT void SetHDisplayEnd(BYTE DisplayPath, WORD Value)
 {
     
     Value -= 8;
@@ -714,7 +714,7 @@ void SetHDisplayEnd(BYTE DisplayPath, WORD Value)
 }
 
 
-void SetHBlankingStart(BYTE DisplayPath, WORD Value)
+RDC_EXPORT void SetHBlankingStart(BYTE DisplayPath, WORD Value)
 {
     
     Value -= 8;
@@ -733,7 +733,7 @@ void SetHBlankingStart(BYTE DisplayPath, WORD Value)
 }
 
 
-void SetHBlankingEnd(BYTE DisplayPath, WORD Value)
+RDC_EXPORT void SetHBlankingEnd(BYTE DisplayPath, WORD Value)
 {
     
     Value -= 8;
@@ -752,7 +752,7 @@ void SetHBlankingEnd(BYTE DisplayPath, WORD Value)
 }
 
 
-void SetHSyncStart(BYTE DisplayPath, WORD Value)
+RDC_EXPORT void SetHSyncStart(BYTE DisplayPath, WORD Value)
 {
     
     Value -= 0;
@@ -771,7 +771,7 @@ void SetHSyncStart(BYTE DisplayPath, WORD Value)
 }
 
 
-void SetHSyncEnd(BYTE DisplayPath, WORD Value)
+RDC_EXPORT void SetHSyncEnd(BYTE DisplayPath, WORD Value)
 {
     
     Value -= 0;
@@ -790,7 +790,7 @@ void SetHSyncEnd(BYTE DisplayPath, WORD Value)
 }
 
 
-void SetVTotal(BYTE DisplayPath, WORD Value)
+RDC_EXPORT void SetVTotal(BYTE DisplayPath, WORD Value)
 {
     
     Value -= 2;
@@ -809,7 +809,7 @@ void SetVTotal(BYTE DisplayPath, WORD Value)
 }
 
 
-void SetVDisplayEnd(BYTE DisplayPath, WORD Value)
+RDC_EXPORT void SetVDisplayEnd(BYTE DisplayPath, WORD Value)
 {
     
     Value -= 1;
@@ -828,7 +828,7 @@ void SetVDisplayEnd(BYTE DisplayPath, WORD Value)
 }
 
 
-void SetVBlankingStart(BYTE DisplayPath, WORD Value)
+RDC_EXPORT void SetVBlankingStart(BYTE DisplayPath, WORD Value)
 {
     
     Value -= 1;
@@ -847,7 +847,7 @@ void SetVBlankingStart(BYTE DisplayPath, WORD Value)
 }
 
 
-void SetVBlankingEnd(BYTE DisplayPath, WORD Value)
+RDC_EXPORT void SetVBlankingEnd(BYTE DisplayPath, WORD Value)
 {
     
     Value -= 1;
@@ -866,7 +866,7 @@ void SetVBlankingEnd(BYTE DisplayPath, WORD Value)
 }
 
 
-void SetVSyncStart(BYTE DisplayPath, WORD Value)
+RDC_EXPORT void SetVSyncStart(BYTE DisplayPath, WORD Value)
 {
     
     Value -= 1;
@@ -885,7 +885,7 @@ void SetVSyncStart(BYTE DisplayPath, WORD Value)
 }
 
 
-void SetVSyncEnd(BYTE DisplayPath, WORD Value)
+RDC_EXPORT void SetVSyncEnd(BYTE DisplayPath, WORD Value)
 {
     
     Value -= 1;
@@ -904,7 +904,7 @@ void SetVSyncEnd(BYTE DisplayPath, WORD Value)
 }
 
 
-void SetPixelClock(CBIOS_Extension *pCBIOSExtension, BYTE DisplayPath, DWORD Clock)
+RDC_EXPORT void SetPixelClock(CBIOS_Extension *pCBIOSExtension, BYTE DisplayPath, DWORD Clock)
 {
     PLL_Info PLLInfo;
     BYTE bPLLDiv=0;
@@ -921,7 +921,7 @@ void SetPixelClock(CBIOS_Extension *pCBIOSExtension, BYTE DisplayPath, DWORD Clo
     pCBIOSExtension->pfnCBIOS_SetVGAPLLReg(DisplayPath, PLLInfo);
 }
 
-DWORD Difference(DWORD Value1, DWORD Value2)
+RDC_EXPORT DWORD Difference(DWORD Value1, DWORD Value2)
 {
     if (Value1 > Value2)
         return (Value1 - Value2);
@@ -930,7 +930,7 @@ DWORD Difference(DWORD Value1, DWORD Value2)
 }
 
 
-PLL_Info ClockToPLLF4002A(DWORD Clock)
+RDC_EXPORT PLL_Info ClockToPLLF4002A(DWORD Clock)
 {
     DWORD MSCount, NSCount, RSCount, FCKVCO, FCKOUT;    
     DWORD NearestClock = 300000000; 
@@ -968,7 +968,7 @@ PLL_Info ClockToPLLF4002A(DWORD Clock)
 }
 
 
-PLL_Info ClockToPLLF9003A(DWORD Clock)
+RDC_EXPORT PLL_Info ClockToPLLF9003A(DWORD Clock)
 {
     DWORD MSCount, NSCount, RSCount, FCKVCO, FCKOUT;    
     DWORD NearestClock = 300000000; 
@@ -1008,7 +1008,7 @@ PLL_Info ClockToPLLF9003A(DWORD Clock)
 }
 
 
-void SetF9003APLLReg(BYTE DisplayPath, PLL_Info PLLInfo)
+RDC_EXPORT void SetF9003APLLReg(BYTE DisplayPath, PLL_Info PLLInfo)
 {
     BYTE RetValue; 
 
@@ -1032,7 +1032,7 @@ void SetF9003APLLReg(BYTE DisplayPath, PLL_Info PLLInfo)
 }
 
 
-void SetF4002APLLReg(BYTE DisplayPath, PLL_Info PLLInfo)
+RDC_EXPORT void SetF4002APLLReg(BYTE DisplayPath, PLL_Info PLLInfo)
 {
     BYTE RetValue; 
 
@@ -1056,7 +1056,7 @@ void SetF4002APLLReg(BYTE DisplayPath, PLL_Info PLLInfo)
 }
 
 
-void SetPolarity(BYTE DevicePort, WORD wValue)
+RDC_EXPORT void SetPolarity(BYTE DevicePort, WORD wValue)
 {
     BYTE ucTmpData = 0;
     wValue &= NCLK+NVS+NHS; 
@@ -1080,7 +1080,7 @@ void SetPolarity(BYTE DevicePort, WORD wValue)
 }
 
 
-void SetFIFO(BYTE DisplayPath)
+RDC_EXPORT void SetFIFO(BYTE DisplayPath)
 {
     if (DisplayPath == DISP1)
     {
@@ -1095,7 +1095,7 @@ void SetFIFO(BYTE DisplayPath)
 }
 
 
-void SetTimingRegs(CBIOS_Extension *pCBIOSExtension, BYTE DisplayPath, MODE_INFO *pModeInfo, RRATE_TABLE *pRRateTable)
+RDC_EXPORT void SetTimingRegs(CBIOS_Extension *pCBIOSExtension, BYTE DisplayPath, MODE_INFO *pModeInfo, RRATE_TABLE *pRRateTable)
 {
     WORD  Attribute    = pRRateTable->Attribute;
     BYTE ucDeviceID   = Get_DEV_ID(DisplayPath);
@@ -1136,7 +1136,7 @@ void SetTimingRegs(CBIOS_Extension *pCBIOSExtension, BYTE DisplayPath, MODE_INFO
     
 }
 
-void SetTimingCentering(CBIOS_Extension *pCBIOSExtension, BYTE DisplayPath, MODE_INFO *pModeInfo, RRATE_TABLE *pRRateTable)
+RDC_EXPORT void SetTimingCentering(CBIOS_Extension *pCBIOSExtension, BYTE DisplayPath, MODE_INFO *pModeInfo, RRATE_TABLE *pRRateTable)
 {
     WORD  Attribute    = pRRateTable->Attribute;
     WORD  wHDMITypeHSize =1280, wHDMITypeVSize =720;
@@ -1188,7 +1188,7 @@ void SetTimingCentering(CBIOS_Extension *pCBIOSExtension, BYTE DisplayPath, MODE
 }
 
 
-void SetPitch(BYTE DisplayPath, WORD Value)
+RDC_EXPORT void SetPitch(BYTE DisplayPath, WORD Value)
 {
     
     Value += 7;
@@ -1208,7 +1208,7 @@ void SetPitch(BYTE DisplayPath, WORD Value)
 }
 
 
-WORD GetPitch(BYTE DisplayPath)
+RDC_EXPORT WORD GetPitch(BYTE DisplayPath)
 {
     WORD wPitch;
     
@@ -1227,7 +1227,7 @@ WORD GetPitch(BYTE DisplayPath)
 }
 
 
-WORD GetVDisplayEnd(BYTE DisplayPath)
+RDC_EXPORT WORD GetVDisplayEnd(BYTE DisplayPath)
 {
     WORD  wDisplayEnd = 0x0;
     
@@ -1247,7 +1247,7 @@ WORD GetVDisplayEnd(BYTE DisplayPath)
 }
 
 
-void SetColorDepth(BYTE DisplayPath, BYTE Value)
+RDC_EXPORT void SetColorDepth(BYTE DisplayPath, BYTE Value)
 {
     BYTE bSetBit = 0x0;
 
@@ -1282,7 +1282,7 @@ void SetColorDepth(BYTE DisplayPath, BYTE Value)
     
 }
 
-void HandleShareConnector(BYTE *pDeviceIndex)
+RDC_EXPORT void HandleShareConnector(BYTE *pDeviceIndex)
 {
     
     if(*pDeviceIndex == DVIIndex)
@@ -1295,7 +1295,7 @@ void HandleShareConnector(BYTE *pDeviceIndex)
 }
 
 
-BYTE GetVBIOSBootUpDevice(WORD* ucDeiceBit)
+RDC_EXPORT BYTE GetVBIOSBootUpDevice(WORD* ucDeiceBit)
 {
     BYTE i;
     *ucDeiceBit = 0;
@@ -1319,7 +1319,7 @@ BYTE GetVBIOSBootUpDevice(WORD* ucDeiceBit)
 }
 
 
-BYTE GetDevicePort(BYTE DeviceIndex)
+RDC_EXPORT BYTE GetDevicePort(BYTE DeviceIndex)
 {
     BYTE i;
     HandleShareConnector(&DeviceIndex);
@@ -1332,7 +1332,7 @@ BYTE GetDevicePort(BYTE DeviceIndex)
 }
 
 
-void ConfigDigitalPort(BYTE DisplayPath)
+RDC_EXPORT void ConfigDigitalPort(BYTE DisplayPath)
 {
     BYTE bDigitalDevice = 0x0, bSetValue = 0x0, DeviceIndex = 0x0;
     
@@ -1375,7 +1375,7 @@ void ConfigDigitalPort(BYTE DisplayPath)
 }
 
 
-void CheckLCDSyncStartValue(BYTE DisplayPath) 
+RDC_EXPORT void CheckLCDSyncStartValue(BYTE DisplayPath) 
 {
     WORD wCheckData;
     wCheckData = LCDTable[0].pPanelTable.Timing.H_Sync_Start + 64;
@@ -1385,7 +1385,7 @@ void CheckLCDSyncStartValue(BYTE DisplayPath)
     }
 }
 
-BYTE bHDMIUnscan(BYTE ucHDMIType)
+RDC_EXPORT BYTE bHDMIUnscan(BYTE ucHDMIType)
 {
     WORD wHSize, wVSize;
     if(ucHDMIType==HDMI1080P)
@@ -1405,7 +1405,7 @@ BYTE bHDMIUnscan(BYTE ucHDMIType)
 }
 
 
-void SetDisplay1UpScalingFactor(MODE_INFO *pModeInfo, MODE_INFO *pPanelInfo)
+RDC_EXPORT void SetDisplay1UpScalingFactor(MODE_INFO *pModeInfo, MODE_INFO *pPanelInfo)
 {
     WORD  wScalingVector=0;
     BYTE  ucScalingCTLReg = (GetSRReg(0x58)&0xF8);
@@ -1442,7 +1442,7 @@ void SetDisplay1UpScalingFactor(MODE_INFO *pModeInfo, MODE_INFO *pPanelInfo)
 }
 
 
-void SetDisplay2UpScalingFactor(MODE_INFO *pModeInfo, MODE_INFO *pPanelInfo)
+RDC_EXPORT void SetDisplay2UpScalingFactor(MODE_INFO *pModeInfo, MODE_INFO *pPanelInfo)
 {
     WORD  wScalingVector=0;
     BYTE  ucScalingCTLReg = (GetSRReg(0x50)&0xF8);
@@ -1479,7 +1479,7 @@ void SetDisplay2UpScalingFactor(MODE_INFO *pModeInfo, MODE_INFO *pPanelInfo)
 }
 
 
-void SetDisplay1DownScalingFactor(MODE_INFO *pModeInfo, MODE_INFO *pPanelInfo)
+RDC_EXPORT void SetDisplay1DownScalingFactor(MODE_INFO *pModeInfo, MODE_INFO *pPanelInfo)
 {
     WORD  wScalingVector=0;
     
@@ -1516,7 +1516,7 @@ void SetDisplay1DownScalingFactor(MODE_INFO *pModeInfo, MODE_INFO *pPanelInfo)
 }
 
 
-CBStatus Get_MODE_INFO_From_VESA_Table(WORD ModeNum, MODE_INFO **ppModeInfo)
+RDC_EXPORT CBStatus Get_MODE_INFO_From_VESA_Table(WORD ModeNum, MODE_INFO **ppModeInfo)
 {
     MODE_INFO *pModeTemp = VESATable;
     CBStatus    bCheck = FALSE;
@@ -1540,7 +1540,7 @@ CBStatus Get_MODE_INFO_From_VESA_Table(WORD ModeNum, MODE_INFO **ppModeInfo)
 }
 
 
-CBStatus Get_MODE_INFO_From_HDMI_Table(WORD ModeNum, MODE_INFO **ppModeInfo)
+RDC_EXPORT CBStatus Get_MODE_INFO_From_HDMI_Table(WORD ModeNum, MODE_INFO **ppModeInfo)
 {
     MODE_INFO *pModeTemp = HDMITable;
     CBStatus    bCheck = FALSE;
@@ -1564,7 +1564,7 @@ CBStatus Get_MODE_INFO_From_HDMI_Table(WORD ModeNum, MODE_INFO **ppModeInfo)
 }
 
 
-CBStatus Get_MODE_INFO_From_LCD_Table(WORD ModeNum, MODE_INFO **ppModeInfo)
+RDC_EXPORT CBStatus Get_MODE_INFO_From_LCD_Table(WORD ModeNum, MODE_INFO **ppModeInfo)
 {
     *ppModeInfo = (MODE_INFO *)LCDTable;   
     if((((*ppModeInfo)->Mode_ID_8bpp) == ModeNum)||
@@ -1576,7 +1576,7 @@ CBStatus Get_MODE_INFO_From_LCD_Table(WORD ModeNum, MODE_INFO **ppModeInfo)
 }
 
 
-CBStatus GetModePointerFromVESATable(WORD ModeNum, BYTE RRIndex, MODE_INFO **ppModeInfo, RRATE_TABLE **ppRRateTable)
+RDC_EXPORT CBStatus GetModePointerFromVESATable(WORD ModeNum, BYTE RRIndex, MODE_INFO **ppModeInfo, RRATE_TABLE **ppRRateTable)
 {
     RRATE_TABLE* pRRateTable_temp = NULL;
     MODE_INFO *pModeInfo_temp = NULL;
@@ -1614,7 +1614,7 @@ CBStatus GetModePointerFromVESATable(WORD ModeNum, BYTE RRIndex, MODE_INFO **ppM
 }
 
 
-CBStatus GetModePointerFromHDMITable(WORD ModeNum, BYTE RRIndex, MODE_INFO **ppModeInfo, RRATE_TABLE **ppRRateTable)
+RDC_EXPORT CBStatus GetModePointerFromHDMITable(WORD ModeNum, BYTE RRIndex, MODE_INFO **ppModeInfo, RRATE_TABLE **ppRRateTable)
 {
     RRATE_TABLE* pRRateTable_temp = NULL;
     MODE_INFO *pModeInfo_temp = NULL;
@@ -1652,7 +1652,7 @@ CBStatus GetModePointerFromHDMITable(WORD ModeNum, BYTE RRIndex, MODE_INFO **ppM
 }
 
 
-void LoadVESATiming(CBIOS_Extension *pCBIOSExtension, BYTE DisplayPath, WORD ModeNum)
+RDC_EXPORT void LoadVESATiming(CBIOS_Extension *pCBIOSExtension, BYTE DisplayPath, WORD ModeNum)
 {
     BYTE bR_Rate_value = 0x0;
     MODE_INFO *pModeInfo = NULL, *pRefMode = NULL;
@@ -1741,7 +1741,7 @@ void LoadVESATiming(CBIOS_Extension *pCBIOSExtension, BYTE DisplayPath, WORD Mod
 }
 
 
-void LoadLCDTiming(CBIOS_Extension *pCBIOSExtension, BYTE DisplayPath, WORD ModeNum)
+RDC_EXPORT void LoadLCDTiming(CBIOS_Extension *pCBIOSExtension, BYTE DisplayPath, WORD ModeNum)
 {
     MODE_INFO pModeInfo;
     MODE_INFO *pMode = NULL;
@@ -1772,7 +1772,7 @@ void LoadLCDTiming(CBIOS_Extension *pCBIOSExtension, BYTE DisplayPath, WORD Mode
 }
 
 
-void LoadHDMITiming(CBIOS_Extension *pCBIOSExtension, BYTE DisplayPath, WORD ModeNum)
+RDC_EXPORT void LoadHDMITiming(CBIOS_Extension *pCBIOSExtension, BYTE DisplayPath, WORD ModeNum)
 {
     BYTE bR_Rate_value = 0x0, bType= 0;
     MODE_INFO *pModeInfo = NULL, *pMode = NULL;
@@ -1818,7 +1818,7 @@ void LoadHDMITiming(CBIOS_Extension *pCBIOSExtension, BYTE DisplayPath, WORD Mod
 }
 
 
-void LoadTiming(CBIOS_Extension *pCBIOSExtension, BYTE DisplayPath, WORD ModeNum)
+RDC_EXPORT void LoadTiming(CBIOS_Extension *pCBIOSExtension, BYTE DisplayPath, WORD ModeNum)
 {
     BYTE ucDevice;
     ucDevice = Get_DEV_ID(DisplayPath);
@@ -1854,7 +1854,7 @@ void LoadTiming(CBIOS_Extension *pCBIOSExtension, BYTE DisplayPath, WORD ModeNum
 }
 
 
-CBStatus GetModeColorDepth(WORD ModeNum, MODE_INFO *pModeInfo, BYTE *pColorDepth)
+RDC_EXPORT CBStatus GetModeColorDepth(WORD ModeNum, MODE_INFO *pModeInfo, BYTE *pColorDepth)
 {
     if(pModeInfo->Mode_ID_8bpp == ModeNum)
     {
@@ -1880,7 +1880,7 @@ CBStatus GetModeColorDepth(WORD ModeNum, MODE_INFO *pModeInfo, BYTE *pColorDepth
     
 }
 
-CBStatus GetModePitch(BYTE DisplayPath, WORD ModeNum, WORD *pPitch)
+RDC_EXPORT CBStatus GetModePitch(BYTE DisplayPath, WORD ModeNum, WORD *pPitch)
 {
     MODE_INFO* pModeInfo = NULL;
     BYTE ColorDepth = 0, ucDevice;
@@ -1929,21 +1929,21 @@ CBStatus GetModePitch(BYTE DisplayPath, WORD ModeNum, WORD *pPitch)
 }
 
 
-void UnLockCR0ToCR7()
+RDC_EXPORT void UnLockCR0ToCR7()
 {
     
     SetCRReg(0x11, 0x00, BIT7);
 }
 
 
-void LockCR0ToCR7()
+RDC_EXPORT void LockCR0ToCR7()
 {
     
     SetCRReg(0x11, 0x80, BIT7);
 }
 
 
-CBStatus CheckForModeAvailable(WORD ModeNum)
+RDC_EXPORT CBStatus CheckForModeAvailable(WORD ModeNum)
 {
     CBStatus bStatus;
     MODE_INFO *pModeInfo = NULL;
@@ -1956,7 +1956,7 @@ CBStatus CheckForModeAvailable(WORD ModeNum)
 }
 
 
-void TurnOnDigitalPort(BYTE DisplayPath)
+RDC_EXPORT void TurnOnDigitalPort(BYTE DisplayPath)
 {
     BYTE DeviceIndex, DevicePort;
     
@@ -1987,7 +1987,7 @@ void TurnOnDigitalPort(BYTE DisplayPath)
 }
 
 
-void TurnOffDigitalPort(BYTE DisplayPath)
+RDC_EXPORT void TurnOffDigitalPort(BYTE DisplayPath)
 {
     BYTE DeviceIndex, DevicePort;
     
@@ -2017,7 +2017,7 @@ void TurnOffDigitalPort(BYTE DisplayPath)
     }    
 }
 
-BYTE GetDevicePortConfig(BYTE DeviceIndex)
+RDC_EXPORT BYTE GetDevicePortConfig(BYTE DeviceIndex)
 {
     BYTE i;
     BYTE Result = 0;
@@ -2041,7 +2041,7 @@ BYTE GetDevicePortConfig(BYTE DeviceIndex)
 }
 
 
-BYTE GetPortConnectPath(BYTE PortType)
+RDC_EXPORT BYTE GetPortConnectPath(BYTE PortType)
 {
     BYTE SR1F, PortMask;
 
@@ -2069,7 +2069,7 @@ BYTE GetPortConnectPath(BYTE PortType)
 }
 
 
-WORD TransDevIDtoBit(BYTE DeviceIndex)
+RDC_EXPORT WORD TransDevIDtoBit(BYTE DeviceIndex)
 {
     if(DeviceIndex == LCDIndex)
         return B_LCD;
@@ -2077,7 +2077,7 @@ WORD TransDevIDtoBit(BYTE DeviceIndex)
     return (1 << (DeviceIndex - 1));
 }
 
-void TurnOnScaler(BYTE DisplayPath)
+RDC_EXPORT void TurnOnScaler(BYTE DisplayPath)
 {
     if (DisplayPath == DISP1)
         SetSRReg(0x58, BIT0, BIT0);
@@ -2085,7 +2085,7 @@ void TurnOnScaler(BYTE DisplayPath)
         SetSRReg(0x50, BIT0, BIT0);
 }
 
-void TurnOffScaler(BYTE DisplayPath)
+RDC_EXPORT void TurnOffScaler(BYTE DisplayPath)
 {
     if (DisplayPath == DISP1)
         SetSRReg(0x58, 0, BIT0);
@@ -2095,7 +2095,7 @@ void TurnOffScaler(BYTE DisplayPath)
     SetSRReg(0x74, 0, BIT7);
 }
 
-void SetDPAReg(BYTE ucDPADelay, BYTE ucDeviceID)
+RDC_EXPORT void SetDPAReg(BYTE ucDPADelay, BYTE ucDeviceID)
 {
     BYTE bDigitalDevice = GetDevicePort(ucDeviceID);
     if(bDigitalDevice & DVP1)
@@ -2105,13 +2105,13 @@ void SetDPAReg(BYTE ucDPADelay, BYTE ucDeviceID)
         SetSRReg(0x21, ucDPADelay, 0x38);
 }
 
-void SetDrivingReg(BYTE ucDrivingStatus)
+RDC_EXPORT void SetDrivingReg(BYTE ucDrivingStatus)
 {
     SetSRReg(SR4A, ucDrivingStatus, BIT0+BIT1);
 }
 
 
-void SerialLoadTable(REG_PACKAGE *pREG_PACKAGE_Table)
+RDC_EXPORT void SerialLoadTable(REG_PACKAGE *pREG_PACKAGE_Table)
 {
     REG_PACKAGE *pTemp_Reg = pREG_PACKAGE_Table;
     
@@ -2142,7 +2142,7 @@ void SerialLoadTable(REG_PACKAGE *pREG_PACKAGE_Table)
 
 }
 
-void LoadDisplay1VESAModeInitRegs()
+RDC_EXPORT void LoadDisplay1VESAModeInitRegs()
 {
     OutPort(MISC_WRITE, 0x2F);
 
@@ -2161,27 +2161,27 @@ void LoadDisplay1VESAModeInitRegs()
     EnableATTR();
 }
 
-void EnableSWPSByPass()
+RDC_EXPORT void EnableSWPSByPass()
 {
     SetSRReg(0x32, BIT0, BIT0);
 }
 
-void DisableSWPSByPass()
+RDC_EXPORT void DisableSWPSByPass()
 {
     SetSRReg(0x32, 0, BIT0);
 }
 
-void ResetLVDSChannelOutPut()
+RDC_EXPORT void ResetLVDSChannelOutPut()
 {
     SetSRReg(0x1E, 0, BIT0+BIT2);
 }
 
-void DisableLCDDither()
+RDC_EXPORT void DisableLCDDither()
 {
     SetSRReg(0x22, 0, BIT0);
 }
 
-void TurnOffTxEncReg(BYTE DisplayPath, BYTE bDigitalDevice)
+RDC_EXPORT void TurnOffTxEncReg(BYTE DisplayPath, BYTE bDigitalDevice)
 {
     BYTE ucDeviceID, bDVP1 = (bDigitalDevice & DVP1);
     ucDeviceID = Get_DEV_ID(DisplayPath);
@@ -2214,7 +2214,7 @@ void TurnOffTxEncReg(BYTE DisplayPath, BYTE bDigitalDevice)
     
 }
 
-void TurnOnTxEncReg(BYTE DisplayPath ,BYTE bDigitalDevice)
+RDC_EXPORT void TurnOnTxEncReg(BYTE DisplayPath ,BYTE bDigitalDevice)
 {
     BYTE ucDeviceID, bDVP1 = (bDigitalDevice & DVP1);
     ucDeviceID = Get_DEV_ID(DisplayPath);
@@ -2251,7 +2251,7 @@ void TurnOnTxEncReg(BYTE DisplayPath ,BYTE bDigitalDevice)
 }
 
 
-void DisableDisplayPathAndDevice(BYTE DisplayPath)
+RDC_EXPORT void DisableDisplayPathAndDevice(BYTE DisplayPath)
 {
     BYTE DeviceIndex = Get_DEV_ID(DisplayPath);
     BYTE DevicePort = GetDevicePort(DeviceIndex);
@@ -2264,7 +2264,7 @@ void DisableDisplayPathAndDevice(BYTE DisplayPath)
 }
 
 
-void ClearFrameBuffer(BYTE DisplayPath, DWORD *pFrameBufferBase, DWORD ulWidth, DWORD ulHeight, BYTE bColorDepth)
+RDC_EXPORT void ClearFrameBuffer(BYTE DisplayPath, DWORD *pFrameBufferBase, DWORD ulWidth, DWORD ulHeight, BYTE bColorDepth)
 {
     DWORD dwFactor  = 0;
     DWORD i = 0;
@@ -2291,7 +2291,7 @@ void ClearFrameBuffer(BYTE DisplayPath, DWORD *pFrameBufferBase, DWORD ulWidth, 
 }
 
 
-void SetDPMS(BYTE DPMSState, BYTE DisplayPath)
+RDC_EXPORT void SetDPMS(BYTE DPMSState, BYTE DisplayPath)
 {
     BYTE RegValue=0; 
 
@@ -2322,14 +2322,14 @@ void SetDPMS(BYTE DPMSState, BYTE DisplayPath)
 }
 
 
-void WaitDisplayPeriod()
+RDC_EXPORT void WaitDisplayPeriod()
 {
      while ((InPort(COLOR_INPUT_STATUS1_READ)&BIT0) == 1);
      
      while ((InPort(COLOR_INPUT_STATUS1_READ)&BIT0) == 0);
 }
 
-void CBIOSI2CWriteClock(BYTE I2CPort, BYTE data)
+RDC_EXPORT void CBIOSI2CWriteClock(BYTE I2CPort, BYTE data)
 {
     ULONG i;
     BYTE ucMaskData=1, ucTmpData;
@@ -2344,7 +2344,7 @@ void CBIOSI2CWriteClock(BYTE I2CPort, BYTE data)
     }
 }
 
-void CBIOSI2CDelay(BYTE I2CPort)
+RDC_EXPORT void CBIOSI2CDelay(BYTE I2CPort)
 {
     BYTE     i,jtemp;
     
@@ -2352,7 +2352,7 @@ void CBIOSI2CDelay(BYTE I2CPort)
         jtemp = GetCRReg(I2CPort);
 }
 
-void CBIOSI2CWriteData(BYTE I2CPort, BYTE data)
+RDC_EXPORT void CBIOSI2CWriteData(BYTE I2CPort, BYTE data)
 {
 
     ULONG i;
@@ -2368,7 +2368,7 @@ void CBIOSI2CWriteData(BYTE I2CPort, BYTE data)
     }
 }
 
-void CBIOSI2CStart(BYTE I2CPort)
+RDC_EXPORT void CBIOSI2CStart(BYTE I2CPort)
 {
     CBIOSI2CWriteClock(I2CPort, 0x00);               
     CBIOSI2CDelay(I2CPort);
@@ -2382,7 +2382,7 @@ void CBIOSI2CStart(BYTE I2CPort)
     CBIOSI2CDelay(I2CPort);                    
 }
 
-void CBIOSSendI2CDataByte(BYTE I2CPort, BYTE Data)
+RDC_EXPORT void CBIOSSendI2CDataByte(BYTE I2CPort, BYTE Data)
 {
     char i;
 
@@ -2402,7 +2402,7 @@ void CBIOSSendI2CDataByte(BYTE I2CPort, BYTE Data)
     }                
 }
 
-BYTE CBIOSCheckACK(BYTE I2CPort)
+RDC_EXPORT BYTE CBIOSCheckACK(BYTE I2CPort)
 {    
     CBIOSI2CWriteClock(I2CPort, 0x00);               
     CBIOSI2CDelay(I2CPort);    
@@ -2413,7 +2413,7 @@ BYTE CBIOSCheckACK(BYTE I2CPort)
     return ((GetCRReg(I2CPort) & 0x20) ? 0:1);                
 }
 
-BYTE CBIOSReceiveI2CDataByte(BYTE I2CPort, BYTE I2CSlave)
+RDC_EXPORT BYTE CBIOSReceiveI2CDataByte(BYTE I2CPort, BYTE I2CSlave)
 {
     BYTE jData=0, jTempData;
     char i;
@@ -2446,7 +2446,7 @@ BYTE CBIOSReceiveI2CDataByte(BYTE I2CPort, BYTE I2CSlave)
     return (jData);                              
 }
 
-void CBIOSSendNACK(BYTE I2CPort)
+RDC_EXPORT void CBIOSSendNACK(BYTE I2CPort)
 {
     CBIOSI2CWriteClock(I2CPort, 0x00);               
     CBIOSI2CDelay(I2CPort);    
@@ -2456,7 +2456,7 @@ void CBIOSSendNACK(BYTE I2CPort)
     CBIOSI2CDelay(I2CPort);    
 }
 
-void CBIOSI2CStop(BYTE I2CPort)
+RDC_EXPORT void CBIOSI2CStop(BYTE I2CPort)
 {
     CBIOSI2CWriteClock(I2CPort, 0x00);               
     CBIOSI2CDelay(I2CPort);    
@@ -2470,7 +2470,7 @@ void CBIOSI2CStop(BYTE I2CPort)
     CBIOSI2CDelay(I2CPort);                      
 }
 
-BYTE CBIOSReadI2C(BYTE I2CPort, BYTE I2CSlave, BYTE RegIdx, BYTE* RegData)
+RDC_EXPORT BYTE CBIOSReadI2C(BYTE I2CPort, BYTE I2CSlave, BYTE RegIdx, BYTE* RegData)
 {
     CBIOSI2CStart(I2CPort);
 
@@ -2509,7 +2509,7 @@ BYTE CBIOSReadI2C(BYTE I2CPort, BYTE I2CSlave, BYTE RegIdx, BYTE* RegData)
     return CBIOSI2C_OK;       
 }
 
-BYTE CBIOSWriteI2C(BYTE I2CPort, BYTE I2CSlave, BYTE RegIdx, BYTE RegData)
+RDC_EXPORT BYTE CBIOSWriteI2C(BYTE I2CPort, BYTE I2CSlave, BYTE RegIdx, BYTE RegData)
 {
     CBIOSI2CStart(I2CPort);
 
@@ -2540,7 +2540,7 @@ BYTE CBIOSWriteI2C(BYTE I2CPort, BYTE I2CSlave, BYTE RegIdx, BYTE RegData)
     return CBIOSI2C_OK;       
 }
 
-void CBIOSGetDeviceI2CInformation(BYTE ucDevice, BYTE* ucI2Cport, BYTE* ucI2CAddress)
+RDC_EXPORT void CBIOSGetDeviceI2CInformation(BYTE ucDevice, BYTE* ucI2Cport, BYTE* ucI2CAddress)
 {
     BYTE i;
     WORD wI2C_Info=0;
@@ -2581,7 +2581,7 @@ void CBIOSGetDeviceI2CInformation(BYTE ucDevice, BYTE* ucI2Cport, BYTE* ucI2CAdd
     }
 }
 
-DWORD CBIOSGetPortI2CInfo(void)
+RDC_EXPORT DWORD CBIOSGetPortI2CInfo(void)
 {
     BYTE i,bCRT = 0x0, bDVP1 = 0x0, bDVP2 = 0x0;
     DWORD dwPortI2C = 0x0;
@@ -2615,7 +2615,7 @@ DWORD CBIOSGetPortI2CInfo(void)
     return dwPortI2C;
 }
 
-void CBIOSSetOutFormat(WORD wAttribute)
+RDC_EXPORT void CBIOSSetOutFormat(WORD wAttribute)
 {
     if(wAttribute & BIT6) 
     {
@@ -2626,7 +2626,7 @@ void CBIOSSetOutFormat(WORD wAttribute)
     }
 }
 
-void CBIOSSetDither()
+RDC_EXPORT void CBIOSSetDither()
 {
     BYTE i,ucLCDIndex;
     for(i=0;i<(sizeof(PortConfig)/sizeof(PORT_CONFIG));i++)
@@ -2646,7 +2646,7 @@ void CBIOSSetDither()
     }
 }
 
-void CBIOSSetOpenLDI(WORD wAttribute)
+RDC_EXPORT void CBIOSSetOpenLDI(WORD wAttribute)
 {
     if(wAttribute & OpenLDI)
     {
@@ -2658,7 +2658,7 @@ void CBIOSSetOpenLDI(WORD wAttribute)
     }
 }
 
-WORD ConvertMStoCount(WORD wTDX)
+RDC_EXPORT WORD ConvertMStoCount(WORD wTDX)
 {
     WORD  wTmp1;
     DWORD dwTmp2;
@@ -2668,7 +2668,7 @@ WORD ConvertMStoCount(WORD wTDX)
     return (WORD)(dwTmp2/293);
 }
 
-void CBIOSSetTD0(WORD wTD0)
+RDC_EXPORT void CBIOSSetTD0(WORD wTD0)
 {
     WORD wSetReg;
     BYTE ucHighByte,ucLowByte;
@@ -2679,7 +2679,7 @@ void CBIOSSetTD0(WORD wTD0)
     SetSRReg(0x1A,ucHighByte,0x0F);
 }
 
-void CBIOSSetTD1(WORD wTD1)
+RDC_EXPORT void CBIOSSetTD1(WORD wTD1)
 {
     WORD wSetReg;
     BYTE ucHighByte,ucLowByte;
@@ -2690,7 +2690,7 @@ void CBIOSSetTD1(WORD wTD1)
     SetSRReg(0x1A,ucHighByte,0xF0);
 }
 
-void CBIOSSetTD2(WORD wTD2)
+RDC_EXPORT void CBIOSSetTD2(WORD wTD2)
 {
     WORD wSetReg;
     BYTE ucHighByte,ucLowByte;
@@ -2701,7 +2701,7 @@ void CBIOSSetTD2(WORD wTD2)
     SetSRReg(0x1B,ucHighByte,0x0F);
 }
 
-void CBIOSSetTD3(WORD wTD3)
+RDC_EXPORT void CBIOSSetTD3(WORD wTD3)
 {
     WORD wSetReg;
     BYTE ucHighByte,ucLowByte;
@@ -2712,7 +2712,7 @@ void CBIOSSetTD3(WORD wTD3)
     SetSRReg(0x1B,ucHighByte,0xF0);
 }
 
-void CBIOSSetTD5(WORD wTD5)
+RDC_EXPORT void CBIOSSetTD5(WORD wTD5)
 {
     WORD wSetReg;
     BYTE ucHighByte,ucLowByte;
@@ -2723,7 +2723,7 @@ void CBIOSSetTD5(WORD wTD5)
     SetSRReg(0x1C,ucHighByte,0xF0);
 }
 
-void CBIOSSetTD6(WORD wTD6)
+RDC_EXPORT void CBIOSSetTD6(WORD wTD6)
 {
     WORD wSetReg;
     BYTE ucHighByte,ucLowByte;
@@ -2734,7 +2734,7 @@ void CBIOSSetTD6(WORD wTD6)
     SetSRReg(0x1D,ucHighByte,0x0F);
 }
 
-void CBIOSSetTD7(WORD wTD7)
+RDC_EXPORT void CBIOSSetTD7(WORD wTD7)
 {
     WORD wSetReg;
     BYTE ucHighByte,ucLowByte;
@@ -2745,7 +2745,7 @@ void CBIOSSetTD7(WORD wTD7)
     SetSRReg(0x1D,ucHighByte,0xF0);
 }
 
-void LoadPowerSequenceTimer(void)
+RDC_EXPORT void LoadPowerSequenceTimer(void)
 {
     BYTE i,ucLCDIndex;
     for(i=0;i<(sizeof(PortConfig)/sizeof(PORT_CONFIG));i++)
@@ -2779,7 +2779,7 @@ void LoadPowerSequenceTimer(void)
     SetSRReg(0x32,0,BIT0);  
 }
 
-void CBIOSInitLCD()
+RDC_EXPORT void CBIOSInitLCD()
 {
     
     Set_LCD_Panel_Size(LCDTable[0].H_Size, LCDTable[0].V_Size);
@@ -2793,7 +2793,7 @@ void CBIOSInitLCD()
     CBIOSSetOpenLDI(LCDTable[0].pPanelTable.Timing.Attribute);
 }
 
-void SetGPIOResetReg(BYTE bGPIOMask)
+RDC_EXPORT void SetGPIOResetReg(BYTE bGPIOMask)
 {
     BYTE ucTmpData;
     DWORD i;
@@ -2806,7 +2806,7 @@ void SetGPIOResetReg(BYTE bGPIOMask)
 }
 
 
-void CBIOSGetTMDSTxType(BYTE ucI2CPort)
+RDC_EXPORT void CBIOSGetTMDSTxType(BYTE ucI2CPort)
 {
     TxEncDetect *pTmp = pTMDSTxTable;
     BYTE ucTmpData = 0, ucTxID = 0;
@@ -2842,7 +2842,7 @@ void CBIOSGetTMDSTxType(BYTE ucI2CPort)
 
 
 
-void CBIOSSetTXType(PCBIOS_Extension pCBIOSExtension)
+RDC_EXPORT void CBIOSSetTXType(PCBIOS_Extension pCBIOSExtension)
 {
     BYTE i;
     for(i=0;i<(sizeof(PortConfig)/sizeof(PORT_CONFIG));i++)
@@ -2881,7 +2881,7 @@ void CBIOSSetTXType(PCBIOS_Extension pCBIOSExtension)
 }
 
 
-void CBIOSGetSupportDevice(PCBIOS_Extension pCBIOSExtension)
+RDC_EXPORT void CBIOSGetSupportDevice(PCBIOS_Extension pCBIOSExtension)
 {
     BYTE i;
     pCBIOSExtension->dwSupportDevices = 0;
@@ -2898,7 +2898,7 @@ void CBIOSGetSupportDevice(PCBIOS_Extension pCBIOSExtension)
 }
 
 
-void CBIOSUpdateDevSupFlag(PCBIOS_Extension pCBIOSExtension)
+RDC_EXPORT void CBIOSUpdateDevSupFlag(PCBIOS_Extension pCBIOSExtension)
 {
     
     if(pCBIOSExtension->dwSupportDevices & B_LCD)
@@ -2914,7 +2914,7 @@ void CBIOSUpdateDevSupFlag(PCBIOS_Extension pCBIOSExtension)
 }
 
 
-void CBIOSInitPortConfig(BYTE* pjROMLinearAddr)
+RDC_EXPORT void CBIOSInitPortConfig(BYTE* pjROMLinearAddr)
 {
     BYTE i;
     BYTE *ucTmpData = (BYTE*)(PortConfig);
@@ -2949,7 +2949,7 @@ void CBIOSInitPortConfig(BYTE* pjROMLinearAddr)
 }
 
 
-BYTE CBIOSCheckDeviceAvailable(BYTE NewDisplay1DeviceID)
+RDC_EXPORT BYTE CBIOSCheckDeviceAvailable(BYTE NewDisplay1DeviceID)
 {
     int i;
     BYTE status = FALSE;
@@ -2971,7 +2971,7 @@ BYTE CBIOSCheckDeviceAvailable(BYTE NewDisplay1DeviceID)
 
 
 
-void CBIOSInitLCDTable(BYTE* pjROMLinearAddr)
+RDC_EXPORT void CBIOSInitLCDTable(BYTE* pjROMLinearAddr)
 {
     WORD  wVGAROMSIZE=0, wDevAddress=0;
     BYTE *ucTmpData = (BYTE*)(LCDTable);
@@ -3016,7 +3016,7 @@ void CBIOSInitLCDTable(BYTE* pjROMLinearAddr)
 }
 
 
-void CBIOSInitHDMITable(BYTE* pjROMLinearAddr)
+RDC_EXPORT void CBIOSInitHDMITable(BYTE* pjROMLinearAddr)
 {
     WORD  wVGAROMSIZE;
     
@@ -3042,26 +3042,26 @@ void CBIOSInitHDMITable(BYTE* pjROMLinearAddr)
     }
 }
 
-void cbGetHDMIModeInfo(WORD* wHSize, WORD* wVSize, BYTE* bRRCnt, BYTE ucHDMIType)
+RDC_EXPORT void cbGetHDMIModeInfo(WORD* wHSize, WORD* wVSize, BYTE* bRRCnt, BYTE ucHDMIType)
 {
     *wHSize = HDMITable[ucHDMIType].H_Size;
     *wVSize = HDMITable[ucHDMIType].V_Size;
     *bRRCnt = HDMITable[ucHDMIType].RRTableCount;
 }
 
-void cbSetHDMIModeInfo(WORD wHSize, WORD wVSize, BYTE ucHDMIType)
+RDC_EXPORT void cbSetHDMIModeInfo(WORD wHSize, WORD wVSize, BYTE ucHDMIType)
 {
     HDMITable[ucHDMIType].H_Size = wHSize;
     HDMITable[ucHDMIType].V_Size = wVSize;
 }
 
-void CBIOSGetHDMIPanelSize(BYTE ucHDMIType, WORD* wHSize, WORD* wVSize)
+RDC_EXPORT void CBIOSGetHDMIPanelSize(BYTE ucHDMIType, WORD* wHSize, WORD* wVSize)
 {
     *wHSize = HDMITable[ucHDMIType].H_Size;
     *wVSize = HDMITable[ucHDMIType].V_Size;
 }
 
-void CBIOSGetVBIOSBuildDate(PCBIOS_Extension pCBIOSExtension)
+RDC_EXPORT void CBIOSGetVBIOSBuildDate(PCBIOS_Extension pCBIOSExtension)
 {
     BYTE* pROMDevIDAddr;
     BYTE ucTmpData[2], ucYear[4];
@@ -3087,7 +3087,7 @@ void CBIOSGetVBIOSBuildDate(PCBIOS_Extension pCBIOSExtension)
     pCBIOSExtension->ucVBIOSBuildDate = (BYTE)(strtoul((char *)ucTmpData,NULL,10));
 }
 
-void CBIOSGetVBIOSVersion(PCBIOS_Extension pCBIOSExtension)
+RDC_EXPORT void CBIOSGetVBIOSVersion(PCBIOS_Extension pCBIOSExtension)
 {
     BYTE* pROMDevIDAddr = (BYTE*)(pCBIOSExtension->pjROMLinearAddr+ROM_Offset_Rev_Num);
     BYTE ucTmpData[2];
@@ -3096,7 +3096,7 @@ void CBIOSGetVBIOSVersion(PCBIOS_Extension pCBIOSExtension)
     pCBIOSExtension->ulVBIOS_Version = strtoul((char *)ucTmpData,NULL, 10);
 }
 
-void CBIOSGetVBIOSRomDeviceID(PCBIOS_Extension pCBIOSExtension)
+RDC_EXPORT void CBIOSGetVBIOSRomDeviceID(PCBIOS_Extension pCBIOSExtension)
 {
     WORD* pROMDevIDAddr = (WORD*)(pCBIOSExtension->pjROMLinearAddr+ROM_Offset_Dev_ID);
     pCBIOSExtension->wVenderID = *pROMDevIDAddr;
@@ -3104,7 +3104,7 @@ void CBIOSGetVBIOSRomDeviceID(PCBIOS_Extension pCBIOSExtension)
 }
 
 
-void CBIOSInitialDataFromVBIOS(PCBIOS_Extension pCBIOSExtension)
+RDC_EXPORT void CBIOSInitialDataFromVBIOS(PCBIOS_Extension pCBIOSExtension)
 {
     pRelated_IOAddress = pCBIOSExtension->pjIOAddress;
     
@@ -3134,7 +3134,7 @@ void CBIOSInitialDataFromVBIOS(PCBIOS_Extension pCBIOSExtension)
     CBIOSSetTXType(pCBIOSExtension);
 }
 
-void CBIOSInitialI2CReg(void)
+RDC_EXPORT void CBIOSInitialI2CReg(void)
 {
     SetCRReg(0xB7, 0x00, 0xFF);
     SetCRReg(0xB5, 0x00, 0xFF);
@@ -3142,7 +3142,7 @@ void CBIOSInitialI2CReg(void)
 }
 
 
-BYTE DetectMonitor(BYTE I2CPort)
+RDC_EXPORT BYTE DetectMonitor(BYTE I2CPort)
 {
     BYTE RegData;
     BYTE Status = 0;
@@ -3168,7 +3168,7 @@ BYTE DetectMonitor(BYTE I2CPort)
 }
 
 
-void WaitLong()
+RDC_EXPORT void WaitLong()
 {
     while(!(InPort(COLOR_INPUT_STATUS1_READ) & BIT3));
     while(InPort(COLOR_INPUT_STATUS1_READ) & BIT3);
@@ -3176,7 +3176,7 @@ void WaitLong()
 }
 
 
-BYTE SenseCRT()
+RDC_EXPORT BYTE SenseCRT()
 {
     BYTE bConnect = 0;
     
@@ -3205,7 +3205,7 @@ BYTE SenseCRT()
 }
 
 
-void SetVBERerurnStatus(WORD VBEReturnStatus, CBIOS_ARGUMENTS *pCBiosArguments)
+RDC_EXPORT void SetVBERerurnStatus(WORD VBEReturnStatus, CBIOS_ARGUMENTS *pCBiosArguments)
 {
     pCBiosArguments->AX = VBEReturnStatus;
 }
@@ -3246,7 +3246,7 @@ void SetVBERerurnStatus(WORD VBEReturnStatus, CBIOS_ARGUMENTS *pCBiosArguments)
 
 
 
-CBStatus OEM_QueryBiosInfo (PCBIOS_Extension pCBIOSExtension)
+RDC_EXPORT CBStatus OEM_QueryBiosInfo (PCBIOS_Extension pCBIOSExtension)
 {
     BYTE ucDDRRate;
     WORD wDramSize;
@@ -3300,7 +3300,7 @@ CBStatus OEM_QueryBiosInfo (PCBIOS_Extension pCBIOSExtension)
     return TRUE;
 }
 
-CBStatus OEM_QueryBiosCaps (CBIOS_ARGUMENTS *pCBiosArguments)
+RDC_EXPORT CBStatus OEM_QueryBiosCaps (CBIOS_ARGUMENTS *pCBiosArguments)
 { 
     SetVBERerurnStatus(VBEFunctionCallSuccessful, pCBiosArguments); 
     return TRUE;
@@ -3356,7 +3356,7 @@ CBStatus OEM_QueryBiosCaps (CBIOS_ARGUMENTS *pCBiosArguments)
 
 
 
-CBStatus OEM_QueryExternalDeviceInfo (CBIOS_ARGUMENTS *pCBiosArguments)
+RDC_EXPORT CBStatus OEM_QueryExternalDeviceInfo (CBIOS_ARGUMENTS *pCBiosArguments)
 {
     BYTE ucI2CPort, ucAddr;
     
@@ -3423,7 +3423,7 @@ CBStatus OEM_QueryExternalDeviceInfo (CBIOS_ARGUMENTS *pCBiosArguments)
 
 
 
-CBStatus OEM_QueryDisplayPathInfo (PCBIOS_Extension pCBIOSExtension)
+RDC_EXPORT CBStatus OEM_QueryDisplayPathInfo (PCBIOS_Extension pCBIOSExtension)
 {
     BYTE ScratchTempData, ucDeviceIndex;
     CBIOS_ARGUMENTS *pCBiosArguments = pCBIOSExtension->pCBiosArguments;
@@ -3482,7 +3482,7 @@ CBStatus OEM_QueryDisplayPathInfo (PCBIOS_Extension pCBIOSExtension)
 }
 
 
-CBStatus OEM_QueryDeviceConnectStatus (PCBIOS_Extension pCBIOSExtension)
+RDC_EXPORT CBStatus OEM_QueryDeviceConnectStatus (PCBIOS_Extension pCBIOSExtension)
 {
     BYTE    QuickCheck;
     CBIOS_ARGUMENTS *pBiosArguments = pCBIOSExtension->pCBiosArguments;
@@ -3546,7 +3546,7 @@ CBStatus OEM_QueryDeviceConnectStatus (PCBIOS_Extension pCBIOSExtension)
     return TRUE;
 }
 
-CBStatus OEM_QuerySupportedMode (CBIOS_ARGUMENTS *pCBiosArguments)
+RDC_EXPORT CBStatus OEM_QuerySupportedMode (CBIOS_ARGUMENTS *pCBiosArguments)
 {
     int VESATableIndex = 0, VESATableSIZE = sizeof(VESATable)/sizeof(MODE_INFO);
     int RRateTableIndex = 0, RRateTableSize;
@@ -3636,7 +3636,7 @@ CBStatus OEM_QuerySupportedMode (CBIOS_ARGUMENTS *pCBiosArguments)
 
 
 
-CBStatus OEM_QueryLCDPanelSizeMode (CBIOS_ARGUMENTS *pCBiosArguments)
+RDC_EXPORT CBStatus OEM_QueryLCDPanelSizeMode (CBIOS_ARGUMENTS *pCBiosArguments)
 {
     BYTE ucInData = pCBiosArguments->CL;
     if(ucInData < 3)
@@ -3666,7 +3666,7 @@ CBStatus OEM_QueryLCDPanelSizeMode (CBIOS_ARGUMENTS *pCBiosArguments)
     }
     return TRUE;
 }
-CBStatus OEM_QueryLCD2PanelSizeMode (CBIOS_ARGUMENTS *pCBiosArguments)
+RDC_EXPORT CBStatus OEM_QueryLCD2PanelSizeMode (CBIOS_ARGUMENTS *pCBiosArguments)
 {
     DWORD dwLCDPanelSize;
 
@@ -3685,14 +3685,14 @@ CBStatus OEM_QueryLCD2PanelSizeMode (CBIOS_ARGUMENTS *pCBiosArguments)
     return TRUE;
 }
 
-CBStatus OEM_QueryTVConfiguration (CBIOS_ARGUMENTS *pCBiosArguments)
+RDC_EXPORT CBStatus OEM_QueryTVConfiguration (CBIOS_ARGUMENTS *pCBiosArguments)
 {
     pCBiosArguments->BL = ReadScratch(IDX_SCRATCH_05);
     SetVBERerurnStatus(VBEFunctionCallSuccessful, pCBiosArguments);
     return TRUE;
 }
 
-CBStatus OEM_SetSetTVFunction(CBIOS_ARGUMENTS *pCBiosArguments)
+RDC_EXPORT CBStatus OEM_SetSetTVFunction(CBIOS_ARGUMENTS *pCBiosArguments)
 {
     PCBIOSTVFun_Disp_Info pCBTVFun = (PCBIOSTVFun_Disp_Info)pCBiosArguments->Ecx;
     BYTE bChange = pCBTVFun->bChange;
@@ -3711,14 +3711,14 @@ CBStatus OEM_SetSetTVFunction(CBIOS_ARGUMENTS *pCBiosArguments)
     return TRUE;
 }
 
-CBStatus OEM_QueryTV2Configuration (CBIOS_ARGUMENTS *pCBiosArguments)
+RDC_EXPORT CBStatus OEM_QueryTV2Configuration (CBIOS_ARGUMENTS *pCBiosArguments)
 {
     pCBiosArguments->BL = ReadScratch(IDX_SCRATCH_06);
     SetVBERerurnStatus(VBEFunctionCallSuccessful, pCBiosArguments);
     return TRUE;
 }
 
-CBStatus OEM_QueryHDMISupportedMode (CBIOS_ARGUMENTS *pCBiosArguments)
+RDC_EXPORT CBStatus OEM_QueryHDMISupportedMode (CBIOS_ARGUMENTS *pCBiosArguments)
 {
     int VESATableIndex = 0, VESATableSIZE = sizeof(HDMITable)/sizeof(MODE_INFO);
     int RRateTableIndex = 0, RRateTableSize;
@@ -3783,7 +3783,7 @@ CBStatus OEM_QueryHDMISupportedMode (CBIOS_ARGUMENTS *pCBiosArguments)
     
 }
 
-CBStatus OEM_SetActiveDisplayDevice (CBIOS_ARGUMENTS *pCBiosArguments)
+RDC_EXPORT CBStatus OEM_SetActiveDisplayDevice (CBIOS_ARGUMENTS *pCBiosArguments)
 {
     BYTE Display1DeviceID, NewDisplay1DeviceID;
     BYTE Display2DeviceID, NewDisplay2DeviceID;
@@ -3832,7 +3832,7 @@ CBStatus OEM_SetActiveDisplayDevice (CBIOS_ARGUMENTS *pCBiosArguments)
     SetVBERerurnStatus(VBEFunctionCallSuccessful, pCBiosArguments);
     return TRUE;
 }
-CBStatus OEM_SetVESAModeForDisplay2(CBIOS_Extension *pCBIOSExtension)
+RDC_EXPORT CBStatus OEM_SetVESAModeForDisplay2(CBIOS_Extension *pCBIOSExtension)
 {
     WORD    ModeNum = pCBIOSExtension->pCBiosArguments->CX & 0x01FF;
     CBIOSEDID_DETAILED_TIMING *pEDIDDetailedTiming = (CBIOSEDID_DETAILED_TIMING*)pCBIOSExtension->pCBiosArguments->Esi;
@@ -3991,7 +3991,7 @@ CBStatus OEM_SetVESAModeForDisplay2(CBIOS_Extension *pCBIOSExtension)
     return TRUE;
 }
 
-CBStatus OEM_SetDevicePowerState (CBIOS_ARGUMENTS *pCBiosArguments)
+RDC_EXPORT CBStatus OEM_SetDevicePowerState (CBIOS_ARGUMENTS *pCBiosArguments)
 {
     
     BYTE display1DeviceID, display2DeviceID, TargetDevice, DMPSState;
@@ -4167,7 +4167,7 @@ CBStatus OEM_SetDevicePowerState (CBIOS_ARGUMENTS *pCBiosArguments)
     return TRUE;
 }
 
-CBStatus OEM_SetDisplay2Pitch(CBIOS_ARGUMENTS *pCBiosArguments)
+RDC_EXPORT CBStatus OEM_SetDisplay2Pitch(CBIOS_ARGUMENTS *pCBiosArguments)
 {
     WORD    VBEReturnStatus = VBEFunctionCallFail;
     WORD    wPitch;
@@ -4180,7 +4180,7 @@ CBStatus OEM_SetDisplay2Pitch(CBIOS_ARGUMENTS *pCBiosArguments)
     return TRUE;
 }
 
-CBStatus OEM_SetRefreshRate(CBIOS_ARGUMENTS *pCBiosArguments)
+RDC_EXPORT CBStatus OEM_SetRefreshRate(CBIOS_ARGUMENTS *pCBiosArguments)
 {
     BYTE RRateID, DisplayPath;
 
@@ -4197,31 +4197,31 @@ CBStatus OEM_SetRefreshRate(CBIOS_ARGUMENTS *pCBiosArguments)
     return TRUE;
 }
 
-CBStatus OEM_SetSetTVConfiguration(CBIOS_ARGUMENTS *pCBiosArguments)
+RDC_EXPORT CBStatus OEM_SetSetTVConfiguration(CBIOS_ARGUMENTS *pCBiosArguments)
 {
     Set_TV_TYPE(pCBiosArguments->CL);
     Set_TV_CONNECTION_TYPE(pCBiosArguments->CH);
     return TRUE;
 }
-CBStatus OEM_SetTV2Configuration (CBIOS_ARGUMENTS *pCBiosArguments)
+RDC_EXPORT CBStatus OEM_SetTV2Configuration (CBIOS_ARGUMENTS *pCBiosArguments)
 {
     return TRUE;
 }
 
-CBStatus OEM_SetHDMIType(CBIOS_ARGUMENTS *pCBiosArguments)
+RDC_EXPORT CBStatus OEM_SetHDMIType(CBIOS_ARGUMENTS *pCBiosArguments)
 {
     Set_HDMI_TYPE(pCBiosArguments->CL);
     SetVBERerurnStatus(VBEFunctionCallSuccessful, pCBiosArguments);
     return TRUE;
 }
-CBStatus OEM_SetHDMIOutputSignal(CBIOS_ARGUMENTS *pCBiosArguments)
+RDC_EXPORT CBStatus OEM_SetHDMIOutputSignal(CBIOS_ARGUMENTS *pCBiosArguments)
 {
     Set_HDMI_Output_Signal(pCBiosArguments->CL);
     SetVBERerurnStatus(VBEFunctionCallSuccessful, pCBiosArguments);
     return TRUE;
 }
 
-CBStatus OEM_VideoPOST (PCBIOS_Extension pCBIOSExtension)
+RDC_EXPORT CBStatus OEM_VideoPOST (PCBIOS_Extension pCBIOSExtension)
 {
     BYTE i=0, btemp=0;
     
@@ -4299,7 +4299,7 @@ CBStatus OEM_VideoPOST (PCBIOS_Extension pCBIOSExtension)
     return TRUE;
 }
 
-CBStatus OEM_VSetEDIDInModeTable(CBIOS_Extension *pCBIOSExtension)
+RDC_EXPORT CBStatus OEM_VSetEDIDInModeTable(CBIOS_Extension *pCBIOSExtension)
 {
     CBIOSEDID_DETAILED_TIMING *pEDIDDetailedTiming = (CBIOSEDID_DETAILED_TIMING*)pCBIOSExtension->pCBiosArguments->Ecx;
 
@@ -4360,7 +4360,7 @@ CBStatus OEM_VSetEDIDInModeTable(CBIOS_Extension *pCBIOSExtension)
     return TRUE;
 }
 
-CBStatus VBE_SetMode(CBIOS_Extension *pCBIOSExtension)
+RDC_EXPORT CBStatus VBE_SetMode(CBIOS_Extension *pCBIOSExtension)
 {
     WORD    ModeNum = pCBIOSExtension->pCBiosArguments->BX & 0x01FF;
     CBStatus    bUserSpecifiedTiming = ((pCBIOSExtension->pCBiosArguments->BX & BIT11) ? TRUE : FALSE);
@@ -4533,7 +4533,7 @@ CBStatus VBE_SetMode(CBIOS_Extension *pCBIOSExtension)
     return TRUE;
 }
 
-CBStatus VBE_SetPitch(CBIOS_Extension *CBIOSExtension)
+RDC_EXPORT CBStatus VBE_SetPitch(CBIOS_Extension *CBIOSExtension)
 {
     WORD    VBEReturnStatus = VBEFunctionCallFail;
     WORD    wPitch;
@@ -4561,7 +4561,7 @@ CBStatus VBE_SetPitch(CBIOS_Extension *CBIOSExtension)
 
 
 
-CBStatus VBE_AccessEDID(CBIOS_Extension *CBIOSExtension)
+RDC_EXPORT CBStatus VBE_AccessEDID(CBIOS_Extension *CBIOSExtension)
 {
     BYTE bConnectStatus = FALSE, bValue = 0;
     BYTE bI2C_PORT;
@@ -4616,7 +4616,7 @@ CBStatus VBE_AccessEDID(CBIOS_Extension *CBIOSExtension)
     return bConnectStatus;
 }
 
-CBStatus CInt10(CBIOS_Extension *pCBIOSExtension)
+RDC_EXPORT CBStatus CInt10(CBIOS_Extension *pCBIOSExtension)
 {
     CBStatus CInt10_Status = FALSE;
 

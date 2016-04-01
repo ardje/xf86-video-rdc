@@ -3,7 +3,7 @@
 for afile in *.c;do
 cat <<PROTO
 /*
- * Prototype for $afile
+ * Prototypes for $afile
  */
 PROTO
 grep -h "^RDC_EXPORT.*" $afile|sort -u|sed 's/RDC_EXPORT/extern/g;s/$/;/g'
