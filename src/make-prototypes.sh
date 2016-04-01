@@ -1,2 +1,5 @@
 #!/bin/sh
-grep -h "^extern.*;" *.c|sort -u > prototypes.h
+(
+grep -h "^RDC_EXPORT.*" *.c|sort -u|sed 's/RDC_EXPORT/extern/g;s/$/;/g'
+echo "#define RDC_EXPORT"
+) > prototypes.h
