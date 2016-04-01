@@ -16,16 +16,16 @@ extern void UpdateVPost(RDCRecPtr pRDC, VPOSTHWINFOPtr pVPHwInfo);
  * Static prototypes for rdc_video.c
  */
 #ifdef _rdc_video_c_
-RDC_STATIC FBLinearPtr RDCAllocateMemory( ScrnInfoPtr pScrn, FBLinearPtr PackedBuf, int size);
-RDC_STATIC int RDCGetPortAttribute( ScrnInfoPtr pScrn, Atom attribute, INT32 * value, pointer data);
-RDC_STATIC int RDCPutImage(ScrnInfoPtr pScrn, short src_x, short src_y, short drw_x, short drw_y, short src_w, short src_h, short drw_w, short drw_h, int id, unsigned char *buf, short width, short height, Bool sync, RegionPtr clipBoxes, pointer data, DrawablePtr pDraw);
-RDC_STATIC int RDCPutImageVPOST(ScrnInfoPtr pScrn, short src_x, short src_y, short drw_x, short drw_y, short src_w, short src_h, short drw_w, short drw_h, int id, unsigned char *buf, short width, short height, Bool sync, RegionPtr clipBoxes, pointer data, DrawablePtr pDraw);
-RDC_STATIC int RDCQueryImageAttributesOverlay(ScrnInfoPtr pScrn,int id, unsigned short *w, unsigned short *h, int *pitches, int *offsets);
-RDC_STATIC int RDCSetPortAttribute( ScrnInfoPtr pScrn, Atom attribute, INT32 value, pointer data);
-RDC_STATIC void RDCQueryBestSize(ScrnInfoPtr pScrn, Bool motion, short vid_w, short vid_h, short drw_w, short drw_h, unsigned int *p_w, unsigned int *p_h, pointer data);
-RDC_STATIC void RDCStopVideoPost(ScrnInfoPtr pScrn, pointer data, Bool shutdown);
-RDC_STATIC void RDCStopVideo(ScrnInfoPtr pScrn, pointer data, Bool shutdown);
-RDC_STATIC XF86VideoAdaptorPtr RDCSetupImageVideoOverlay(ScreenPtr pScreen);
+static FBLinearPtr RDCAllocateMemory( ScrnInfoPtr pScrn, FBLinearPtr PackedBuf, int size);
+static int RDCGetPortAttribute( ScrnInfoPtr pScrn, Atom attribute, INT32 * value, pointer data);
+static int RDCPutImage(ScrnInfoPtr pScrn, short src_x, short src_y, short drw_x, short drw_y, short src_w, short src_h, short drw_w, short drw_h, int id, unsigned char *buf, short width, short height, Bool sync, RegionPtr clipBoxes, pointer data, DrawablePtr pDraw);
+static int RDCPutImageVPOST(ScrnInfoPtr pScrn, short src_x, short src_y, short drw_x, short drw_y, short src_w, short src_h, short drw_w, short drw_h, int id, unsigned char *buf, short width, short height, Bool sync, RegionPtr clipBoxes, pointer data, DrawablePtr pDraw);
+static int RDCQueryImageAttributesOverlay(ScrnInfoPtr pScrn,int id, unsigned short *w, unsigned short *h, int *pitches, int *offsets);
+static int RDCSetPortAttribute( ScrnInfoPtr pScrn, Atom attribute, INT32 value, pointer data);
+static void RDCQueryBestSize(ScrnInfoPtr pScrn, Bool motion, short vid_w, short vid_h, short drw_w, short drw_h, unsigned int *p_w, unsigned int *p_h, pointer data);
+static void RDCStopVideoPost(ScrnInfoPtr pScrn, pointer data, Bool shutdown);
+static void RDCStopVideo(ScrnInfoPtr pScrn, pointer data, Bool shutdown);
+static XF86VideoAdaptorPtr RDCSetupImageVideoOverlay(ScreenPtr pScreen);
 #endif
 
 

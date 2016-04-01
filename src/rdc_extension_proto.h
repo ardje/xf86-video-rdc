@@ -16,10 +16,10 @@ extern void RDCDisplayExtensionInit(ScrnInfoPtr pScrn);
  * Static prototypes for rdc_extension.c
  */
 #ifdef _rdc_extension_c_
-RDC_STATIC int ProcRDCGFXCommand(ClientPtr client);
-RDC_STATIC int ProcRDCGFXDispatch(ClientPtr client);
-RDC_STATIC int ProcRDCGFXQueryVersion (ClientPtr client);
-RDC_STATIC void RDCGFXResetProc(ExtensionEntry* extEntry);
+static int ProcRDCGFXCommand(ClientPtr client);
+static int ProcRDCGFXDispatch(ClientPtr client);
+static int ProcRDCGFXQueryVersion (ClientPtr client);
+static void RDCGFXResetProc(ExtensionEntry* extEntry);
 #endif
 
 

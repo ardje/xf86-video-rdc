@@ -12,19 +12,19 @@ extern void RDCHideCursor(ScrnInfoPtr pScrn);
  * Static prototypes for rdc_cursor.c
  */
 #ifdef _rdc_cursor_c_
-RDC_STATIC Bool RDCUseHWCursorARGB(ScreenPtr pScreen, CursorPtr pCurs);
-RDC_STATIC Bool RDCUseHWCursor(ScreenPtr pScreen, CursorPtr pCurs);
-RDC_STATIC void RDCFireCursor(ScrnInfoPtr pScrn);
-RDC_STATIC void RDCLoadCursorARGB_HQ(ScrnInfoPtr pScrn, CursorPtr pCurs);
-RDC_STATIC void RDCLoadCursorARGB(ScrnInfoPtr pScrn, CursorPtr pCurs);
-RDC_STATIC void RDCLoadCursorImage_HQ(ScrnInfoPtr pScrn, UCHAR *src);
-RDC_STATIC void RDCLoadCursorImage(ScrnInfoPtr pScrn, UCHAR *src);
-RDC_STATIC void RDCSetCursorColors_HQ(ScrnInfoPtr pScrn, int bg, int fg);
-RDC_STATIC void RDCSetCursorColors(ScrnInfoPtr pScrn, int bg, int fg);
-RDC_STATIC void RDCSetCursorPosition_HQ(ScrnInfoPtr pScrn, int x, int y);
-RDC_STATIC void RDCSetCursorPosition(ScrnInfoPtr pScrn, int x, int y);
-RDC_STATIC void RDCShowCursor_HQ(ScrnInfoPtr pScrn);
-RDC_STATIC void RDCShowCursor(ScrnInfoPtr pScrn);
+static Bool RDCUseHWCursorARGB(ScreenPtr pScreen, CursorPtr pCurs);
+static Bool RDCUseHWCursor(ScreenPtr pScreen, CursorPtr pCurs);
+static void RDCFireCursor(ScrnInfoPtr pScrn);
+static void RDCLoadCursorARGB_HQ(ScrnInfoPtr pScrn, CursorPtr pCurs);
+static void RDCLoadCursorARGB(ScrnInfoPtr pScrn, CursorPtr pCurs);
+static void RDCLoadCursorImage_HQ(ScrnInfoPtr pScrn, UCHAR *src);
+static void RDCLoadCursorImage(ScrnInfoPtr pScrn, UCHAR *src);
+static void RDCSetCursorColors_HQ(ScrnInfoPtr pScrn, int bg, int fg);
+static void RDCSetCursorColors(ScrnInfoPtr pScrn, int bg, int fg);
+static void RDCSetCursorPosition_HQ(ScrnInfoPtr pScrn, int x, int y);
+static void RDCSetCursorPosition(ScrnInfoPtr pScrn, int x, int y);
+static void RDCShowCursor_HQ(ScrnInfoPtr pScrn);
+static void RDCShowCursor(ScrnInfoPtr pScrn);
 #endif
 
 

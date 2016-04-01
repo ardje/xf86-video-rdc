@@ -29,16 +29,16 @@ extern xf86MonPtr RDCDoDDC(ScrnInfoPtr pScrn, int index);
  * Static prototypes for rdc_driver.c
  */
 #ifdef _rdc_driver_c_
-RDC_STATIC Bool RDCEnterVT(ScrnInfoPtr pScrn);
-RDC_STATIC Bool rdc_pci_probe (DriverPtr		driver, int		        entity_num, struct pci_device	*device, intptr_t		match_data);
-RDC_STATIC Bool RDCPreInit(ScrnInfoPtr pScrn, int flags);
-RDC_STATIC Bool RDCProbe(DriverPtr drv, int flags);
-RDC_STATIC Bool RDCScreenInit(ScreenPtr pScreen, int argc, char **argv);
-RDC_STATIC ModeStatus RDCValidMode(ScrnInfoPtr pScrn, DisplayModePtr mode, Bool verbose, int flags);
-RDC_STATIC pointer RDCSetup(pointer module, pointer opts, int *errmaj, int *errmin);
-RDC_STATIC void RDCFreeScreen(ScrnInfoPtr pScrn);
-RDC_STATIC void RDCIdentify(int flags);
-RDC_STATIC void RDCLeaveVT(ScrnInfoPtr pScrn);
+static Bool RDCEnterVT(ScrnInfoPtr pScrn);
+static Bool rdc_pci_probe (DriverPtr		driver, int		        entity_num, struct pci_device	*device, intptr_t		match_data);
+static Bool RDCPreInit(ScrnInfoPtr pScrn, int flags);
+static Bool RDCProbe(DriverPtr drv, int flags);
+static Bool RDCScreenInit(ScreenPtr pScreen, int argc, char **argv);
+static ModeStatus RDCValidMode(ScrnInfoPtr pScrn, DisplayModePtr mode, Bool verbose, int flags);
+static pointer RDCSetup(pointer module, pointer opts, int *errmaj, int *errmin);
+static void RDCFreeScreen(ScrnInfoPtr pScrn);
+static void RDCIdentify(int flags);
+static void RDCLeaveVT(ScrnInfoPtr pScrn);
 #endif
 
 

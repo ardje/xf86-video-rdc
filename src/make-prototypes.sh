@@ -19,7 +19,7 @@ cat <<PROTO
 #ifdef _${afile/.c/_c}_
 PROTO
 
-grep -h "^RDC_STATIC.*" $afile|sort -u|sed 's/RDC_EXPORT/static/g;s/$/;/g'
+grep -h "^RDC_STATIC.*" $afile|sort -u|sed 's/RDC_STATIC/static/g;s/$/;/g'
 cat <<PROTO
 #endif
 
