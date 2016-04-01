@@ -837,5 +837,6 @@ extern Bool RDCAccelInit(ScreenPtr pScreen);
 // rdc_2dtool.c
 extern UCHAR *pjRequestCMDQ(RDCRecPtr pRDC, ULONG ulDataLen);
 
+#include "prototypes.h"
 
 #endif

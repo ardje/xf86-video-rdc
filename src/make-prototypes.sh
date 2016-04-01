@@ -1,2 +1,2 @@
 #!/bin/sh
-grep -h "extern.*;" *.c|sort -u > prototypes.h
+grep -h "^extern.*;" *.c|sort -u > prototypes.h
