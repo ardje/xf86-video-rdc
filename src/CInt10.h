@@ -230,4 +230,5 @@ typedef struct _TxEncDetect
 } TxEncDetect;
 #pragma   pack(pop)
 
+extern MODE_INFO VESATable;
 #endif
