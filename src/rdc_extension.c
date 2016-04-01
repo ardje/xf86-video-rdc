@@ -162,7 +162,7 @@ static int ProcRDCGFXDispatch(ClientPtr client)
     return BadRequest;
 }
 
-void RDCDisplayExtensionInit(ScrnInfoPtr pScrn)
+RDC_EXPORT void RDCDisplayExtensionInit(ScrnInfoPtr pScrn)
 {
     xf86DrvMsgVerb(pScrn->scrnIndex, X_INFO, 5, "==Enter RDCDisplayExtensionInit()== \n");
 
@@ -200,8 +200,7 @@ void RDCDisplayExtensionInit(ScrnInfoPtr pScrn)
     }
     xf86DrvMsgVerb(pScrn->scrnIndex, X_INFO, 5, "==Exit RDCDisplayExtensionInit()== \n");    
 }
-
-int RDCGFXUtilityProc(xRDCGFXCommandReq* req)
+RDC_EXPORT int RDCGFXUtilityProc(xRDCGFXCommandReq* req)
 {
     ScrnInfoPtr pScrn = xf86Screens[g_ScreenNumber];
     RDCRecPtr pRDC = RDCPTR(pScrn);
@@ -791,7 +790,7 @@ int RDCGFXUtilityProc(xRDCGFXCommandReq* req)
 }
 
 
-int EC_SetLCDPWM(RDCRecPtr pRDC, char *level)
+RDC_EXPORT int EC_SetLCDPWM(RDCRecPtr pRDC, char *level)
 {
     xf86DrvMsgVerb(0, X_INFO, 5, "==Enter EC_SetLCDPWM() level == \n");
 
@@ -813,7 +812,7 @@ int EC_SetLCDPWM(RDCRecPtr pRDC, char *level)
 }
 
 
-int EC_QueryLCDPWM(RDCRecPtr pRDC, char *level)
+RDC_EXPORT int EC_QueryLCDPWM(RDCRecPtr pRDC, char *level)
 {
     xf86DrvMsgVerb(0, X_INFO, 5, "==Enter EC_QueryLCDPWM()== \n");
 
@@ -848,7 +847,7 @@ int EC_QueryLCDPWM(RDCRecPtr pRDC, char *level)
     }
 }
 
-void GetSAA7105CCRSLevel(UCHAR ucI2Cport, UCHAR ucDevAddress, UCHAR *Level)
+RDC_EXPORT void GetSAA7105CCRSLevel(UCHAR ucI2Cport, UCHAR ucDevAddress, UCHAR *Level)
 {
     UCHAR bTmpData;
     
@@ -856,7 +855,7 @@ void GetSAA7105CCRSLevel(UCHAR ucI2Cport, UCHAR ucDevAddress, UCHAR *Level)
     xf86DrvMsgVerb(0, 0, 4, "==CCRS Level Get Data =%x==\n",*Level);
 }
 
-UCHAR ucGetTV_CVBS_CCRSLevel(UCHAR *Level)
+RDC_EXPORT UCHAR ucGetTV_CVBS_CCRSLevel(UCHAR *Level)
 {
     ScrnInfoPtr pScrn = xf86Screens[g_ScreenNumber];
     RDCRecPtr pRDC = RDCPTR(pScrn);
@@ -885,7 +884,7 @@ UCHAR ucGetTV_CVBS_CCRSLevel(UCHAR *Level)
     return TRUE;
 }
 
-void GetFS473PositionFromVBIOS(RDCRecPtr pRDC)
+RDC_EXPORT void GetFS473PositionFromVBIOS(RDCRecPtr pRDC)
 {
     
     USHORT   wHres;
@@ -950,7 +949,7 @@ void GetFS473PositionFromVBIOS(RDCRecPtr pRDC)
     pRDC->TVEncoderInfo[0].iHScaler = 0;
 }
 
-void CBIOS_SetTVEncDispRegModify(RDCRecPtr pRDC, PTV_Disp_Info pTVDispInfo, BYTE bChange)
+RDC_EXPORT void CBIOS_SetTVEncDispRegModify(RDCRecPtr pRDC, PTV_Disp_Info pTVDispInfo, BYTE bChange)
 {
     CBIOS_ARGUMENTS *pCBiosArguments = pRDC->pCBIOSExtension->pCBiosArguments;
     CBTV_Disp_Info   CBTVDispInfo;

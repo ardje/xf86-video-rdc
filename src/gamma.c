@@ -42,7 +42,7 @@
 
 
 
-void EnableGamma(ScrnInfoPtr pScrn, BOOL Enable)
+RDC_EXPORT void EnableGamma(ScrnInfoPtr pScrn, BOOL Enable)
 {
     RDCRecPtr pRDC = RDCPTR(pScrn);
     BYTE CRA8 = 0;
@@ -69,7 +69,7 @@ void EnableGamma(ScrnInfoPtr pScrn, BOOL Enable)
 }
 
 
-void SaveGammaTable(ScrnInfoPtr pScrn, PVIDEO_CLUT ClutBuffer)
+RDC_EXPORT void SaveGammaTable(ScrnInfoPtr pScrn, PVIDEO_CLUT ClutBuffer)
 {
     RDCRecPtr pRDC = RDCPTR(pScrn);
     ULONG ulStatus;
@@ -80,7 +80,7 @@ void SaveGammaTable(ScrnInfoPtr pScrn, PVIDEO_CLUT ClutBuffer)
 }
 
  
-BOOL CompGamma(PVIDEO_CLUT ClutBuffer)
+RDC_EXPORT BOOL CompGamma(PVIDEO_CLUT ClutBuffer)
 {
     DWORD i;
 
@@ -98,7 +98,7 @@ BOOL CompGamma(PVIDEO_CLUT ClutBuffer)
 }
 
 
-int VgaSetColorLookup(ScrnInfoPtr pScrn, PVIDEO_CLUT ClutBuffer, ULONG ClutBufferSize)
+RDC_EXPORT int VgaSetColorLookup(ScrnInfoPtr pScrn, PVIDEO_CLUT ClutBuffer, ULONG ClutBufferSize)
 {
     RDCRecPtr pRDC = RDCPTR(pScrn);
     USHORT i, j;

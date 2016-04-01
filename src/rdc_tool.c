@@ -57,21 +57,7 @@
 #include "rdc.h"
 #include "rdc_extension.h"
 
-
-Bool RDCMapMem(ScrnInfoPtr pScrn);
-Bool RDCUnmapMem(ScrnInfoPtr pScrn);
-Bool RDCMapMMIO(ScrnInfoPtr pScrn);
-void RDCUnmapMMIO(ScrnInfoPtr pScrn);
-Bool RDCMapVBIOS(ScrnInfoPtr pScrn);
-Bool RDCUnmapVBIOS(ScrnInfoPtr pScrn);
-ULONG EC_ReadPortUchar(BYTE *port, BYTE *value);
-void EC_WritePortUchar(BYTE *port, BYTE data);
-void EC_DetectCaps(ScrnInfoPtr pScrn, ECINFO* pECChip);
-
-
-
-Bool
-RDCMapMem(ScrnInfoPtr pScrn)
+RDC_EXPORT Bool RDCMapMem(ScrnInfoPtr pScrn)
 {
     RDCRecPtr pRDC = RDCPTR(pScrn);
     
@@ -102,8 +88,7 @@ RDCMapMem(ScrnInfoPtr pScrn)
     return TRUE;
 }
 
-Bool
-RDCUnmapMem(ScrnInfoPtr pScrn)
+RDC_EXPORT Bool RDCUnmapMem(ScrnInfoPtr pScrn)
 {
     RDCRecPtr pRDC = RDCPTR(pScrn);
 
@@ -120,8 +105,7 @@ RDCUnmapMem(ScrnInfoPtr pScrn)
 }
 
 
-Bool
-RDCMapMMIO(ScrnInfoPtr pScrn)
+RDC_EXPORT Bool RDCMapMMIO(ScrnInfoPtr pScrn)
 {
    int mmioFlags;
     RDCRecPtr pRDC = RDCPTR(pScrn);
@@ -150,8 +134,7 @@ RDCMapMMIO(ScrnInfoPtr pScrn)
     return TRUE;
 }
 
-void
-RDCUnmapMMIO(ScrnInfoPtr pScrn)
+RDC_EXPORT void RDCUnmapMMIO(ScrnInfoPtr pScrn)
 {
     RDCRecPtr pRDC = RDCPTR(pScrn);
 
@@ -167,7 +150,7 @@ RDCUnmapMMIO(ScrnInfoPtr pScrn)
 }
 
 
-Bool RDCMapVBIOS(ScrnInfoPtr pScrn)
+RDC_EXPORT Bool RDCMapVBIOS(ScrnInfoPtr pScrn)
 {
     RDCRecPtr   pRDC = RDCPTR(pScrn);
     FILE        *fpVBIOS;
@@ -268,7 +251,7 @@ Bool RDCMapVBIOS(ScrnInfoPtr pScrn)
     }
 }
 
-Bool RDCUnmapVBIOS(ScrnInfoPtr pScrn)
+RDC_EXPORT Bool RDCUnmapVBIOS(ScrnInfoPtr pScrn)
 {
     RDCRecPtr pRDC = RDCPTR(pScrn);
 
@@ -286,7 +269,7 @@ Bool RDCUnmapVBIOS(ScrnInfoPtr pScrn)
 }
 
 
-ULONG EC_ReadPortUchar(BYTE *port, BYTE *value)
+RDC_EXPORT ULONG EC_ReadPortUchar(BYTE *port, BYTE *value)
 {
     xf86DrvMsgVerb(0, X_INFO, ErrorLevel, "==Enter EC_ReadPortUchar()\n");
 
@@ -309,7 +292,7 @@ ULONG EC_ReadPortUchar(BYTE *port, BYTE *value)
     return EC_ACCESS_FAIL;
 };
 
-void EC_WritePortUchar(BYTE *port, BYTE data)
+RDC_EXPORT void EC_WritePortUchar(BYTE *port, BYTE data)
 {
     xf86DrvMsgVerb(0, X_INFO, ErrorLevel, "==Enter EC_WritePortUchar()\n");
     
@@ -330,7 +313,7 @@ void EC_WritePortUchar(BYTE *port, BYTE data)
     xf86DrvMsgVerb(0, X_INFO, ErrorLevel, "==Leave EC_WritePortUchar()\n");
 };
 
-void EC_DetectCaps(ScrnInfoPtr pScrn, ECINFO* pECChip)
+RDC_EXPORT void EC_DetectCaps(ScrnInfoPtr pScrn, ECINFO* pECChip)
 {
     xf86DrvMsgVerb(0, X_INFO, ErrorLevel, "==Enter EC_DetectCaps()\n");
     

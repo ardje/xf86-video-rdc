@@ -24,32 +24,32 @@
 #include "CInt10.h"
 #include "CInt10FunProto.h"
 
-BYTE Get_TVEnc_TX_ID()
+RDC_EXPORT BYTE Get_TVEnc_TX_ID()
 {
     return ReadScratch(IDX_TV1_ENCODER_ID);
 }
 
-BYTE Get_TV_TYPE()
+RDC_EXPORT BYTE Get_TV_TYPE()
 {
     return ReadScratch(IDX_TV1_TYPE);
 }
 
-void Set_TV_TYPE(BYTE ucTVType)
+RDC_EXPORT void Set_TV_TYPE(BYTE ucTVType)
 {
     WriteScratch(IDX_TV1_TYPE, ucTVType);
 }
 
-BYTE Get_TV_CONNECTION_TYPE()
+RDC_EXPORT BYTE Get_TV_CONNECTION_TYPE()
 {
     return ReadScratch(IDX_TV1_CONNECTION_TYPE);
 }
 
-void Set_TV_CONNECTION_TYPE(BYTE ucTVConnectionType)
+RDC_EXPORT void Set_TV_CONNECTION_TYPE(BYTE ucTVConnectionType)
 {
     WriteScratch(IDX_TV1_CONNECTION_TYPE, ucTVConnectionType);
 }
 
-void WriteFS473I2CData(BYTE ucIndex, WORD wData)
+RDC_EXPORT void WriteFS473I2CData(BYTE ucIndex, WORD wData)
 {
     BYTE ucI2CPort, ucAddr;
     CBIOSGetDeviceI2CInformation(TVIndex, &ucI2CPort, &ucAddr);
@@ -57,7 +57,7 @@ void WriteFS473I2CData(BYTE ucIndex, WORD wData)
     CBIOSWriteI2C(ucI2CPort, ucAddr, ucIndex+1, (BYTE)(wData>>8));
 }
 
-BYTE bSetSAA7105TimingReg(BYTE bDisplayPath, WORD wModeNum)
+RDC_EXPORT BYTE bSetSAA7105TimingReg(BYTE bDisplayPath, WORD wModeNum)
 {
     SAA7105_Mode_TABLE *pSAAModeTable;
     BYTE i, ucI2CPort, ucAddr;
@@ -112,7 +112,7 @@ BYTE bSetSAA7105TimingReg(BYTE bDisplayPath, WORD wModeNum)
     return TRUE;
 }
 
-BYTE bSetFS473TimingReg(BYTE bDisplayPath, WORD wModeNum)
+RDC_EXPORT BYTE bSetFS473TimingReg(BYTE bDisplayPath, WORD wModeNum)
 {
     FS473_I2C_REG *pFS473FormatReg;
     FS473_Mode_TABLE *pFS473ModeTable;
@@ -188,7 +188,7 @@ BYTE bSetFS473TimingReg(BYTE bDisplayPath, WORD wModeNum)
     return TRUE;
 }
 
-void CBIOSSetFS473VScalingLevel(PCBIOSTVFun_Disp_Info pCBTVFun)
+RDC_EXPORT void CBIOSSetFS473VScalingLevel(PCBIOSTVFun_Disp_Info pCBTVFun)
 {
     FSVSRegdata *FSScalingTAble;
     BYTE i,ucI2CPort, ucAddr, bTVType, bStatus=0, bTmp=0, bDispPath=0;
@@ -265,7 +265,7 @@ void CBIOSSetFS473VScalingLevel(PCBIOSTVFun_Disp_Info pCBTVFun)
     }
 }
 
-void LoadTVTiming(CBIOS_Extension *pCBIOSExtension, BYTE DisplayPath, WORD ModeNum)
+RDC_EXPORT void LoadTVTiming(CBIOS_Extension *pCBIOSExtension, BYTE DisplayPath, WORD ModeNum)
 {
     BYTE bTVEncID = Get_TVEnc_TX_ID();
     CBIOSDebugPrint((0, "==Set TV mode = %X  at CBIOS !!==\n", ModeNum));
@@ -276,7 +276,7 @@ void LoadTVTiming(CBIOS_Extension *pCBIOSExtension, BYTE DisplayPath, WORD ModeN
         bSetFS473TimingReg(DisplayPath,ModeNum);
 }
 
-void SetSAA7105InitReg()
+RDC_EXPORT void SetSAA7105InitReg()
 {
     BYTE ucI2CPort, ucAddr;
     SAA7105_I2C_REG *pInitSAA7105Reg = (SAA7105_I2C_REG*)(&SAA7105InitReg);
@@ -290,7 +290,7 @@ void SetSAA7105InitReg()
     CBIOSDebugPrint((0, "==SetSAA7105InitReg Completed !!==\n"));
 }
 
-void SetFS473InitReg()
+RDC_EXPORT void SetFS473InitReg()
 {
     BYTE ucI2CPort, ucAddr;
     FS473_I2C_REG *pInitFS473Reg = (FS473_I2C_REG*)(&FS473InitReg);
@@ -304,7 +304,7 @@ void SetFS473InitReg()
     CBIOSDebugPrint((0, "==SetFS473InitReg Completed !!==\n"));
 }
 
-void InitTVEncReg(BYTE ucTVEncID)
+RDC_EXPORT void InitTVEncReg(BYTE ucTVEncID)
 {
     if(ucTVEncID == TVEnc_SAA7105)
         SetSAA7105InitReg();
@@ -312,14 +312,14 @@ void InitTVEncReg(BYTE ucTVEncID)
         SetFS473InitReg();
 }
 
-void CBIOSInitTV()
+RDC_EXPORT void CBIOSInitTV()
 {
     InitTVEncReg(Get_TVEnc_TX_ID());
     Set_TV_TYPE(NTSC);
     Set_TV_CONNECTION_TYPE(CVBS|SVideo);
 }
 
-void SetTVDACPower(BYTE bPowerstate)
+RDC_EXPORT void SetTVDACPower(BYTE bPowerstate)
 {
     BYTE ucI2CPort, ucAddr;
     BYTE bTVEncID = Get_TVEnc_TX_ID();
@@ -377,7 +377,7 @@ void SetTVDACPower(BYTE bPowerstate)
 }
 
 
-BYTE SenseSAA7105TV(BYTE I2CPort, BYTE I2CSlave)
+RDC_EXPORT BYTE SenseSAA7105TV(BYTE I2CPort, BYTE I2CSlave)
 {
     BYTE EncoderType, PowerCtrl, bConnect, RData;
 
@@ -414,7 +414,7 @@ BYTE SenseSAA7105TV(BYTE I2CPort, BYTE I2CSlave)
 }
 
 
-BYTE SenseFS473TV(BYTE I2CPort, BYTE I2CSlave)
+RDC_EXPORT BYTE SenseFS473TV(BYTE I2CPort, BYTE I2CSlave)
 {
     BYTE Regd4Data, Regd9Data;
     BYTE bConnect, i;
@@ -449,7 +449,7 @@ BYTE SenseFS473TV(BYTE I2CPort, BYTE I2CSlave)
 }
 
 
-BYTE SenseTV()
+RDC_EXPORT BYTE SenseTV()
 {
     BYTE TV_Encoder;
     BYTE I2CPort, I2CSlave;
@@ -471,18 +471,18 @@ BYTE SenseTV()
     return bConnect;
 }
 
-void EnableTVClock()
+RDC_EXPORT void EnableTVClock()
 {
     SetCRReg(0xD0, BIT6, BIT6);
 }
 
-void DisableTVClock()
+RDC_EXPORT void DisableTVClock()
 {
     SetCRReg(0xD0, 0, BIT6);
     SetTVDACPower(DeviceOFF); 
 }
 
-void UpdatePLLByTVEnc(DWORD dwPixelClock)
+RDC_EXPORT void UpdatePLLByTVEnc(DWORD dwPixelClock)
 {
     FSPLLPatch  *pFSModePLLTable  = (FSPLLPatch*)(&FocusPLLPatch);
     SAAPLLPatch *pSAAModePLLTable = (SAAPLLPatch*)(&Saa7105PLLPatch);
@@ -537,7 +537,7 @@ void UpdatePLLByTVEnc(DWORD dwPixelClock)
     }    
 }
 
-void vSetFS473CCRSLevel(BYTE bCCRSLevel)
+RDC_EXPORT void vSetFS473CCRSLevel(BYTE bCCRSLevel)
 {
     BYTE bTmpdata[4],i;
     BYTE ucI2CPort, ucAddr;
@@ -566,7 +566,7 @@ void vSetFS473CCRSLevel(BYTE bCCRSLevel)
         CBIOSWriteI2C(ucI2CPort, ucAddr, i+0x20,bTmpdata[i]);
 }
 
-void SetTVCCRSLevel(BYTE bCCRSLevel)
+RDC_EXPORT void SetTVCCRSLevel(BYTE bCCRSLevel)
 {
     BYTE bTmpdata=0;
     BYTE ucI2CPort, ucAddr;
@@ -584,7 +584,7 @@ void SetTVCCRSLevel(BYTE bCCRSLevel)
     }
 }
 
-void SetFS473HPosition(BYTE bHPosition)
+RDC_EXPORT void SetFS473HPosition(BYTE bHPosition)
 {
     BYTE ucI2CPort, ucAddr;
     CBIOSGetDeviceI2CInformation(TVIndex, &ucI2CPort, &ucAddr);
@@ -592,7 +592,7 @@ void SetFS473HPosition(BYTE bHPosition)
     CBIOSWriteI2C(ucI2CPort, ucAddr, (Reg_FS473HPos+1),0);
 }
 
-void SetFS473VPosition(BYTE bVPosition)
+RDC_EXPORT void SetFS473VPosition(BYTE bVPosition)
 {
     BYTE ucI2CPort, ucAddr;
     CBIOSGetDeviceI2CInformation(TVIndex, &ucI2CPort, &ucAddr);
@@ -600,7 +600,7 @@ void SetFS473VPosition(BYTE bVPosition)
     CBIOSWriteI2C(ucI2CPort, ucAddr, (Reg_FS473VPos+1),0);
 }
 
-void SetFS473HSCaler(PCBIOSTVFun_Disp_Info pCBTVFun)
+RDC_EXPORT void SetFS473HSCaler(PCBIOSTVFun_Disp_Info pCBTVFun)
 {
     BYTE ucI2CPort, ucAddr;
     WORD wHres,wHScalerVector, wHScalerDiff;

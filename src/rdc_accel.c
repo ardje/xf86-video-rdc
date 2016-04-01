@@ -152,8 +152,7 @@ static void RDCSubsequentDashedTwoPointLine(ScrnInfoPtr pScrn,
 
 static ExaDriverPtr RDCInitExa(ScreenPtr pScreen);
 
-Bool
-RDCAccelInit(ScreenPtr pScreen)
+RDC_EXPORT Bool RDCAccelInit(ScreenPtr pScreen)
 {
     ScrnInfoPtr    pScrn = xf86Screens[pScreen->myNum];
     RDCRecPtr      pRDC = RDCPTR(pScrn);
@@ -2134,8 +2133,7 @@ RDCSubsequentDashedTwoPointLine(ScrnInfoPtr pScrn,
 #endif
 
 
-void
-RDCAccelWaitMarker(ScreenPtr pScreen, int marker)
+RDC_EXPORT void RDCAccelWaitMarker(ScreenPtr pScreen, int marker)
 {
     ScrnInfoPtr pScrn = xf86Screens[pScreen->myNum];
     RDCRecPtr pRDC = RDCPTR(pScrn);
@@ -2175,8 +2173,7 @@ RDCAccelWaitMarker(ScreenPtr pScreen, int marker)
 }
 
 
-int
-RDCAccelMarkSync(ScreenPtr pScreen)
+RDC_EXPORT int RDCAccelMarkSync(ScreenPtr pScreen)
 {
     PKT_SC *pSingleCMD;
     ScrnInfoPtr pScrn = xf86Screens[pScreen->myNum];
@@ -2516,10 +2513,7 @@ RDCExaDoneCopy(PixmapPtr pPixmap)
 
 
 
-Bool RDCExaUploadToScreen ( PixmapPtr   pDst,
-				            int x, int y,
-				            int w, int h,
-                            char *src, int src_pitch)
+RDC_EXPORT Bool RDCExaUploadToScreen ( PixmapPtr   pDst, int x, int y, int w, int h, char *src, int src_pitch)
 {
     ScrnInfoPtr pScrn = xf86Screens[pDst->drawable.pScreen->myNum];
     RDCRecPtr pRDC = RDCPTR(pScrn);
@@ -2552,10 +2546,7 @@ Bool RDCExaUploadToScreen ( PixmapPtr   pDst,
 }
 
 
-Bool RDCExaDownloadFromScreen (PixmapPtr pSrc,
-                               int x,  int y,
-                               int w,  int h,
-                               char *dst,  int dst_pitch)
+RDC_EXPORT Bool RDCExaDownloadFromScreen (PixmapPtr pSrc, int x,  int y, int w,  int h, char *dst,  int dst_pitch)
 {
     ScrnInfoPtr pScrn = xf86Screens[pSrc->drawable.pScreen->myNum];
     RDCRecPtr pRDC = RDCPTR(pScrn);

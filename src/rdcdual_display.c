@@ -37,9 +37,7 @@
 
 #ifdef HAVE_DUAL
 
-extern Bool RDCModeInit(ScrnInfoPtr pScrn, DisplayModePtr mode);
-
-Bool GetDisaplyStatus(ScrnInfoPtr pScrn)
+RDC_EXPORT Bool GetDisaplyStatus(ScrnInfoPtr pScrn)
 {
     xf86CrtcConfigPtr xf86_config = XF86_CRTC_CONFIG_PTR(pScrn);
     RDCRecPtr pRDC = RDCPTR(pScrn);   
@@ -267,8 +265,7 @@ static const xf86CrtcFuncsRec rdc_crtc_funcs = {
 
 
 
-void
-rdc_crtc_init(ScrnInfoPtr pScrn, int pipe)
+RDC_EXPORT void rdc_crtc_init(ScrnInfoPtr pScrn, int pipe)
 {
     xf86CrtcPtr crtc;
     RDCCrtcPrivatePtr rdc_crtc;
@@ -360,14 +357,12 @@ rdc_crt_mode_fixup(xf86OutputPtr output, DisplayModePtr mode,
     return TRUE;
 }
 
-void
-rdc_output_prepare (xf86OutputPtr output)
+RDC_EXPORT void rdc_output_prepare (xf86OutputPtr output)
 {
     output->funcs->dpms (output, DPMSModeOff);
 }
 
-void
-rdc_output_commit (xf86OutputPtr output)
+RDC_EXPORT void rdc_output_commit (xf86OutputPtr output)
 {
     output->funcs->dpms (output, DPMSModeOn);
 }
@@ -435,8 +430,7 @@ static const xf86OutputFuncsRec rdc_crt_output_funcs = {
 
 };
 
-void
-rdc_crt_init(ScrnInfoPtr pScrn)
+RDC_EXPORT void rdc_crt_init(ScrnInfoPtr pScrn)
 {
     xf86OutputPtr	    output;
     RDCOutputPrivatePtr    rdc_output;
@@ -562,8 +556,7 @@ static const xf86OutputFuncsRec rdc_hdmi_output_funcs = {
     
 };
 
-void
-rdc_hdmi_init(pScrn)
+RDC_EXPORT void rdc_hdmi_init(pScrn)
 {
     xf86OutputPtr	    output;
     RDCOutputPrivatePtr    rdc_output;

@@ -24,32 +24,32 @@
 #include "CInt10.h"
 #include "CInt10FunProto.h"
 
-BYTE Get_HDMI_TYPE()
+RDC_EXPORT BYTE Get_HDMI_TYPE()
 {
     return ReadScratch(IDX_HDMI1_TYPE);
 }
 
-void Set_HDMI_TYPE(BYTE ucHDMIType)
+RDC_EXPORT void Set_HDMI_TYPE(BYTE ucHDMIType)
 {
     WriteScratch(IDX_HDMI1_TYPE, ucHDMIType);
 }
 
-BYTE Get_HDMI_Output_Signal(BYTE DisplayPath)
+RDC_EXPORT BYTE Get_HDMI_Output_Signal(BYTE DisplayPath)
 {
     return ReadScratch(IDX_HDMI1_CONNECTION_TYPE);
 }
 
-void Set_HDMI_Output_Signal(BYTE ucOutputSignal)
+RDC_EXPORT void Set_HDMI_Output_Signal(BYTE ucOutputSignal)
 {
     WriteScratch(IDX_HDMI1_CONNECTION_TYPE, ucOutputSignal);
 }
 
-BYTE Get_TMDS_TX_ID()
+RDC_EXPORT BYTE Get_TMDS_TX_ID()
 {
     return ReadScratch(IDX_TMDS1_TX_ID);
 }
 
-void SetEP932MInitReg(BYTE ucDeviceID)
+RDC_EXPORT void SetEP932MInitReg(BYTE ucDeviceID)
 {
     HDMI_I2C_REG *pInitEP932MReg = (HDMI_I2C_REG*)(&EP932M_INIT_Reg);
     BYTE ucI2CPort, ucAddr;
@@ -71,7 +71,7 @@ void SetEP932MInitReg(BYTE ucDeviceID)
 }
 
 
-void GetHDMIVideoCodeID(BYTE ucHDMIType, BYTE* ucHDMIVCID)
+RDC_EXPORT void GetHDMIVideoCodeID(BYTE ucHDMIType, BYTE* ucHDMIVCID)
 {
     
     
@@ -102,7 +102,7 @@ void GetHDMIVideoCodeID(BYTE ucHDMIType, BYTE* ucHDMIVCID)
     }
 }
 
-void SetHDMIInfoframe(BYTE ucHDMIType)
+RDC_EXPORT void SetHDMIInfoframe(BYTE ucHDMIType)
 {
     BYTE ucI2CPort, ucAddr, i, ucHDMIVCID;
     BYTE Temp_Data[15];
@@ -234,7 +234,7 @@ void SetHDMIInfoframe(BYTE ucHDMIType)
     CBIOSWriteI2C(ucI2CPort, ucAddr, Addr_EP932M_Fire_All ,0xF0);
 }
 
-void EnableTMDSReg(BYTE ucDeviceID, BYTE ucHDMIType)
+RDC_EXPORT void EnableTMDSReg(BYTE ucDeviceID, BYTE ucHDMIType)
 {
     
     BYTE ucI2CPort, ucAddr;
@@ -271,7 +271,7 @@ void EnableTMDSReg(BYTE ucDeviceID, BYTE ucHDMIType)
     }
 }
 
-void DisableTMDSReg()
+RDC_EXPORT void DisableTMDSReg()
 {
     BYTE ucI2CPort, ucAddr;
     CBIOSGetDeviceI2CInformation(DVIIndex, &ucI2CPort, &ucAddr);
@@ -291,7 +291,7 @@ void DisableTMDSReg()
     }
 }
 
-void SetTMDSTxPW(BYTE ucPowerStatus)
+RDC_EXPORT void SetTMDSTxPW(BYTE ucPowerStatus)
 {
     BYTE ucI2CPort, ucAddr, ucData=0;
     BYTE ucTxID = Get_TMDS_TX_ID();
@@ -323,7 +323,7 @@ void SetTMDSTxPW(BYTE ucPowerStatus)
 }
 
 
-BYTE QueryHDMIConnectStatus(BYTE QuickCheck)
+RDC_EXPORT BYTE QueryHDMIConnectStatus(BYTE QuickCheck)
 {
     BYTE I2CPort, I2CSlave;
     BYTE bConnect;
@@ -411,7 +411,7 @@ BYTE QueryHDMIConnectStatus(BYTE QuickCheck)
     return (bConnect);
 }
 
-void SetTMDSDPAReg(DWORD dwPixelClock, BYTE ucDeviceID)
+RDC_EXPORT void SetTMDSDPAReg(DWORD dwPixelClock, BYTE ucDeviceID)
 {
     
     BYTE ucI2CPort, ucAddr, i=0;

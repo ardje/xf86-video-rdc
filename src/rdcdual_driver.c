@@ -66,8 +66,6 @@
 
 static Bool RDCPreInitDual(ScrnInfoPtr pScrn, int flags);
 static Bool RDCScreenInitDual(int Index, ScreenPtr pScreen, int argc, char **argv);
-Bool RDCSwitchModeDual(int scrnIndex, DisplayModePtr mode, int flags);
-void RDCAdjustFrameDual(int scrnIndex, int x, int y, int flags);
 static Bool RDCEnterVTDual(int scrnIndex, int flags);
 static void RDCLeaveVTDual(int scrnIndex, int flags);
 static void RDCFreeScreenDual(int scrnIndex, int flags);
@@ -1215,15 +1213,14 @@ RDCScreenInitDual(int scrnIndex, ScreenPtr pScreen, int argc, char **argv)
     return TRUE;
 } 
 
-Bool RDCSwitchModeDual(int scrnIndex, DisplayModePtr mode, int flags)
+RDC_EXPORT Bool RDCSwitchModeDual(int scrnIndex, DisplayModePtr mode, int flags)
 {
    ScrnInfoPtr pScrn = xf86Screens[scrnIndex];
    xf86DrvMsg(pScrn->scrnIndex, X_INFO,"==Enter RDCSwitchModeM15()==\n");
    return xf86SetSingleMode (pScrn, mode, RR_Rotate_0);
 }
 
-void
-RDCAdjustFrameDual(int scrnIndex, int x, int y, int flags)
+RDC_EXPORT void RDCAdjustFrameDual(int scrnIndex, int x, int y, int flags)
 {
     ScrnInfoPtr pScrn = xf86Screens[scrnIndex];
     RDCRecPtr   pRDC  = RDCPTR(pScrn);
@@ -1343,7 +1340,7 @@ RDCValidModeDual(int scrnIndex, DisplayModePtr mode, Bool verbose, int flags)
     return MODE_OK;
 }            
 
-void RDCInitpScrnDual(ScrnInfoPtr pScrn)
+RDC_EXPORT void RDCInitpScrnDual(ScrnInfoPtr pScrn)
 {
    pScrn->PreInit = RDCPreInitDual;
    pScrn->ScreenInit = RDCScreenInitDual;

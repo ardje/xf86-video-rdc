@@ -203,14 +203,57 @@ extern WORD TransDevIDtoBit(BYTE DeviceIndex);
 /*
  * Prototypes for HDMI.c
  */
+extern BYTE Get_HDMI_Output_Signal(BYTE DisplayPath);
+extern BYTE Get_HDMI_TYPE();
+extern BYTE Get_TMDS_TX_ID();
+extern BYTE QueryHDMIConnectStatus(BYTE QuickCheck);
+extern void DisableTMDSReg();
+extern void EnableTMDSReg(BYTE ucDeviceID, BYTE ucHDMIType);
+extern void GetHDMIVideoCodeID(BYTE ucHDMIType, BYTE* ucHDMIVCID);
+extern void SetEP932MInitReg(BYTE ucDeviceID);
+extern void SetHDMIInfoframe(BYTE ucHDMIType);
+extern void Set_HDMI_Output_Signal(BYTE ucOutputSignal);
+extern void Set_HDMI_TYPE(BYTE ucHDMIType);
+extern void SetTMDSDPAReg(DWORD dwPixelClock, BYTE ucDeviceID);
+extern void SetTMDSTxPW(BYTE ucPowerStatus);
 
 /*
  * Prototypes for TV.c
  */
+extern BYTE bSetFS473TimingReg(BYTE bDisplayPath, WORD wModeNum);
+extern BYTE bSetSAA7105TimingReg(BYTE bDisplayPath, WORD wModeNum);
+extern BYTE Get_TV_CONNECTION_TYPE();
+extern BYTE Get_TVEnc_TX_ID();
+extern BYTE Get_TV_TYPE();
+extern BYTE SenseFS473TV(BYTE I2CPort, BYTE I2CSlave);
+extern BYTE SenseSAA7105TV(BYTE I2CPort, BYTE I2CSlave);
+extern BYTE SenseTV();
+extern void CBIOSInitTV();
+extern void CBIOSSetFS473VScalingLevel(PCBIOSTVFun_Disp_Info pCBTVFun);
+extern void DisableTVClock();
+extern void EnableTVClock();
+extern void InitTVEncReg(BYTE ucTVEncID);
+extern void LoadTVTiming(CBIOS_Extension *pCBIOSExtension, BYTE DisplayPath, WORD ModeNum);
+extern void SetFS473HPosition(BYTE bHPosition);
+extern void SetFS473HSCaler(PCBIOSTVFun_Disp_Info pCBTVFun);
+extern void SetFS473InitReg();
+extern void SetFS473VPosition(BYTE bVPosition);
+extern void SetSAA7105InitReg();
+extern void SetTVCCRSLevel(BYTE bCCRSLevel);
+extern void Set_TV_CONNECTION_TYPE(BYTE ucTVConnectionType);
+extern void SetTVDACPower(BYTE bPowerstate);
+extern void Set_TV_TYPE(BYTE ucTVType);
+extern void UpdatePLLByTVEnc(DWORD dwPixelClock);
+extern void vSetFS473CCRSLevel(BYTE bCCRSLevel);
+extern void WriteFS473I2CData(BYTE ucIndex, WORD wData);
 
 /*
  * Prototypes for gamma.c
  */
+extern BOOL CompGamma(PVIDEO_CLUT ClutBuffer);
+extern int VgaSetColorLookup(ScrnInfoPtr pScrn, PVIDEO_CLUT ClutBuffer, ULONG ClutBufferSize);
+extern void EnableGamma(ScrnInfoPtr pScrn, BOOL Enable);
+extern void SaveGammaTable(ScrnInfoPtr pScrn, PVIDEO_CLUT ClutBuffer);
 
 /*
  * Prototypes for rdc_2dtool.c
@@ -232,10 +275,19 @@ extern void vWaitEngIdle(RDCRecPtr pRDC);
 /*
  * Prototypes for rdc_accel.c
  */
+extern Bool RDCAccelInit(ScreenPtr pScreen);
+extern Bool RDCExaDownloadFromScreen (PixmapPtr pSrc, int x,  int y, int w,  int h, char *dst,  int dst_pitch);
+extern Bool RDCExaUploadToScreen ( PixmapPtr   pDst, int x, int y, int w, int h, char *src, int src_pitch);
+extern int RDCAccelMarkSync(ScreenPtr pScreen);
+extern void RDCAccelWaitMarker(ScreenPtr pScreen, int marker);
 
 /*
  * Prototypes for rdc_cursor.c
  */
+extern Bool bInitHWC(ScrnInfoPtr pScrn, RDCRecPtr pRDC) {;
+extern Bool RDCCursorInit(ScreenPtr pScreen);
+extern void RDCHideCursor_HQ(ScrnInfoPtr pScrn);
+extern void RDCHideCursor(ScrnInfoPtr pScrn);
 
 /*
  * Prototypes for rdc_driver.c
@@ -266,33 +318,97 @@ extern xf86MonPtr RDCDoDDC(ScrnInfoPtr pScrn, int index);
 /*
  * Prototypes for rdc_extension.c
  */
+extern int EC_QueryLCDPWM(RDCRecPtr pRDC, char *level);
+extern int EC_SetLCDPWM(RDCRecPtr pRDC, char *level);
+extern int RDCGFXUtilityProc(xRDCGFXCommandReq* req);
+extern UCHAR ucGetTV_CVBS_CCRSLevel(UCHAR *Level);
+extern void CBIOS_SetTVEncDispRegModify(RDCRecPtr pRDC, PTV_Disp_Info pTVDispInfo, BYTE bChange);
+extern void GetFS473PositionFromVBIOS(RDCRecPtr pRDC);
+extern void GetSAA7105CCRSLevel(UCHAR ucI2Cport, UCHAR ucDevAddress, UCHAR *Level);
+extern void RDCDisplayExtensionInit(ScrnInfoPtr pScrn);
 
 /*
  * Prototypes for rdc_mode.c
  */
+extern Bool BTranslateIndexToRefreshRate(UCHAR ucRRateIndex, float *fRefreshRate);
+extern Bool RDCSetMode(ScrnInfoPtr pScrn, DisplayModePtr mode);
+extern char* pcConvertResolutionToString(ULONG ulResolution);
+extern DisplayModePtr RDCBuildModePool(ScrnInfoPtr pScrn);
+extern DisplayModePtr SearchDisplayModeRecPtr(DisplayModePtr pModePoolHead, CBIOS_ARGUMENTS *pCBiosArguments);
+extern USHORT usGetVbeModeNum(ScrnInfoPtr pScrn, DisplayModePtr mode);
 
 /*
  * Prototypes for rdc_tool.c
  */
+extern Bool RDCMapMem(ScrnInfoPtr pScrn);
+extern Bool RDCMapMMIO(ScrnInfoPtr pScrn);
+extern Bool RDCMapVBIOS(ScrnInfoPtr pScrn);
+extern Bool RDCUnmapMem(ScrnInfoPtr pScrn);
+extern Bool RDCUnmapVBIOS(ScrnInfoPtr pScrn);
+extern ULONG EC_ReadPortUchar(BYTE *port, BYTE *value);
+extern void EC_DetectCaps(ScrnInfoPtr pScrn, ECINFO* pECChip);
+extern void EC_WritePortUchar(BYTE *port, BYTE data);
+extern void RDCUnmapMMIO(ScrnInfoPtr pScrn);
 
 /*
  * Prototypes for rdc_vgatool.c
  */
+extern Bool bRDCRegInit(ScrnInfoPtr pScrn);
+extern Bool RDCCheckCapture(ScrnInfoPtr pScrn);
+extern Bool RDCFilterModeByBandWidth(ScrnInfoPtr pScrn, DisplayModePtr mode);
+extern BYTE GetReg(WORD base);
+extern CBStatus CBIOS_SetEDIDToModeTable(ScrnInfoPtr pScrn, EDID_DETAILED_TIMING *pEDIDDetailedTiming);
+extern ULONG GetVRAMInfo(ScrnInfoPtr pScrn);
+extern ULONG RDCGetMemBandWidth(ScrnInfoPtr pScrn);
+extern void CreateEDIDDetailedTimingList(UCHAR *ucEdidBuffer, ULONG ulEdidBufferSize, EDID_DETAILED_TIMING *pEDIDDetailedTiming);
+extern void GetIndexRegMask(WORD base, BYTE index, BYTE mask, BYTE* val);
+extern void GetIndexReg(WORD base, BYTE index, BYTE* val);
+extern void ParseEDIDDetailedTiming(UCHAR *pucDetailedTimingBlock, EDID_DETAILED_TIMING *pEDIDDetailedTiming);
+extern void RDCDisplayPowerManagementSet(ScrnInfoPtr pScrn, int PowerManagementMode, int flags);
+extern void SetIndexRegMask(WORD base, BYTE index, BYTE mask, BYTE val);
+extern void SetIndexReg(WORD base, BYTE index, BYTE val);
+extern void SetReg(WORD base, BYTE val);
+extern void VGA_LOAD_PALETTE_INDEX(BYTE index, BYTE red, BYTE green, BYTE blue);
+extern void vRDCLoadPalette(ScrnInfoPtr pScrn, int numColors, int *indices, LOCO *colors, VisualPtr pVisual);
+extern void vRDCOpenKey(ScrnInfoPtr pScrn);
+extern void vSetDispalyStartAddress(xf86CrtcPtr crtc, int x, int y);
+extern void vSetStartAddressCRT1(RDCRecPtr pRDC, ULONG base);
 
 /*
  * Prototypes for rdc_video.c
  */
+extern UpdateOverlay(RDCRecPtr pRDC, VIDHWINFOPtr pVIDHwInfo, int iSrcBufIndex);
+extern void RDCAllocateVPOSTMem(ScrnInfoPtr pScrn, RDCPortPrivPtr pRDCPortPriv, long width, long height, Bool bRDC_Video);
+extern void RDCCopyFOURCC(RDCRecPtr  pRDC, unsigned char* pSrcStart, RDCPortPrivPtr pRDCPortPriv, unsigned long SrcPitch, unsigned long DstPitch, int FourCC, short width, short height);
+extern void RDCCopyFourCCVPOST(RDCRecPtr  pRDC, RDCPortPrivPtr pRDCPortPriv, unsigned char* pSrc, long Width, long Height, Bool bRDC_Video);
+extern void RDCUpdateVideo(RDCRecPtr pRDC, RDCPortPrivPtr pRDCPortPriv, BYTE bEnable, Bool bRDC_Video);
+extern void RDCUpdateVID(RDCRecPtr  pRDC, RDCPortPrivPtr pRDCPortPriv, BYTE bEnable);
+extern void RDCVideoInit(ScreenPtr pScreen);
+extern void UpdateVPost(RDCRecPtr pRDC, VPOSTHWINFOPtr pVPHwInfo);
 
 /*
  * Prototypes for rdcdual_display.c
  */
+extern Bool GetDisaplyStatus(ScrnInfoPtr pScrn);
+extern void rdc_crtc_init(ScrnInfoPtr pScrn, int pipe);
+extern void rdc_crt_init(ScrnInfoPtr pScrn);
+extern void rdc_hdmi_init(pScrn);
+extern void rdc_output_commit (xf86OutputPtr output);
+extern void rdc_output_prepare (xf86OutputPtr output);
 
 /*
  * Prototypes for rdcdual_driver.c
  */
+extern Bool RDCSwitchModeDual(int scrnIndex, DisplayModePtr mode, int flags);
+extern void RDCAdjustFrameDual(int scrnIndex, int x, int y, int flags);
+extern void RDCInitpScrnDual(ScrnInfoPtr pScrn);
 
 /*
  * Prototypes for vidinit.c
  */
+extern unsigned long CMD(Cofe *RGB, int op);
+extern void CheckBoundary(float *pfValue, float fMin, float fMax);
+extern void QDec2Hex( Cofe *RGB );
+extern void SetVIDColor(RDCRecPtr pRDC);
 
 #define RDC_EXPORT

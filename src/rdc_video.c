@@ -68,18 +68,10 @@ static int RDCPutImage(ScrnInfoPtr,short,short,short,short,short,short,short,sho
 		               int,unsigned char*,short,short,Bool,RegionPtr,pointer,DrawablePtr);
 static int RDCQueryImageAttributesOverlay(ScrnInfoPtr,int,unsigned short*,unsigned short*,int*,int*);
 static FBLinearPtr RDCAllocateMemory(ScrnInfoPtr, FBLinearPtr, int);
-void RDCUpdateVID(RDCRecPtr, RDCPortPrivPtr, BYTE);
-void RDCCopyFOURCC(RDCRecPtr, unsigned char*, RDCPortPrivPtr, unsigned long, 
-                   unsigned long, int, short, short);
-
     
 static void RDCStopVideoPost(ScrnInfoPtr,pointer,Bool);
 static int RDCPutImageVPOST(ScrnInfoPtr,short,short,short,short,short,short,short,short,
 		               int,unsigned char*,short,short,Bool,RegionPtr,pointer,DrawablePtr);
-void RDCAllocateVPOSTMem(ScrnInfoPtr, RDCPortPrivPtr, long, long, Bool);
-void RDCCopyFourCCVPOST(RDCRecPtr, RDCPortPrivPtr, unsigned char*, long, long, Bool);
-void RDCUpdateVideo(RDCRecPtr, RDCPortPrivPtr, BYTE, Bool);
-extern Bool GetDisaplyStatus(ScrnInfoPtr pScrn);
 
 
 #define IMAGE_MAX_WIDTH		1920
@@ -142,7 +134,7 @@ typedef struct VideoInfo
 } VideoInfo;
 
 
-void RDCVideoInit(ScreenPtr pScreen)
+RDC_EXPORT void RDCVideoInit(ScreenPtr pScreen)
 {
     ScrnInfoPtr pScrn = xf86Screens[pScreen->myNum];
     RDCRecPtr pRDC = RDCPTR(pScrn);
@@ -773,7 +765,7 @@ RDCAllocateMemory(
 }
 
 
-void RDCUpdateVID(RDCRecPtr  pRDC, RDCPortPrivPtr pRDCPortPriv, BYTE bEnable)
+RDC_EXPORT void RDCUpdateVID(RDCRecPtr  pRDC, RDCPortPrivPtr pRDCPortPriv, BYTE bEnable)
 {
     unsigned long   SrcWidth, DstWidth, SrcHeight, DstHeight;
     VIDHWINFOPtr pVIDHwInfo = &pRDCPortPriv->VidhwInfo;
@@ -929,9 +921,7 @@ void RDCUpdateVID(RDCRecPtr  pRDC, RDCPortPrivPtr pRDCPortPriv, BYTE bEnable)
 }
 
 
-void RDCCopyFOURCC(RDCRecPtr  pRDC, unsigned char* pSrcStart, RDCPortPrivPtr pRDCPortPriv,
-                   unsigned long SrcPitch, unsigned long DstPitch, int FourCC, 
-                   short width, short height)
+RDC_EXPORT void RDCCopyFOURCC(RDCRecPtr  pRDC, unsigned char* pSrcStart, RDCPortPrivPtr pRDCPortPriv, unsigned long SrcPitch, unsigned long DstPitch, int FourCC, short width, short height)
 {
     unsigned char* pDst = NULL;
     
@@ -1096,12 +1086,7 @@ RDCStopVideoPost(ScrnInfoPtr pScrn, pointer data, Bool shutdown)
     xf86DrvMsgVerb(0, X_INFO, DefaultLevel, "==RDCStopVideo()  Exit==\n");
 }
 
-void RDCCopyFourCCVPOST(RDCRecPtr  pRDC, 
-                        RDCPortPrivPtr pRDCPortPriv, 
-                        unsigned char* pSrc,
-                        long Width, 
-                        long Height,
-                        Bool bRDC_Video)
+RDC_EXPORT void RDCCopyFourCCVPOST(RDCRecPtr  pRDC, RDCPortPrivPtr pRDCPortPriv, unsigned char* pSrc, long Width, long Height, Bool bRDC_Video)
 {
     VPOSTHWINFOPtr  pVPHwInfo = &pRDCPortPriv->VPosthwInfo;
     VideoInfo *pVideoInfo = (VideoInfo *) pSrc;
@@ -1295,7 +1280,7 @@ void RDCCopyFourCCVPOST(RDCRecPtr  pRDC,
     }
 }
 
-void UpdateVPost(RDCRecPtr pRDC, VPOSTHWINFOPtr pVPHwInfo)
+RDC_EXPORT void UpdateVPost(RDCRecPtr pRDC, VPOSTHWINFOPtr pVPHwInfo)
 {
     PKT_SC          *pSingleCMD;
     
@@ -1387,7 +1372,7 @@ void UpdateVPost(RDCRecPtr pRDC, VPOSTHWINFOPtr pVPHwInfo)
     }
 }
 
-UpdateOverlay(RDCRecPtr pRDC, VIDHWINFOPtr pVIDHwInfo, int iSrcBufIndex)
+RDC_EXPORT UpdateOverlay(RDCRecPtr pRDC, VIDHWINFOPtr pVIDHwInfo, int iSrcBufIndex)
 {
     PKT_SC          *pSingleCMD;
 
@@ -1530,7 +1515,7 @@ UpdateOverlay(RDCRecPtr pRDC, VIDHWINFOPtr pVIDHwInfo, int iSrcBufIndex)
     }
 }
 
-void RDCUpdateVideo(RDCRecPtr pRDC, RDCPortPrivPtr pRDCPortPriv, BYTE bEnable, Bool bRDC_Video)
+RDC_EXPORT void RDCUpdateVideo(RDCRecPtr pRDC, RDCPortPrivPtr pRDCPortPriv, BYTE bEnable, Bool bRDC_Video)
 {
     unsigned long   SrcWidth, DstWidth, SrcHeight, DstHeight; 
     PKT_SC          *pSingleCMD;
@@ -2021,7 +2006,7 @@ void RDCUpdateVideo(RDCRecPtr pRDC, RDCPortPrivPtr pRDCPortPriv, BYTE bEnable, B
 
 
 
-void RDCAllocateVPOSTMem(ScrnInfoPtr pScrn, RDCPortPrivPtr pRDCPortPriv, long width, long height, Bool bRDC_Video)
+RDC_EXPORT void RDCAllocateVPOSTMem(ScrnInfoPtr pScrn, RDCPortPrivPtr pRDCPortPriv, long width, long height, Bool bRDC_Video)
 {
     int             size, i, shift;
     ULONG           ulSrcPitch, ulDstPitch; 

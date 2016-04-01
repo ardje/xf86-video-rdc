@@ -55,47 +55,37 @@
 #include "rdc.h"
 
 
-void vRDCOpenKey(ScrnInfoPtr pScrn);
-Bool bRDCRegInit(ScrnInfoPtr pScrn);
-ULONG GetVRAMInfo(ScrnInfoPtr pScrn);
-Bool RDCCheckCapture(ScrnInfoPtr pScrn);
-Bool RDCFilterModeByBandWidth(ScrnInfoPtr pScrn, DisplayModePtr mode);
-void vSetStartAddressCRT1(RDCRecPtr pRDC, ULONG base);
-void vSetDispalyStartAddress(xf86CrtcPtr crtc, int x, int y);
-void vRDCLoadPalette(ScrnInfoPtr pScrn, int numColors, int *indices, LOCO *colors, VisualPtr pVisual);
-void RDCDisplayPowerManagementSet(ScrnInfoPtr pScrn, int PowerManagementMode, int flags);
-ULONG RDCGetMemBandWidth(ScrnInfoPtr pScrn);
 
 
-BYTE GetReg(WORD base)
+RDC_EXPORT BYTE GetReg(WORD base)
 {
     return InPort(base);
 }
 
-void SetReg(WORD base, BYTE val)
+RDC_EXPORT void SetReg(WORD base, BYTE val)
 {
     OutPort(base,val);
 }
 
-void GetIndexReg(WORD base, BYTE index, BYTE* val)
+RDC_EXPORT void GetIndexReg(WORD base, BYTE index, BYTE* val)
 {
     OutPort(base,index);
     *val = InPort(base+1);
 }
                                         
-void SetIndexReg(WORD base, BYTE index, BYTE val)
+RDC_EXPORT void SetIndexReg(WORD base, BYTE index, BYTE val)
 {
     OutPort(base,index);
     OutPort(base+1,val);
 }
                                         
-void GetIndexRegMask(WORD base, BYTE index, BYTE mask, BYTE* val)
+RDC_EXPORT void GetIndexRegMask(WORD base, BYTE index, BYTE mask, BYTE* val)
 {
     OutPort(base,index);
     *val = (InPort(base+1) & mask);
 }
     
-void SetIndexRegMask(WORD base, BYTE index, BYTE mask, BYTE val)
+RDC_EXPORT void SetIndexRegMask(WORD base, BYTE index, BYTE mask, BYTE val)
 {
     UCHAR ucTemp;
     OutPort(base,index);
@@ -103,7 +93,7 @@ void SetIndexRegMask(WORD base, BYTE index, BYTE mask, BYTE val)
     SetIndexReg(base,index,ucTemp);
 }
 
-void VGA_LOAD_PALETTE_INDEX(BYTE index, BYTE red, BYTE green, BYTE blue)
+RDC_EXPORT void VGA_LOAD_PALETTE_INDEX(BYTE index, BYTE red, BYTE green, BYTE blue)
 {
     UCHAR ucTemp;
     SetReg(DAC_INDEX_WRITE, index);
@@ -116,15 +106,13 @@ void VGA_LOAD_PALETTE_INDEX(BYTE index, BYTE red, BYTE green, BYTE blue)
     ucTemp = GetReg(SEQ_INDEX);
 }
 
-void
-vRDCOpenKey(ScrnInfoPtr pScrn)
+RDC_EXPORT void vRDCOpenKey(ScrnInfoPtr pScrn)
 {
     RDCRecPtr pRDC = RDCPTR(pScrn);
     SetIndexReg(COLOR_CRTC_INDEX,0x80, 0xA8);     
 }
 
-Bool
-bRDCRegInit(ScrnInfoPtr pScrn)
+RDC_EXPORT Bool bRDCRegInit(ScrnInfoPtr pScrn)
 {
     RDCRecPtr pRDC = RDCPTR(pScrn);
 
@@ -134,8 +122,7 @@ bRDCRegInit(ScrnInfoPtr pScrn)
    return (TRUE);
 }
 
-Bool
-RDCCheckCapture(ScrnInfoPtr pScrn)
+RDC_EXPORT Bool RDCCheckCapture(ScrnInfoPtr pScrn)
 {
     UCHAR jReg;
     vRDCOpenKey(pScrn);
@@ -148,8 +135,7 @@ RDCCheckCapture(ScrnInfoPtr pScrn)
         return FALSE;
 }
 
-ULONG
-GetVRAMInfo(ScrnInfoPtr pScrn)
+RDC_EXPORT ULONG GetVRAMInfo(ScrnInfoPtr pScrn)
 {
     RDCRecPtr pRDC = RDCPTR(pScrn);
     UCHAR jReg;
@@ -178,8 +164,7 @@ GetVRAMInfo(ScrnInfoPtr pScrn)
     return (DEFAULT_VIDEOMEM_SIZE);
 }
 
-Bool 
-RDCFilterModeByBandWidth(ScrnInfoPtr pScrn, DisplayModePtr mode)
+RDC_EXPORT Bool RDCFilterModeByBandWidth(ScrnInfoPtr pScrn, DisplayModePtr mode)
 {
     ULONG RequestMemBandWidth = 0;
     RDCRecPtr pRDC = RDCPTR(pScrn);
@@ -197,7 +182,7 @@ RDCFilterModeByBandWidth(ScrnInfoPtr pScrn, DisplayModePtr mode)
 }
 
 
-void vSetDispalyStartAddress(xf86CrtcPtr crtc, int x, int y)
+RDC_EXPORT void vSetDispalyStartAddress(xf86CrtcPtr crtc, int x, int y)
 {
     BYTE         IndexData;
     unsigned long Offset;
@@ -224,8 +209,7 @@ void vSetDispalyStartAddress(xf86CrtcPtr crtc, int x, int y)
     
 }
 
-void
-vSetStartAddressCRT1(RDCRecPtr pRDC, ULONG base)
+RDC_EXPORT void vSetStartAddressCRT1(RDCRecPtr pRDC, ULONG base)
 {
     ULONG uc1stFlippingCmdReg;
 
@@ -254,8 +238,7 @@ vSetStartAddressCRT1(RDCRecPtr pRDC, ULONG base)
 
 }
 
-ULONG
-RDCGetMemBandWidth(ScrnInfoPtr pScrn)
+RDC_EXPORT ULONG RDCGetMemBandWidth(ScrnInfoPtr pScrn)
 {
     CBIOS_ARGUMENTS *pCBiosArguments;
     RDCRecPtr pRDC = RDCPTR(pScrn);
@@ -319,9 +302,7 @@ RDCGetMemBandWidth(ScrnInfoPtr pScrn)
     return(ActualDRAMBandwidth);
 }
 
-void
-vRDCLoadPalette(ScrnInfoPtr pScrn, int numColors, int *indices, LOCO *colors,
-               VisualPtr pVisual)
+RDC_EXPORT void vRDCLoadPalette(ScrnInfoPtr pScrn, int numColors, int *indices, LOCO *colors, VisualPtr pVisual)
 {
     RDCRecPtr  pRDC = RDCPTR(pScrn);
     int     i, j, index;
@@ -388,8 +369,7 @@ vRDCLoadPalette(ScrnInfoPtr pScrn, int numColors, int *indices, LOCO *colors,
     } 
 } 
 
-void
-RDCDisplayPowerManagementSet(ScrnInfoPtr pScrn, int PowerManagementMode, int flags)
+RDC_EXPORT void RDCDisplayPowerManagementSet(ScrnInfoPtr pScrn, int PowerManagementMode, int flags)
 {
     RDCRecPtr pRDC;
     UCHAR SEQ01, CRB6;
@@ -430,7 +410,7 @@ RDCDisplayPowerManagementSet(ScrnInfoPtr pScrn, int PowerManagementMode, int fla
     SetIndexRegMask(COLOR_CRTC_INDEX,0xB6, 0xFC, CRB6);
 }
 
-CBStatus CBIOS_SetEDIDToModeTable(ScrnInfoPtr pScrn, EDID_DETAILED_TIMING *pEDIDDetailedTiming)
+RDC_EXPORT CBStatus CBIOS_SetEDIDToModeTable(ScrnInfoPtr pScrn, EDID_DETAILED_TIMING *pEDIDDetailedTiming)
 {
     
     RDCRecPtr pRDC = RDCPTR(pScrn);
@@ -449,7 +429,7 @@ CBStatus CBIOS_SetEDIDToModeTable(ScrnInfoPtr pScrn, EDID_DETAILED_TIMING *pEDID
     return CInt10(pRDC->pCBIOSExtension);
 }
 
-void ParseEDIDDetailedTiming(UCHAR *pucDetailedTimingBlock, EDID_DETAILED_TIMING *pEDIDDetailedTiming)
+RDC_EXPORT void ParseEDIDDetailedTiming(UCHAR *pucDetailedTimingBlock, EDID_DETAILED_TIMING *pEDIDDetailedTiming)
 {
     ULONG ulRefreshRate, ulPixelClock;
     ULONG ulHorTotal, ulHorDispEnd, ulHorBlankingTime, ulHorBorder, ulHorSyncStart, ulHorSyncTime;
@@ -495,7 +475,7 @@ void ParseEDIDDetailedTiming(UCHAR *pucDetailedTimingBlock, EDID_DETAILED_TIMING
     
 }   
 
-void CreateEDIDDetailedTimingList(UCHAR *ucEdidBuffer, ULONG ulEdidBufferSize, EDID_DETAILED_TIMING *pEDIDDetailedTiming)
+RDC_EXPORT void CreateEDIDDetailedTimingList(UCHAR *ucEdidBuffer, ULONG ulEdidBufferSize, EDID_DETAILED_TIMING *pEDIDDetailedTiming)
 {
     UCHAR *pucDetailedTimingBlock = ucEdidBuffer + 0x36;
     EDID_DETAILED_TIMING *pCurrent;

@@ -20,7 +20,7 @@
 
 #include "rdc.h"
 
-void QDec2Hex( Cofe *RGB )
+RDC_EXPORT void QDec2Hex( Cofe *RGB )
 {
 	int iIt[12],i;
 	double dTmp[12];
@@ -81,7 +81,7 @@ void QDec2Hex( Cofe *RGB )
 	RGB->dwPD3 = ( (unsigned long)(dTmp[11] * (float)0x100)) & 0xff ;
 }
 
-unsigned long CMD(Cofe *RGB, int op)
+RDC_EXPORT unsigned long CMD(Cofe *RGB, int op)
 {
 	int tmpA,tmpB,tmpC;
 	unsigned long dwtmpA=0,dwtmpB=0,dwtmpC=0,Reg=0;
@@ -215,7 +215,7 @@ unsigned long CMD(Cofe *RGB, int op)
 	return Reg;
 }
 
-void CheckBoundary(float *pfValue, float fMin, float fMax)
+RDC_EXPORT void CheckBoundary(float *pfValue, float fMin, float fMax)
 {
     if (*pfValue > fMax)
         *pfValue = fMax;
@@ -223,7 +223,7 @@ void CheckBoundary(float *pfValue, float fMin, float fMax)
         *pfValue = fMin;
 };
 
-void SetVIDColor(RDCRecPtr pRDC)
+RDC_EXPORT void SetVIDColor(RDCRecPtr pRDC)
 {
     POVERLAY_STATUS lpOverlayStatus;
     LPVIDCOLORENHANCE lpVidColor;

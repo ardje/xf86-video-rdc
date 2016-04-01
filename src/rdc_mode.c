@@ -72,22 +72,7 @@ RRateInfo RefreshRateMap[] = { {60.0f,  FALSE, 0},
 
 
 
-extern void vRDCOpenKey(ScrnInfoPtr pScrn);
-extern Bool bRDCRegInit(ScrnInfoPtr pScrn);
-
-extern Bool bInitHWC(ScrnInfoPtr pScrn, RDCRecPtr pRDC);
-
-
-Bool RDCSetMode(ScrnInfoPtr pScrn, DisplayModePtr mode);
-USHORT usGetVbeModeNum(ScrnInfoPtr pScrn, DisplayModePtr mode);
-float fDifference(float Value1, float Value2);
-DisplayModePtr RDCBuildModePool(ScrnInfoPtr pScrn);
-Bool BTranslateIndexToRefreshRate(UCHAR ucRRateIndex, float *fRefreshRate);
-char* pcConvertResolutionToString(ULONG ulResolution);
-DisplayModePtr SearchDisplayModeRecPtr(DisplayModePtr pModePoolHead, CBIOS_ARGUMENTS *pCBiosArguments);
-
-Bool
-RDCSetMode(ScrnInfoPtr pScrn, DisplayModePtr mode)
+RDC_EXPORT Bool RDCSetMode(ScrnInfoPtr pScrn, DisplayModePtr mode)
 {
     RDCRecPtr pRDC;
     MODE_PRIVATE *pModePrivate;
@@ -142,7 +127,7 @@ RDCSetMode(ScrnInfoPtr pScrn, DisplayModePtr mode)
     return (TRUE);    
 }
 
-USHORT usGetVbeModeNum(ScrnInfoPtr pScrn, DisplayModePtr mode)
+RDC_EXPORT USHORT usGetVbeModeNum(ScrnInfoPtr pScrn, DisplayModePtr mode)
 {
     RDCRecPtr pRDC;
     MODE_PRIVATE *pModePrivate;
@@ -211,7 +196,7 @@ USHORT usGetVbeModeNum(ScrnInfoPtr pScrn, DisplayModePtr mode)
 
 }
 
-DisplayModePtr RDCBuildModePool(ScrnInfoPtr pScrn)
+RDC_EXPORT DisplayModePtr RDCBuildModePool(ScrnInfoPtr pScrn)
 {
     DisplayModePtr pMode = NULL, pModePoolHead = NULL, pModePoolTail = NULL;
     
@@ -420,7 +405,7 @@ DisplayModePtr RDCBuildModePool(ScrnInfoPtr pScrn)
     return pModePoolHead;
 }
 
-Bool BTranslateIndexToRefreshRate(UCHAR ucRRateIndex, float *fRefreshRate)
+RDC_EXPORT Bool BTranslateIndexToRefreshRate(UCHAR ucRRateIndex, float *fRefreshRate)
 {
     int i;
 
@@ -435,7 +420,7 @@ Bool BTranslateIndexToRefreshRate(UCHAR ucRRateIndex, float *fRefreshRate)
     return (FALSE);
 }
 
-char* pcConvertResolutionToString(ULONG ulResolution)
+RDC_EXPORT char* pcConvertResolutionToString(ULONG ulResolution)
 {
     USHORT usHorResolution = (USHORT)(ulResolution & 0x0000FFFF);
     USHORT usVerResolution = (USHORT)(ulResolution >> 16);
@@ -488,7 +473,7 @@ char* pcConvertResolutionToString(ULONG ulResolution)
     return pcResolution;
 }
 
-DisplayModePtr SearchDisplayModeRecPtr(DisplayModePtr pModePoolHead, CBIOS_ARGUMENTS *pCBiosArguments)
+RDC_EXPORT DisplayModePtr SearchDisplayModeRecPtr(DisplayModePtr pModePoolHead, CBIOS_ARGUMENTS *pCBiosArguments)
 {
     DisplayModePtr pMode = pModePoolHead;
     MODE_PRIVATE *pModePrivate;
