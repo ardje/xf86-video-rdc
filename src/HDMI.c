@@ -23,6 +23,8 @@
 #include "HDMITbl.h"
 #include "CInt10.h"
 #include "CInt10FunProto.h"
+#include "HDMI_proto.h"
+#define RDC_EXPORT
 
 RDC_EXPORT BYTE Get_HDMI_TYPE()
 {

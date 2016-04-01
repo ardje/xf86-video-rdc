@@ -278,3 +278,5 @@ typedef struct {
 #define VP_SRC_MAX_WIDTH            1920
 
 #define PATCH_YV12_WIDTH            784
+
+#include "rdc_video_proto.h"

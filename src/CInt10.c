@@ -20,10 +20,11 @@
 #include <stdlib.h>
 #include <string.h>
 #include "cbdbg.h"
+#define _CINT10_C_
 #include "CInt10.h"
 #include "CInt10Tbl.h"
 #include "CInt10FunProto.h"
-
+#define RDC_EXPORT
 
 BYTE* pRelated_IOAddress;
 

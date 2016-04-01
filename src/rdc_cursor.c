@@ -131,7 +131,8 @@ RDC_EXPORT Bool RDCCursorInit(ScreenPtr pScreen)
     return(xf86InitCursor(pScreen, infoPtr));    
 }
 
-RDC_EXPORT Bool bInitHWC(ScrnInfoPtr pScrn, RDCRecPtr pRDC) {
+RDC_EXPORT Bool bInitHWC(ScrnInfoPtr pScrn, RDCRecPtr pRDC)
+{
     
      
     

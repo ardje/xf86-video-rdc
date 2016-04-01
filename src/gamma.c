@@ -40,8 +40,6 @@
 
 
 
-
-
 RDC_EXPORT void EnableGamma(ScrnInfoPtr pScrn, BOOL Enable)
 {
     RDCRecPtr pRDC = RDCPTR(pScrn);

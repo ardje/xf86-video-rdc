@@ -50,3 +50,5 @@
 #define HWC_MMIO_OFFSET         0x584
 #define HWC_MMIO_POSITION       0x588
 #define HWC_MMIO_ADDRESS        0x58C
+
+#include "rdc_cursor_proto.h"

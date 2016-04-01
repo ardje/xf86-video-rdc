@@ -680,9 +680,9 @@ struct _RDCRec
 
     ULONG               MemoryBandwidth;         
 
-    IOADDRESS           IODBase;                
-    IOADDRESS           PIOOffset;
-    IOADDRESS           RelocateIO;
+    ADDRESS           IODBase;                
+    ADDRESS           PIOOffset;
+    ADDRESS           RelocateIO;
 
     USHORT              usSupportDevice;
 
@@ -831,12 +831,12 @@ typedef struct _RDCOutputPrivateRec {
 #define STRINGIZE(x) STRINGIZE_DETAIL(x)
 #define rdcLog(msg) xf86DrvMsgVerb(0, X_INFO, 0,__FILE__ "(" STRINGIZE(__LINE__) "): " msg "\n")
 
-// rdc_accel.c
-extern Bool RDCAccelInit(ScreenPtr pScreen);
+#include "rdc_accel_proto.h"
+#include "rdc_driver_proto.h"
+#include "HDMI_proto.h"
+#include "TV_proto.h"
+#include "rdc_mode_proto.h"
 
-// rdc_2dtool.c
-extern UCHAR *pjRequestCMDQ(RDCRecPtr pRDC, ULONG ulDataLen);
-
-#include "prototypes.h"
+#define RDC_EXPORT
 
 #endif

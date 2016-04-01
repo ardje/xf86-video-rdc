@@ -584,3 +584,5 @@ typedef struct {
         addr->PKT_SC_dwHeader   = (ULONG)(PKT_SINGLE_CMD_HEADER + CMDQREQ_2DFENCE); \
         addr->PKT_SC_dwData[0] = (ULONG)(no);   \
       }        
+
+#include "rdc_2dtool_proto.h"

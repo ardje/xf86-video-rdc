@@ -23,6 +23,7 @@
 #include "TVTbl.h"
 #include "CInt10.h"
 #include "CInt10FunProto.h"
+#include "TV_proto.h"
 
 RDC_EXPORT BYTE Get_TVEnc_TX_ID()
 {

@@ -268,11 +268,4 @@ typedef struct _CBTV_Disp_Info
     WORD    wModeHres;          
 } CBTV_Disp_Info,*PCBTV_Disp_Info;
 
-
-int EC_SetLCDPWM(RDCRecPtr pRDC, char *level);
-int EC_QueryLCDPWM(RDCRecPtr pRDC, char *level);
-void GetFS473PositionFromVBIOS(RDCRecPtr pRDC);
-void CBIOS_SetTVEncDispRegModify(RDCRecPtr pRDC, PTV_Disp_Info pTVDispInfo, BYTE bChange);
-void GetSAA7105CCRSLevel(UCHAR ucI2Cport, UCHAR ucDevAddress, UCHAR *Level);
-UCHAR ucGetTV_CVBS_CCRSLevel(UCHAR *Level);
-
+#include "rdc_extension_proto.h"

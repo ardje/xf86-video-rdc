@@ -1,6 +1,7 @@
-#!/bin/sh
-(
+#!/bin/bash
+> prototypes.h
 for afile in *.c;do
+(
 cat <<PROTO
 /*
  * Prototypes for $afile
@@ -8,6 +9,8 @@ cat <<PROTO
 PROTO
 grep -h "^RDC_EXPORT.*" $afile|sort -u|sed 's/RDC_EXPORT/extern/g;s/$/;/g'
 echo
-done
+echo "#undef RDC_EXPORT"
 echo "#define RDC_EXPORT"
-) > prototypes.h
+) > ${afile/.c/_proto.h}
+echo "#include \"${afile/.c/_proto.h}\"" >> prototypes.h
+done

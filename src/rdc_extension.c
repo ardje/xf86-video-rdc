@@ -63,7 +63,7 @@
 #include "dixstruct.h"  
 
 #include "rdc_extension.h"
-
+#include "gamma_proto.h"
 
 
 

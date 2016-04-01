@@ -38,3 +38,4 @@
 #define VIDEOMEM_SIZE_256M      0x10000000
 #define VIDEOMEM_SIZE_512M      0x20000000
 
+#include "rdc_vgatool_proto.h"

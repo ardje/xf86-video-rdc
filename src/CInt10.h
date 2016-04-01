@@ -230,5 +230,8 @@ typedef struct _TxEncDetect
 } TxEncDetect;
 #pragma   pack(pop)
 
+#ifndef _CINT10_C_
 extern MODE_INFO VESATable;
+#endif
+#include "CInt10_proto.h"
 #endif
