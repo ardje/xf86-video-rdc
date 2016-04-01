@@ -520,7 +520,7 @@ static const xf86OutputFuncsRec rdc_hdmi_output_funcs = {
     
 };
 
-RDC_EXPORT void rdc_hdmi_init(pScrn)
+RDC_EXPORT void rdc_hdmi_init(ScrnInfoPtr pScrn)
 {
     xf86OutputPtr	    output;
     RDCOutputPrivatePtr    rdc_output;
