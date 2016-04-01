@@ -63,67 +63,6 @@
 #ifdef HAVE_DUAL
 
 
-#if !XSERVER_LIBPCIACCESS
-extern Bool RDCMapMem(ScrnInfoPtr pScrn);
-#endif
-extern Bool RDCUnmapMem(ScrnInfoPtr pScrn);
-extern Bool RDCMapMMIO(ScrnInfoPtr pScrn);
-extern void RDCUnmapMMIO(ScrnInfoPtr pScrn);
-extern Bool RDCMapVBIOS(ScrnInfoPtr pScrn);
-extern Bool RDCUnmapVBIOS(ScrnInfoPtr pScrn);
-
-extern void vRDCOpenKey(ScrnInfoPtr pScrn);
-extern Bool bRDCRegInit(ScrnInfoPtr pScrn);
-extern ULONG GetVRAMInfo(ScrnInfoPtr pScrn);
-extern Bool RDCCheckCapture(ScrnInfoPtr pScrn);
-extern Bool RDCFilterModeByBandWidth(ScrnInfoPtr pScrn, DisplayModePtr mode);
-extern ULONG RDCGetMemBandWidth(ScrnInfoPtr pScrn);
-extern void vRDCLoadPalette(ScrnInfoPtr pScrn, int numColors, int *indices, LOCO *colors, VisualPtr pVisual);
-extern void RDCDisplayPowerManagementSet(ScrnInfoPtr pScrn, int PowerManagementMode, int flags);
-extern void vSetStartAddressCRT1(RDCRecPtr pRDC, ULONG base);
-extern Bool RDCSetMode(ScrnInfoPtr pScrn, DisplayModePtr mode);
-
-extern Bool RDCAccelInit(ScreenPtr pScreen);
-
-extern Bool RDCCursorInit(ScreenPtr pScreen);
-extern DisplayModePtr RDCBuildModePool(ScrnInfoPtr pScrn);
-extern void RDCVideoInit(ScreenPtr pScreen);
-
-extern Bool bInitCMDQInfo(ScrnInfoPtr pScrn, RDCRecPtr pRDC);
-extern Bool bEnableCMDQ(RDCRecPtr pRDC);
-extern Bool bCRInitCMDQInfo(ScrnInfoPtr pScrn, RDCRecPtr pRDC);
-extern Bool bCREnableCMDQ(RDCRecPtr pRDC);
-
-extern Bool bCREnable2D(RDCRecPtr pRDC);
-extern void vCRDisable2D(RDCRecPtr pRDC);
-extern void vCRWaitEngIdle(RDCRecPtr pRDC);
-
-extern Bool bEnable2D(RDCRecPtr pRDC);
-extern void vDisable2D(RDCRecPtr pRDC);
-extern void vWaitEngIdle(RDCRecPtr pRDC);
-extern void CreateEDIDDetailedTimingList(UCHAR *ucEdidBuffer, ULONG ulEdidBufferSize, EDID_DETAILED_TIMING *pEDIDDetailedTiming);
-extern CBStatus CBIOS_SetEDIDToModeTable(ScrnInfoPtr pScrn, EDID_DETAILED_TIMING *pEDIDDetailedTiming);
-
-
-extern Bool RDCGetRec(ScrnInfoPtr pScrn);
-extern void RDCFreeRec(ScrnInfoPtr pScrn);
-extern Bool RDCSaveScreen(ScreenPtr pScreen, Bool unblack);
-extern Bool RDCCloseScreen(int scrnIndex, ScreenPtr pScreen);
-extern void RDCSave(ScrnInfoPtr pScrn);
-extern void RDCRestore(ScrnInfoPtr pScrn);
-extern void RDCProbeDDC(ScrnInfoPtr pScrn, int index);
-extern xf86MonPtr RDCDoDDC(ScrnInfoPtr pScrn, int index);
-extern void vFillRDCModeInfo (ScrnInfoPtr pScrn);
-extern Bool RDCModeInit(ScrnInfoPtr pScrn, DisplayModePtr mode);
-extern void RDCSetHWCaps(RDCRecPtr pRDC);
-
-extern Bool RDCRandRGetInfo(ScrnInfoPtr pScrn, Rotation *rotations);
-extern Bool RDCRandRSetConfig(ScrnInfoPtr pScrn, xorgRRConfig *config);
-extern Bool RDCDriverFunc(ScrnInfoPtr pScrn, xorgDriverFuncOp op, pointer data);
-extern void RDCApertureInit(ScrnInfoPtr pScrn);
-extern void TurnDirectAccessFBON(ScrnInfoPtr pScrn, Bool bTurnOn);
-extern void RDCPointerMoved(int index, int x, int y);
-extern void vUpdateHDMIFakeMode(ScrnInfoPtr pScrn);
 
 static Bool RDCPreInitDual(ScrnInfoPtr pScrn, int flags);
 static Bool RDCScreenInitDual(int Index, ScreenPtr pScreen, int argc, char **argv);
