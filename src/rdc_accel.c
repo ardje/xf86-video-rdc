@@ -690,7 +690,7 @@ RDC_STATIC void RDCSubsequentSolidFillRect(ScrnInfoPtr pScrn, int dst_x, int dst
 } 
 
 
-RDC_STATIC static void RDCSetupForSolidLine(ScrnInfoPtr pScrn, int color, int rop, unsigned int planemask)
+RDC_STATIC void RDCSetupForSolidLine(ScrnInfoPtr pScrn, int color, int rop, unsigned int planemask)
 {
 
     RDCRecPtr pRDC = RDCPTR(pScrn);

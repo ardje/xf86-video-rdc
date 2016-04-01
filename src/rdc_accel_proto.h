@@ -16,7 +16,6 @@ extern void RDCAccelWaitMarker(ScreenPtr pScreen, int marker);
 static Bool RDCExaPrepareCopy( PixmapPtr pSrcPixmap, PixmapPtr pDstPixmap, int xdir, int ydir, int alu, Pixel planeMask);
 static Bool RDCExaPrepareSolid(PixmapPtr pPixmap, int alu, Pixel planeMask, Pixel fg);
 static ExaDriverPtr RDCInitExa(ScreenPtr pScreen);
-static static void RDCSetupForSolidLine(ScrnInfoPtr pScrn, int color, int rop, unsigned int planemask);
 static void RDCDisableClipping(ScrnInfoPtr pScrn);
 static void RDCExaCopy( PixmapPtr pDstPixmap, int srcX, int srcY, int dstX, int dstY, int width, int height);
 static void RDCExaDoneCopy(PixmapPtr pPixmap);
@@ -30,6 +29,7 @@ static void RDCSetupForMonoPatternFill(ScrnInfoPtr pScrn, int patx, int paty, in
 static void RDCSetupForScreenToScreenColorExpandFill(ScrnInfoPtr pScrn, int fg, int bg, int rop, unsigned int planemask);
 static void RDCSetupForScreenToScreenCopy(ScrnInfoPtr pScrn, int xdir, int ydir, int rop, unsigned int planemask, int trans_color);
 static void RDCSetupForSolidFill(ScrnInfoPtr pScrn, int color, int rop, unsigned int planemask);
+static void RDCSetupForSolidLine(ScrnInfoPtr pScrn, int color, int rop, unsigned int planemask);
 static void RDCSubsequentColor8x8PatternFillRect(ScrnInfoPtr pScrn, int patx, int paty, int dst_x, int dst_y, int width, int height);
 static void RDCSubsequentCPUToScreenColorExpandFill(ScrnInfoPtr pScrn, int dst_x, int dst_y, int width, int height, int offset);
 static void RDCSubsequentDashedTwoPointLine(ScrnInfoPtr pScrn, int x1, int y1, int x2, int y2, int flags, int phase);
