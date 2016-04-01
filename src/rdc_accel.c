@@ -97,11 +97,9 @@ int RDCXAAPatternROP[16]=
 };
 
 
-extern UCHAR *pjRequestCMDQ(RDCRecPtr pRDC, ULONG ulDataLen);
-extern Bool bGetLineTerm(_LINEInfo *LineInfo, LINEPARAM *dsLineParam);
+//extern Bool bGetLineTerm(_LINEInfo *LineInfo, LINEPARAM *dsLineParam);
 
 
-extern Bool RDCAccelInit(ScreenPtr pScreen);
 static void RDCSync(ScrnInfoPtr pScrn);
 static void RDCSetupForScreenToScreenCopy(ScrnInfoPtr pScrn, 
                                           int xdir, int ydir, int rop,

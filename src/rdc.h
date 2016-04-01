@@ -831,5 +831,11 @@ typedef struct _RDCOutputPrivateRec {
 #define STRINGIZE(x) STRINGIZE_DETAIL(x)
 #define rdcLog(msg) xf86DrvMsgVerb(0, X_INFO, 0,__FILE__ "(" STRINGIZE(__LINE__) "): " msg "\n")
 
+// rdc_accel.c
+extern Bool RDCAccelInit(ScreenPtr pScreen);
+
+// rdc_2dtool.c
+extern UCHAR *pjRequestCMDQ(RDCRecPtr pRDC, ULONG ulDataLen);
+
 
 #endif
