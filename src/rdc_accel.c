@@ -2635,7 +2635,7 @@ static ExaDriverPtr RDCInitExa(ScreenPtr pScreen)
     
     if (!exaDriverInit(pScreen, pExa)) 
     {
-        xfree(pExa);
+        free(pExa);
         xf86DrvMsgVerb(0, X_INFO, ErrorLevel, "==Init EXA fail== \n");
         return NULL;
     }

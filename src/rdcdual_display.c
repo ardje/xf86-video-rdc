@@ -403,7 +403,7 @@ static void
 rdc_crt_destroy (xf86OutputPtr output)
 {
     if (output->driver_private)
-	xfree (output->driver_private);
+	free (output->driver_private);
 }
 
 #ifdef RANDR_GET_CRTC_INTERFACE
@@ -505,7 +505,7 @@ rdc_hdmi_destroy (xf86OutputPtr output)
 
     if (intel_output != NULL) 
     {
-	    xfree(intel_output);
+	    free(intel_output);
     }
 }
 
