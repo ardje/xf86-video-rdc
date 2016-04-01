@@ -59,22 +59,7 @@
 #include <sys/ioctl.h>
 #include <errno.h>
 
-
-Bool    bInitCMDQInfo(ScrnInfoPtr pScrn, RDCRecPtr pRDC);
-Bool    bEnableCMDQ(RDCRecPtr pRDC);
-Bool    bEnable2D(RDCRecPtr pRDC);
-void    vDisable2D(RDCRecPtr pRDC);
-void    vWaitEngIdle(RDCRecPtr pRDC);    
-UCHAR   *pjRequestCMDQ(RDCRecPtr pRDC, ULONG   ulDataLen);
-
-Bool    bCRInitCMDQInfo(ScrnInfoPtr pScrn, RDCRecPtr pRDC);
-Bool    bCREnableCMDQ(RDCRecPtr pRDC);
-Bool    bCREnable2D(RDCRecPtr pRDC);
-void    vCRDisable2D(RDCRecPtr pRDC);
-void    vCRWaitEngIdle(RDCRecPtr pRDC);    
-
-Bool
-bInitCMDQInfo(ScrnInfoPtr pScrn, RDCRecPtr pRDC)
+RDC_EXPORT Bool bInitCMDQInfo(ScrnInfoPtr pScrn, RDCRecPtr pRDC)
 {
 
     ScreenPtr pScreen;
@@ -111,8 +96,7 @@ bInitCMDQInfo(ScrnInfoPtr pScrn, RDCRecPtr pRDC)
     return (TRUE);    
 }
 
-Bool
-bEnableCMDQ(RDCRecPtr pRDC)
+RDC_EXPORT Bool bEnableCMDQ(RDCRecPtr pRDC)
 {
     ULONG ulVMCmdQBasePort = 0;
     
@@ -175,8 +159,7 @@ bEnableCMDQ(RDCRecPtr pRDC)
     return (TRUE);    
 }
 
-Bool
-bEnable2D(RDCRecPtr pRDC)
+RDC_EXPORT Bool bEnable2D(RDCRecPtr pRDC)
 {
 
     xf86DrvMsgVerb(0, X_INFO, InternalLevel, "==Enable 2D== \n");
@@ -189,8 +172,7 @@ bEnable2D(RDCRecPtr pRDC)
     return (TRUE);    
 }
 
-void
-vDisable2D(RDCRecPtr pRDC)
+RDC_EXPORT void vDisable2D(RDCRecPtr pRDC)
 {
    xf86DrvMsgVerb(0, X_INFO, InternalLevel, "==Engine Disable 2D== \n");
 
@@ -202,8 +184,7 @@ vDisable2D(RDCRecPtr pRDC)
 }
 
 
-void
-vWaitEngIdle(RDCRecPtr pRDC)
+RDC_EXPORT void vWaitEngIdle(RDCRecPtr pRDC)
 {
     ULONG  ulEngState, ulEngState2;
 
@@ -230,8 +211,7 @@ __inline ULONG ulGetCMDQLength(RDCRecPtr pRDC, ULONG ulWritePointer, ULONG ulCMD
     return ((ulReadPointer << 3) + pRDC->CMDQInfo.ulCMDQSize - ulWritePointer - CMD_QUEUE_GUARD_BAND) & ulCMDQMask;
 }
 
-UCHAR *pjRequestCMDQ(
-RDCRecPtr pRDC, ULONG   ulDataLen)
+RDC_EXPORT UCHAR *pjRequestCMDQ( RDCRecPtr pRDC, ULONG   ulDataLen)
 {
     xf86DrvMsgVerb(0, X_INFO, DefaultLevel, "== pjRequestCMDQ()  Entry==\n");
     
@@ -307,7 +287,7 @@ RDCRecPtr pRDC, ULONG   ulDataLen)
     xf86DrvMsgVerb(0, X_INFO, DefaultLevel, "== pjRequestCMDQ()  Exit==\n");
 } 
 
-Bool bCRInitCMDQInfo(ScrnInfoPtr pScrn, RDCRecPtr pRDC)
+RDC_EXPORT Bool bCRInitCMDQInfo(ScrnInfoPtr pScrn, RDCRecPtr pRDC)
 {
 
     ScreenPtr pScreen;
@@ -338,7 +318,7 @@ Bool bCRInitCMDQInfo(ScrnInfoPtr pScrn, RDCRecPtr pRDC)
     return (TRUE);    
 }
 
-Bool bCREnableCMDQ(RDCRecPtr pRDC)
+RDC_EXPORT Bool bCREnableCMDQ(RDCRecPtr pRDC)
 {
     ULONG ulVMCmdQCtrlPort = 0;
     
@@ -370,7 +350,7 @@ Bool bCREnableCMDQ(RDCRecPtr pRDC)
     return (TRUE);    
 }
 
-Bool bCREnable2D(RDCRecPtr pRDC)
+RDC_EXPORT Bool bCREnable2D(RDCRecPtr pRDC)
 {
 
     xf86DrvMsgVerb(0, X_INFO, InternalLevel, "==bCREnable2D()== \n");
@@ -384,7 +364,7 @@ Bool bCREnable2D(RDCRecPtr pRDC)
     return (TRUE);    
 }
 
-void vCRDisable2D(RDCRecPtr pRDC)
+RDC_EXPORT void vCRDisable2D(RDCRecPtr pRDC)
 {
    xf86DrvMsgVerb(0, X_INFO, InternalLevel, "==vCRDisable2D()== \n");
 
@@ -397,8 +377,7 @@ void vCRDisable2D(RDCRecPtr pRDC)
     xf86DrvMsgVerb(0, X_INFO, InternalLevel, "<<== vCRDisable2D()\n");
 }
 
-void
-vCRWaitEngIdle(RDCRecPtr pRDC)
+RDC_EXPORT void vCRWaitEngIdle(RDCRecPtr pRDC)
 {
     xf86DrvMsgVerb(0, X_INFO, 10, "==vCRWaitEngIdle()== \n");
 
@@ -436,7 +415,7 @@ vCRWaitEngIdle(RDCRecPtr pRDC)
     xf86DrvMsgVerb(0, X_INFO, 10, "<<== vCRWaitEngIdle()\n");
 }
 
-int FireCRCMDQ(int iDev, unsigned int *pCmd, unsigned int size)
+RDC_EXPORT int FireCRCMDQ(int iDev, unsigned int *pCmd, unsigned int size)
 {
     int iRet;
     unsigned int ioctlPara[3];
@@ -454,7 +433,7 @@ int FireCRCMDQ(int iDev, unsigned int *pCmd, unsigned int size)
     return iRet;
 };
 
-unsigned int GetFBIFCaps(int iDev)
+RDC_EXPORT unsigned int GetFBIFCaps(int iDev)
 {
     int iRet = 0;
     unsigned int ioctlPara = 0;
