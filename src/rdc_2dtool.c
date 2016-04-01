@@ -415,7 +415,8 @@ RDC_EXPORT void vCRWaitEngIdle(RDCRecPtr pRDC)
     xf86DrvMsgVerb(0, X_INFO, 10, "<<== vCRWaitEngIdle()\n");
 }
 
-RDC_EXPORT int FireCRCMDQ(int iDev, unsigned int *pCmd, unsigned int size)
+// RDC_EXPORT int FireCRCMDQ(int iDev, unsigned int *pCmd, unsigned int size)
+RDC_EXPORT int FireCRCMDQ(int iDev, PKT_SC *pCmd, unsigned int size)
 {
     int iRet;
     unsigned int ioctlPara[3];
