@@ -776,9 +776,9 @@ RDCPreInit(ScrnInfoPtr pScrn, int flags)
 #endif
      
 #if XSERVER_LIBPCIACCESS
-    pRDC->RelocateIO = (IOADDRESS)(pRDC->PciInfo->regions[2].base_addr + pRDC->IODBase);
+    pRDC->RelocateIO = (ADDRESS)(pRDC->PciInfo->regions[2].base_addr + pRDC->IODBase);
 #else    
-    pRDC->RelocateIO = (IOADDRESS)(pRDC->PciInfo->ioBase[2] + pRDC->IODBase);
+    pRDC->RelocateIO = (ADDRESS)(pRDC->PciInfo->ioBase[2] + pRDC->IODBase);
 #endif
     
     if (pRDC->pEnt->device->MemBase != 0) 
