@@ -30,8 +30,9 @@
 #include <sys/ioctl.h>
 
 #include "xf86.h"
+#define _rdcdual_display_c_
 #include "rdc.h"
-#include "rdcdual_display.h"
+#include "rdcdual_display_proto.h"
 #include "xf86Modes.h"
 #include "rdc_mode.h"
 
@@ -71,8 +72,7 @@ RDC_EXPORT Bool GetDisaplyStatus(ScrnInfoPtr pScrn)
 }
 
 
-static void
-rdc_crtc_dpms(xf86CrtcPtr crtc, int mode)
+RDC_STATIC void rdc_crtc_dpms(xf86CrtcPtr crtc, int mode)
 {
     ScrnInfoPtr pScrn = crtc->scrn;
     RDCRecPtr pRDC = RDCPTR(pScrn);
@@ -95,39 +95,31 @@ rdc_crtc_dpms(xf86CrtcPtr crtc, int mode)
     rdc_crtc->dpms_mode = mode;
 }
 
-static Bool
-rdc_crtc_lock (xf86CrtcPtr crtc)
+RDC_STATIC Bool rdc_crtc_lock (xf86CrtcPtr crtc)
 {
     
 
     return FALSE;
 }
 
-static void
-rdc_crtc_unlock (xf86CrtcPtr crtc)
+RDC_STATIC void rdc_crtc_unlock (xf86CrtcPtr crtc)
 {
 
 }
 
-static Bool
-rdc_crtc_mode_fixup(xf86CrtcPtr crtc, DisplayModePtr mode,
-		     DisplayModePtr adjusted_mode)
+RDC_STATIC Bool rdc_crtc_mode_fixup(xf86CrtcPtr crtc, DisplayModePtr mode, DisplayModePtr adjusted_mode)
 {
     return TRUE;
 }
 
-static void
-rdc_crtc_prepare (xf86CrtcPtr crtc)
+RDC_STATIC void rdc_crtc_prepare (xf86CrtcPtr crtc)
 {
     RDCCrtcPrivatePtr	rdc_crtc = crtc->driver_private;
 }
 
 
 
-static void
-rdc_crtc_mode_set(xf86CrtcPtr crtc, DisplayModePtr mode,
-		   DisplayModePtr adjusted_mode,
-		   int x, int y)
+RDC_STATIC void rdc_crtc_mode_set(xf86CrtcPtr crtc, DisplayModePtr mode, DisplayModePtr adjusted_mode, int x, int y)
 {
     ScrnInfoPtr pScrn = crtc->scrn;
     xf86CrtcConfigPtr   xf86_config = XF86_CRTC_CONFIG_PTR(pScrn);
@@ -169,8 +161,7 @@ rdc_crtc_mode_set(xf86CrtcPtr crtc, DisplayModePtr mode,
 }
 
 
-static void
-rdc_crtc_commit (xf86CrtcPtr crtc)
+RDC_STATIC void rdc_crtc_commit (xf86CrtcPtr crtc)
 {
     RDCCrtcPrivatePtr	rdc_crtc = crtc->driver_private;
     Bool		deactivate = FALSE;
@@ -179,9 +170,7 @@ rdc_crtc_commit (xf86CrtcPtr crtc)
 }
 
 
-static void
-rdc_crtc_gamma_set(xf86CrtcPtr crtc, CARD16 *red, CARD16 *green, CARD16 *blue,
-		    int size)
+RDC_STATIC void rdc_crtc_gamma_set(xf86CrtcPtr crtc, CARD16 *red, CARD16 *green, CARD16 *blue, int size)
 {
     RDCCrtcPrivatePtr rdc_crtc = crtc->driver_private;
 }
@@ -230,8 +219,7 @@ rdc_crtc_load_cursor_argb (xf86CrtcPtr crtc, CARD32 *image)
 #endif
 
 #if RANDR_13_INTERFACE
-static void
-rdc_crtc_set_origin(xf86CrtcPtr crtc, int x, int y)
+RDC_STATIC void rdc_crtc_set_origin(xf86CrtcPtr crtc, int x, int y)
 {
     	
 }
@@ -284,8 +272,7 @@ RDC_EXPORT void rdc_crtc_init(ScrnInfoPtr pScrn, int pipe)
 }         
 
 
-static void
-rdc_crt_dpms(xf86OutputPtr output, int mode)
+RDC_STATIC void rdc_crt_dpms(xf86OutputPtr output, int mode)
 {
     ScrnInfoPtr	    pScrn = output->scrn;
     RDCRecPtr	        pRDC = RDCPTR(pScrn);
@@ -327,22 +314,19 @@ rdc_crt_dpms(xf86OutputPtr output, int mode)
     SetIndexRegMask(COLOR_CRTC_INDEX,0xB6, 0xFC, CRB6);
 }
 
-static void
-rdc_crt_save (xf86OutputPtr output)
+RDC_STATIC void rdc_crt_save (xf86OutputPtr output)
 {
     ScrnInfoPtr	pScrn = output->scrn;
     RDCRecPtr	        pRDC = RDCPTR(pScrn);
 }
 
-static void
-rdc_crt_restore (xf86OutputPtr output)
+RDC_STATIC void rdc_crt_restore (xf86OutputPtr output)
 {
     ScrnInfoPtr	pScrn = output->scrn;
     RDCRecPtr	        pRDC = RDCPTR(pScrn);
 }
 
-static int
-rdc_crt_mode_valid(xf86OutputPtr output, DisplayModePtr pMode)
+RDC_STATIC int rdc_crt_mode_valid(xf86OutputPtr output, DisplayModePtr pMode)
 { 
     if(!pMode->Private)
          return MODE_BAD;
@@ -350,9 +334,7 @@ rdc_crt_mode_valid(xf86OutputPtr output, DisplayModePtr pMode)
     return MODE_OK;
 }
 
-static Bool
-rdc_crt_mode_fixup(xf86OutputPtr output, DisplayModePtr mode,
-		    DisplayModePtr adjusted_mode)
+RDC_STATIC Bool rdc_crt_mode_fixup(xf86OutputPtr output, DisplayModePtr mode, DisplayModePtr adjusted_mode)
 {
     return TRUE;
 }
@@ -367,23 +349,19 @@ RDC_EXPORT void rdc_output_commit (xf86OutputPtr output)
     output->funcs->dpms (output, DPMSModeOn);
 }
 
-static void
-rdc_crt_mode_set(xf86OutputPtr output, DisplayModePtr mode,
-		  DisplayModePtr adjusted_mode)
+RDC_STATIC void rdc_crt_mode_set(xf86OutputPtr output, DisplayModePtr mode, DisplayModePtr adjusted_mode)
 {
     
 }
 
 
 
-static xf86OutputStatus
-rdc_crt_detect(xf86OutputPtr output)
+RDC_STATIC xf86OutputStatus rdc_crt_detect(xf86OutputPtr output)
 {  
     return XF86OutputStatusConnected;
 }
 
-static DisplayModePtr
-rdc_crt_get_modes (xf86OutputPtr output)
+RDC_STATIC DisplayModePtr rdc_crt_get_modes (xf86OutputPtr output)
 {
     ScrnInfoPtr		    pScrn = output->scrn;
     DisplayModePtr      modes;
@@ -394,16 +372,14 @@ rdc_crt_get_modes (xf86OutputPtr output)
 }
 
 
-static void
-rdc_crt_destroy (xf86OutputPtr output)
+RDC_STATIC void rdc_crt_destroy (xf86OutputPtr output)
 {
     if (output->driver_private)
 	free (output->driver_private);
 }
 
 #ifdef RANDR_GET_CRTC_INTERFACE
-static xf86CrtcPtr
-rdc_crt_get_crtc(xf86OutputPtr output)
+RDC_STATIC xf86CrtcPtr rdc_crt_get_crtc(xf86OutputPtr output)
 {
     ScrnInfoPtr	pScrn = output->scrn; 
     xf86CrtcConfigPtr config = XF86_CRTC_CONFIG_PTR (pScrn);
@@ -455,8 +431,7 @@ RDC_EXPORT void rdc_crt_init(ScrnInfoPtr pScrn)
     output->doubleScanAllowed = FALSE;
 }
 
-static int
-rdc_hdmi_mode_valid(xf86OutputPtr output, DisplayModePtr pMode)
+RDC_STATIC int rdc_hdmi_mode_valid(xf86OutputPtr output, DisplayModePtr pMode)
 {
     if(!pMode->Private)
          return MODE_BAD;
@@ -466,34 +441,28 @@ rdc_hdmi_mode_valid(xf86OutputPtr output, DisplayModePtr pMode)
 }
 
 
-static Bool
-rdc_hdmi_mode_fixup(xf86OutputPtr output, DisplayModePtr mode,
-		     DisplayModePtr adjusted_mode)
+RDC_STATIC Bool rdc_hdmi_mode_fixup(xf86OutputPtr output, DisplayModePtr mode, DisplayModePtr adjusted_mode)
 {
     return TRUE;
 }
 
 
-static void
-rdc_hdmi_dpms(xf86OutputPtr output, int mode)
+RDC_STATIC void rdc_hdmi_dpms(xf86OutputPtr output, int mode)
 {
 
 }
 
-static void
-rdc_hdmi_save(xf86OutputPtr output)
+RDC_STATIC void rdc_hdmi_save(xf86OutputPtr output)
 {
 
 }
 
-static void
-rdc_hdmi_restore(xf86OutputPtr output)
+RDC_STATIC void rdc_hdmi_restore(xf86OutputPtr output)
 {
 
 }
 
-static void
-rdc_hdmi_destroy (xf86OutputPtr output)
+RDC_STATIC void rdc_hdmi_destroy (xf86OutputPtr output)
 {
     RDCOutputPrivatePtr intel_output = output->driver_private;
 
@@ -503,21 +472,17 @@ rdc_hdmi_destroy (xf86OutputPtr output)
     }
 }
 
-static void
-rdc_hdmi_mode_set(xf86OutputPtr output, DisplayModePtr mode,
-		  DisplayModePtr adjusted_mode)
+RDC_STATIC void rdc_hdmi_mode_set(xf86OutputPtr output, DisplayModePtr mode, DisplayModePtr adjusted_mode)
 {
     
 }
 
-static xf86OutputStatus
-rdc_hdmi_detect(xf86OutputPtr output)
+RDC_STATIC xf86OutputStatus rdc_hdmi_detect(xf86OutputPtr output)
 {  
     return XF86OutputStatusConnected;
 }
 
-static DisplayModePtr
-rdc_hdmi_get_modes (xf86OutputPtr output)
+RDC_STATIC DisplayModePtr rdc_hdmi_get_modes (xf86OutputPtr output)
 {
     ScrnInfoPtr		    pScrn = output->scrn;
     DisplayModePtr      modes;
@@ -530,8 +495,7 @@ rdc_hdmi_get_modes (xf86OutputPtr output)
 
 
 #ifdef RANDR_GET_CRTC_INTERFACE
-static xf86CrtcPtr
-rdc_hdmi_get_crtc(xf86OutputPtr output)
+RDC_STATIC xf86CrtcPtr rdc_hdmi_get_crtc(xf86OutputPtr output)
 {
     ScrnInfoPtr	pScrn = output->scrn; 
     xf86CrtcConfigPtr config = XF86_CRTC_CONFIG_PTR (pScrn);

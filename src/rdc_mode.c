@@ -52,6 +52,7 @@
 #include "xf86Cursor.h"
 
 
+#define _rdc_mode_c_
 #include "rdc.h"
 #include "rdc_mode.h"
 

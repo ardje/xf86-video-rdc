@@ -52,7 +52,7 @@
 
 #include "xf86Cursor.h"
 
-
+#define _rdc_accel_c_
 #include "rdc.h"
 
 
@@ -95,62 +95,6 @@ int RDCXAAPatternROP[16]=
     ROP_DPan,
     ROP_1
 };
-
-
-//extern Bool bGetLineTerm(_LINEInfo *LineInfo, LINEPARAM *dsLineParam);
-
-
-static void RDCSync(ScrnInfoPtr pScrn);
-static void RDCSetupForScreenToScreenCopy(ScrnInfoPtr pScrn, 
-                                          int xdir, int ydir, int rop,
-                                          unsigned int planemask, int trans_color);
-static void RDCSubsequentScreenToScreenCopy(ScrnInfoPtr pScrn, int x1, int y1, int x2,
-                                            int y2, int w, int h);                                
-static void RDCSetupForSolidFill(ScrnInfoPtr pScrn,
-                                 int color, int rop, unsigned int planemask);
-static void RDCSubsequentSolidFillRect(ScrnInfoPtr pScrn,
-                                       int dst_x, int dst_y, int width, int height);  
-static void RDCSetupForSolidLine(ScrnInfoPtr pScrn,
-                                 int color, int rop, unsigned int planemask);
-static void RDCSubsequentSolidHorVertLine(ScrnInfoPtr pScrn,
-                                          int x, int y, int len, int dir);
-static void RDCSetupForDashedLine(ScrnInfoPtr pScrn,
-                                  int fg, int bg, int rop, unsigned int planemask,
-                                  int length, UCHAR *pattern);
-static void RDCSetupForMonoPatternFill(ScrnInfoPtr pScrn,
-                                       int patx, int paty, int fg, int bg,
-                                       int rop, unsigned int planemask);
-static void RDCSubsequentMonoPatternFill(ScrnInfoPtr pScrn,
-                                         int patx, int paty,
-                                         int x, int y, int w, int h);
-static void RDCSetupForColor8x8PatternFill(ScrnInfoPtr pScrn, int patx, int paty,
-                               int rop, unsigned int planemask, int trans_col);
-static void RDCSubsequentColor8x8PatternFillRect(ScrnInfoPtr pScrn, int patx, int paty,
-                                                 int x, int y, int w, int h);
-static void RDCSetupForCPUToScreenColorExpandFill(ScrnInfoPtr pScrn,
-                                                  int fg, int bg,
-                                                  int rop, unsigned int planemask);
-static void RDCSubsequentCPUToScreenColorExpandFill(ScrnInfoPtr pScrn,
-                                                    int x, int y,
-                                                    int width, int height, int skipleft);
-static void RDCSetupForScreenToScreenColorExpandFill(ScrnInfoPtr pScrn,
-                                                     int fg, int bg,
-                                                     int rop, unsigned int planemask);
-static void RDCSubsequentScreenToScreenColorExpandFill(ScrnInfoPtr pScrn,
-                                                       int x, int y, int width, int height,
-                                                       int src_x, int src_y, int offset);
-static void RDCSetClippingRectangle(ScrnInfoPtr pScrn,
-                                    int left, int top, int right, int bottom);
-static void RDCDisableClipping(ScrnInfoPtr pScrn); 
-
-static void RDCSubsequentSolidTwoPointLine(ScrnInfoPtr pScrn,
-                                           int x1, int y1, int x2, int y2, int flags);                                       
-static void RDCSubsequentDashedTwoPointLine(ScrnInfoPtr pScrn,
-                                            int x1, int y1, int x2, int y2,
-                                            int flags, int phase);
-
-
-static ExaDriverPtr RDCInitExa(ScreenPtr pScreen);
 
 RDC_EXPORT Bool RDCAccelInit(ScreenPtr pScreen)
 {
@@ -296,8 +240,7 @@ RDC_EXPORT Bool RDCAccelInit(ScreenPtr pScreen)
 #endif
 } 
 
-static void
-RDCSync(ScrnInfoPtr pScrn)
+RDC_STATIC void RDCSync(ScrnInfoPtr pScrn)
 {
     RDCRecPtr pRDC = RDCPTR(pScrn);
 
@@ -312,9 +255,7 @@ RDCSync(ScrnInfoPtr pScrn)
 } 
 
 
-static void RDCSetupForScreenToScreenCopy(ScrnInfoPtr pScrn,
-                                          int xdir, int ydir, int rop,
-                                          unsigned int planemask, int trans_color)
+RDC_STATIC void RDCSetupForScreenToScreenCopy(ScrnInfoPtr pScrn, int xdir, int ydir, int rop, unsigned int planemask, int trans_color)
 {
     RDCRecPtr pRDC = RDCPTR(pScrn);
     PKT_SC *pSingleCMD;
@@ -423,9 +364,7 @@ static void RDCSetupForScreenToScreenCopy(ScrnInfoPtr pScrn,
 #endif
 } 
 
-static void
-RDCSubsequentScreenToScreenCopy(ScrnInfoPtr pScrn, int x1, int y1, int x2,
-                                int y2, int width, int height)
+RDC_STATIC void RDCSubsequentScreenToScreenCopy(ScrnInfoPtr pScrn, int x1, int y1, int x2, int y2, int width, int height)
 {
     RDCRecPtr pRDC = RDCPTR(pScrn);
     PKT_SC *pSingleCMD;
@@ -561,9 +500,7 @@ RDCSubsequentScreenToScreenCopy(ScrnInfoPtr pScrn, int x1, int y1, int x2,
 #endif
 } 
 
-static void
-RDCSetupForSolidFill(ScrnInfoPtr pScrn,
-                     int color, int rop, unsigned int planemask)
+RDC_STATIC void RDCSetupForSolidFill(ScrnInfoPtr pScrn, int color, int rop, unsigned int planemask)
 {
     
     RDCRecPtr pRDC = RDCPTR(pScrn);
@@ -640,9 +577,7 @@ RDCSetupForSolidFill(ScrnInfoPtr pScrn,
 } 
 
 
-static void
-RDCSubsequentSolidFillRect(ScrnInfoPtr pScrn,
-                           int dst_x, int dst_y, int width, int height)
+RDC_STATIC void RDCSubsequentSolidFillRect(ScrnInfoPtr pScrn, int dst_x, int dst_y, int width, int height)
 {
     RDCRecPtr pRDC = RDCPTR(pScrn);
     PKT_SC *pSingleCMD;
@@ -755,8 +690,7 @@ RDCSubsequentSolidFillRect(ScrnInfoPtr pScrn,
 } 
 
 
-static void RDCSetupForSolidLine(ScrnInfoPtr pScrn, 
-                                 int color, int rop, unsigned int planemask)
+RDC_STATIC static void RDCSetupForSolidLine(ScrnInfoPtr pScrn, int color, int rop, unsigned int planemask)
 {
 
     RDCRecPtr pRDC = RDCPTR(pScrn);
@@ -837,8 +771,7 @@ static void RDCSetupForSolidLine(ScrnInfoPtr pScrn,
 } 
 
 #ifdef HAVE_XAA
-static void RDCSubsequentSolidHorVertLine(ScrnInfoPtr pScrn,
-                                          int x, int y, int len, int dir)
+RDC_STATIC void RDCSubsequentSolidHorVertLine(ScrnInfoPtr pScrn, int x, int y, int len, int dir)
 {
 
     RDCRecPtr pRDC = RDCPTR(pScrn);
@@ -1011,10 +944,7 @@ static void RDCSubsequentSolidHorVertLine(ScrnInfoPtr pScrn,
 #endif
 
 
-static void
-RDCSetupForDashedLine(ScrnInfoPtr pScrn,
-                      int fg, int bg, int rop, unsigned int planemask,
-                      int length, UCHAR *pattern)
+RDC_STATIC void RDCSetupForDashedLine(ScrnInfoPtr pScrn, int fg, int bg, int rop, unsigned int planemask, int length, UCHAR *pattern)
 {
 
     RDCRecPtr pRDC = RDCPTR(pScrn);
@@ -1110,10 +1040,7 @@ RDCSetupForDashedLine(ScrnInfoPtr pScrn,
 }
 
 
-static void
-RDCSetupForMonoPatternFill(ScrnInfoPtr pScrn,
-                           int patx, int paty, int fg, int bg,
-                           int rop, unsigned int planemask)
+RDC_STATIC void RDCSetupForMonoPatternFill(ScrnInfoPtr pScrn, int patx, int paty, int fg, int bg, int rop, unsigned int planemask)
 {
     
     RDCRecPtr pRDC = RDCPTR(pScrn);
@@ -1200,10 +1127,7 @@ RDCSetupForMonoPatternFill(ScrnInfoPtr pScrn,
 } 
 
                       
-static void
-RDCSubsequentMonoPatternFill(ScrnInfoPtr pScrn,
-                             int patx, int paty,
-                             int dst_x, int dst_y, int width, int height)
+RDC_STATIC void RDCSubsequentMonoPatternFill(ScrnInfoPtr pScrn, int patx, int paty, int dst_x, int dst_y, int width, int height)
 {
     RDCRecPtr pRDC = RDCPTR(pScrn);
     PKT_SC *pSingleCMD;
@@ -1282,9 +1206,7 @@ RDCSubsequentMonoPatternFill(ScrnInfoPtr pScrn,
 #endif
 } 
 
-static void
-RDCSetupForColor8x8PatternFill(ScrnInfoPtr pScrn, int patx, int paty,
-                   int rop, unsigned int planemask, int trans_col)
+RDC_STATIC void RDCSetupForColor8x8PatternFill(ScrnInfoPtr pScrn, int patx, int paty, int rop, unsigned int planemask, int trans_col)
 {
     
     RDCRecPtr pRDC = RDCPTR(pScrn);
@@ -1381,9 +1303,7 @@ RDCSetupForColor8x8PatternFill(ScrnInfoPtr pScrn, int patx, int paty,
 #endif
 } 
                
-static void
-RDCSubsequentColor8x8PatternFillRect(ScrnInfoPtr pScrn, int patx, int paty,
-                                     int dst_x, int dst_y, int width, int height)
+RDC_STATIC void RDCSubsequentColor8x8PatternFillRect(ScrnInfoPtr pScrn, int patx, int paty, int dst_x, int dst_y, int width, int height)
 {
     RDCRecPtr pRDC = RDCPTR(pScrn);
     PKT_SC *pSingleCMD;
@@ -1464,10 +1384,7 @@ RDCSubsequentColor8x8PatternFillRect(ScrnInfoPtr pScrn, int patx, int paty,
 } 
 
 
-static void
-RDCSetupForCPUToScreenColorExpandFill(ScrnInfoPtr pScrn,
-                                      int fg, int bg,
-                                      int rop, unsigned int planemask)
+RDC_STATIC void RDCSetupForCPUToScreenColorExpandFill(ScrnInfoPtr pScrn, int fg, int bg, int rop, unsigned int planemask)
 {
 
     RDCRecPtr pRDC = RDCPTR(pScrn);
@@ -1556,10 +1473,7 @@ RDCSetupForCPUToScreenColorExpandFill(ScrnInfoPtr pScrn,
 #endif
 }
                                
-static void
-RDCSubsequentCPUToScreenColorExpandFill(ScrnInfoPtr pScrn,
-                                        int dst_x, int dst_y,
-                                        int width, int height, int offset)
+RDC_STATIC void RDCSubsequentCPUToScreenColorExpandFill(ScrnInfoPtr pScrn, int dst_x, int dst_y, int width, int height, int offset)
 {
 
     RDCRecPtr pRDC = RDCPTR(pScrn);
@@ -1647,10 +1561,7 @@ RDCSubsequentCPUToScreenColorExpandFill(ScrnInfoPtr pScrn,
 
 
 
-static void
-RDCSetupForScreenToScreenColorExpandFill(ScrnInfoPtr pScrn,
-                                         int fg, int bg,
-                                         int rop, unsigned int planemask)
+RDC_STATIC void RDCSetupForScreenToScreenColorExpandFill(ScrnInfoPtr pScrn, int fg, int bg, int rop, unsigned int planemask)
 {
     RDCRecPtr pRDC = RDCPTR(pScrn);
     PKT_SC *pSingleCMD;
@@ -1739,10 +1650,7 @@ RDCSetupForScreenToScreenColorExpandFill(ScrnInfoPtr pScrn,
 
 
 
-static void
-RDCSubsequentScreenToScreenColorExpandFill(ScrnInfoPtr pScrn,
-                                           int dst_x, int dst_y, int width, int height,
-                                           int src_x, int src_y, int offset)
+RDC_STATIC void RDCSubsequentScreenToScreenColorExpandFill(ScrnInfoPtr pScrn, int dst_x, int dst_y, int width, int height, int src_x, int src_y, int offset)
 {
    RDCRecPtr pRDC = RDCPTR(pScrn);
     PKT_SC *pSingleCMD;
@@ -1837,9 +1745,7 @@ RDCSubsequentScreenToScreenColorExpandFill(ScrnInfoPtr pScrn,
 
       
 
-static void
-RDCSetClippingRectangle(ScrnInfoPtr pScrn,
-                        int left, int top, int right, int bottom)
+RDC_STATIC void RDCSetClippingRectangle(ScrnInfoPtr pScrn, int left, int top, int right, int bottom)
 {
     
     RDCRecPtr pRDC = RDCPTR(pScrn);
@@ -1896,8 +1802,7 @@ RDCSetClippingRectangle(ScrnInfoPtr pScrn,
 #endif
 }
 
-static void
-RDCDisableClipping(ScrnInfoPtr pScrn)
+RDC_STATIC void RDCDisableClipping(ScrnInfoPtr pScrn)
 {
     RDCRecPtr pRDC = RDCPTR(pScrn);
 #if Accel_2D_DEBUG
@@ -1910,8 +1815,7 @@ RDCDisableClipping(ScrnInfoPtr pScrn)
 }
 
 #ifdef HAVE_XAA
-static void RDCSubsequentSolidTwoPointLine(ScrnInfoPtr pScrn,
-                                           int x1, int y1, int x2, int y2, int flags)
+RDC_STATIC void RDCSubsequentSolidTwoPointLine(ScrnInfoPtr pScrn, int x1, int y1, int x2, int y2, int flags)
 {
  
     RDCRecPtr pRDC = RDCPTR(pScrn);
@@ -2032,10 +1936,7 @@ static void RDCSubsequentSolidTwoPointLine(ScrnInfoPtr pScrn,
 } 
 
 
-static void
-RDCSubsequentDashedTwoPointLine(ScrnInfoPtr pScrn,
-                                int x1, int y1, int x2, int y2,
-                                int flags, int phase)
+RDC_STATIC void RDCSubsequentDashedTwoPointLine(ScrnInfoPtr pScrn, int x1, int y1, int x2, int y2, int flags, int phase)
 {
  
     RDCRecPtr  pRDC = RDCPTR(pScrn);
@@ -2229,8 +2130,7 @@ RDC_EXPORT int RDCAccelMarkSync(ScreenPtr pScreen)
 }
 
 
-static Bool
-RDCExaPrepareSolid(PixmapPtr pPixmap, int alu, Pixel planeMask, Pixel fg)
+RDC_STATIC Bool RDCExaPrepareSolid(PixmapPtr pPixmap, int alu, Pixel planeMask, Pixel fg)
 {
     ScrnInfoPtr pScrn = xf86Screens[pPixmap->drawable.pScreen->myNum];
     RDCRecPtr pRDC = RDCPTR(pScrn);
@@ -2281,8 +2181,7 @@ RDCExaPrepareSolid(PixmapPtr pPixmap, int alu, Pixel planeMask, Pixel fg)
 }
 
 
-static void
-RDCExaSolid(PixmapPtr pPixmap, int x1, int y1, int x2, int y2)
+RDC_STATIC void RDCExaSolid(PixmapPtr pPixmap, int x1, int y1, int x2, int y2)
 {
     ScrnInfoPtr pScrn = xf86Screens[pPixmap->drawable.pScreen->myNum];
     RDCRecPtr pRDC = RDCPTR(pScrn);
@@ -2345,20 +2244,13 @@ RDCExaSolid(PixmapPtr pPixmap, int x1, int y1, int x2, int y2)
 }
 
 
-static void
-RDCExaDoneSolidCopy(PixmapPtr pPixmap)
+RDC_STATIC void RDCExaDoneSolidCopy(PixmapPtr pPixmap)
 {
     xf86DrvMsgVerb(0, X_INFO, InfoLevel, "==RDCExaDoneSolidCopy==\n");
 }
 
 
-static Bool
-RDCExaPrepareCopy( PixmapPtr pSrcPixmap, 
-                   PixmapPtr pDstPixmap, 
-                   int xdir,
-                   int ydir, 
-                   int alu, 
-                   Pixel planeMask)
+RDC_STATIC Bool RDCExaPrepareCopy( PixmapPtr pSrcPixmap, PixmapPtr pDstPixmap, int xdir, int ydir, int alu, Pixel planeMask)
 {
     ScrnInfoPtr pScrn = xf86Screens[pDstPixmap->drawable.pScreen->myNum];
     RDCRecPtr pRDC = RDCPTR(pScrn);
@@ -2420,14 +2312,7 @@ RDCExaPrepareCopy( PixmapPtr pSrcPixmap,
 }
 
 
-static void
-RDCExaCopy( PixmapPtr pDstPixmap, 
-            int srcX, 
-            int srcY, 
-            int dstX, 
-            int dstY,
-            int width, 
-            int height)
+RDC_STATIC void RDCExaCopy( PixmapPtr pDstPixmap, int srcX, int srcY, int dstX, int dstY, int width, int height)
 {
     ScrnInfoPtr pScrn = xf86Screens[pDstPixmap->drawable.pScreen->myNum];
     RDCRecPtr pRDC = RDCPTR(pScrn);
@@ -2505,8 +2390,7 @@ RDCExaCopy( PixmapPtr pDstPixmap,
 }
 
 
-static void
-RDCExaDoneCopy(PixmapPtr pPixmap)
+RDC_STATIC void RDCExaDoneCopy(PixmapPtr pPixmap)
 {
     xf86DrvMsgVerb(0, X_INFO, ErrorLevel, "==RDCExaDoneCopy==\n");
 }
@@ -2580,7 +2464,7 @@ RDC_EXPORT Bool RDCExaDownloadFromScreen (PixmapPtr pSrc, int x,  int y, int w, 
 
 
 
-static ExaDriverPtr RDCInitExa(ScreenPtr pScreen)
+RDC_STATIC ExaDriverPtr RDCInitExa(ScreenPtr pScreen)
 {
     ScrnInfoPtr pScrn = xf86Screens[pScreen->myNum];
     RDCRecPtr pRDC = RDCPTR(pScrn);

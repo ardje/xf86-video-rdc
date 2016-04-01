@@ -53,27 +53,8 @@
 #include "cursorstr.h"
 
 
+#define _rdc_cursor_c_
 #include "rdc.h"
-
-
-static void RDCShowCursor(ScrnInfoPtr pScrn); 
-static void RDCSetCursorPosition(ScrnInfoPtr pScrn, int x, int y);
-static void RDCSetCursorColors(ScrnInfoPtr pScrn, int bg, int fg);
-static void RDCLoadCursorImage(ScrnInfoPtr pScrn, UCHAR *src);
-static Bool RDCUseHWCursor(ScreenPtr pScreen, CursorPtr pCurs);
-static void RDCLoadCursorARGB(ScrnInfoPtr pScrn, CursorPtr pCurs);
-static Bool RDCUseHWCursorARGB(ScreenPtr pScreen, CursorPtr pCurs);
-
-static void RDCFireCursor(ScrnInfoPtr pScrn); 
-
-
-
-static void RDCShowCursor_HQ(ScrnInfoPtr pScrn); 
-static void RDCSetCursorColors_HQ(ScrnInfoPtr pScrn, int bg, int fg);
-static void RDCLoadCursorImage_HQ(ScrnInfoPtr pScrn, UCHAR *src);
-static void RDCLoadCursorARGB_HQ(ScrnInfoPtr pScrn, CursorPtr pCurs);
-static void RDCSetCursorPosition_HQ(ScrnInfoPtr pScrn, int x, int y);
-
 
 RDC_EXPORT Bool RDCCursorInit(ScreenPtr pScreen)
 {
@@ -155,8 +136,7 @@ RDC_EXPORT Bool bInitHWC(ScrnInfoPtr pScrn, RDCRecPtr pRDC)
 }
 
 
-static void
-RDCShowCursor(ScrnInfoPtr pScrn)
+RDC_STATIC void RDCShowCursor(ScrnInfoPtr pScrn)
 {
     RDCRecPtr   pRDC = RDCPTR(pScrn);    
     UCHAR     jReg;
@@ -188,8 +168,7 @@ RDC_EXPORT void RDCHideCursor(ScrnInfoPtr pScrn)
 #endif
 }
 
-static void
-RDCSetCursorPosition(ScrnInfoPtr pScrn, int x, int y)
+RDC_STATIC void RDCSetCursorPosition(ScrnInfoPtr pScrn, int x, int y)
 {
     RDCRecPtr    pRDC = RDCPTR(pScrn);
     DisplayModePtr mode = pRDC->ModePtr;    
@@ -256,8 +235,7 @@ RDCSetCursorPosition(ScrnInfoPtr pScrn, int x, int y)
 }  
 
 
-static void
-RDCSetCursorColors(ScrnInfoPtr pScrn, int bg, int fg)
+RDC_STATIC void RDCSetCursorColors(ScrnInfoPtr pScrn, int bg, int fg)
 {
     RDCRecPtr     pRDC = RDCPTR(pScrn);
 
@@ -271,8 +249,7 @@ RDCSetCursorColors(ScrnInfoPtr pScrn, int bg, int fg)
 #endif
 }
 
-static void
-RDCLoadCursorImage(ScrnInfoPtr pScrn, UCHAR *src)
+RDC_STATIC void RDCLoadCursorImage(ScrnInfoPtr pScrn, UCHAR *src)
 {
     RDCRecPtr   pRDC = RDCPTR(pScrn);   
     int         i, j, k;
@@ -340,8 +317,7 @@ RDCLoadCursorImage(ScrnInfoPtr pScrn, UCHAR *src)
 #endif
 }
 
-static Bool 
-RDCUseHWCursor(ScreenPtr pScreen, CursorPtr pCurs)
+RDC_STATIC Bool RDCUseHWCursor(ScreenPtr pScreen, CursorPtr pCurs)
 {
     ScrnInfoPtr     pScrn = xf86Screens[pScreen->myNum];
     RDCRecPtr       pRDC = RDCPTR(pScrn);
@@ -408,8 +384,7 @@ RDCUseHWCursor(ScreenPtr pScreen, CursorPtr pCurs)
     return TRUE;
 }
 
-static void
-RDCLoadCursorARGB(ScrnInfoPtr pScrn, CursorPtr pCurs)
+RDC_STATIC void RDCLoadCursorARGB(ScrnInfoPtr pScrn, CursorPtr pCurs)
 {
     RDCRecPtr   pRDC = RDCPTR(pScrn);   
 
@@ -510,8 +485,7 @@ RDCLoadCursorARGB(ScrnInfoPtr pScrn, CursorPtr pCurs)
 #endif
 }
 
-static Bool 
-RDCUseHWCursorARGB(ScreenPtr pScreen, CursorPtr pCurs)
+RDC_STATIC Bool RDCUseHWCursorARGB(ScreenPtr pScreen, CursorPtr pCurs)
 {
     ScrnInfoPtr     pScrn = xf86Screens[pScreen->myNum];
     RDCRecPtr       pRDC = RDCPTR(pScrn);
@@ -577,8 +551,7 @@ RDCUseHWCursorARGB(ScreenPtr pScreen, CursorPtr pCurs)
     return TRUE;
 }
 
-static void
-RDCFireCursor(ScrnInfoPtr pScrn)
+RDC_STATIC void RDCFireCursor(ScrnInfoPtr pScrn)
 {
     RDCRecPtr  pRDC = RDCPTR(pScrn);
 #if HWC_DEBUG
@@ -601,7 +574,7 @@ RDC_EXPORT void RDCHideCursor_HQ(ScrnInfoPtr pScrn)
     *((volatile ULONG*)(pRDC->MMIOVirtualAddr + HWC_MMIO_CTRL)) = (ulCursorCTRL& ~BIT1);
 }
 
-static void RDCShowCursor_HQ(ScrnInfoPtr pScrn)
+RDC_STATIC void RDCShowCursor_HQ(ScrnInfoPtr pScrn)
 {
     ULONG      ulCursorCTRL;
     RDCRecPtr  pRDC = RDCPTR(pScrn);
@@ -629,7 +602,7 @@ static void RDCShowCursor_HQ(ScrnInfoPtr pScrn)
 #endif
 }
 
-static void RDCSetCursorColors_HQ(ScrnInfoPtr pScrn, int bg, int fg)
+RDC_STATIC void RDCSetCursorColors_HQ(ScrnInfoPtr pScrn, int bg, int fg)
 {
     RDCRecPtr   pRDC = RDCPTR(pScrn);
 
@@ -715,7 +688,7 @@ static void RDCSetCursorColors_HQ(ScrnInfoPtr pScrn, int bg, int fg)
 
 }
 
-static void RDCLoadCursorImage_HQ(ScrnInfoPtr pScrn, UCHAR *src)
+RDC_STATIC void RDCLoadCursorImage_HQ(ScrnInfoPtr pScrn, UCHAR *src)
 {
     RDCRecPtr   pRDC = RDCPTR(pScrn);   
     ULONG       ulPatternOffset;
@@ -737,7 +710,7 @@ static void RDCLoadCursorImage_HQ(ScrnInfoPtr pScrn, UCHAR *src)
 #endif
 }
 
-static void RDCLoadCursorARGB_HQ(ScrnInfoPtr pScrn, CursorPtr pCurs)
+RDC_STATIC void RDCLoadCursorARGB_HQ(ScrnInfoPtr pScrn, CursorPtr pCurs)
 {
     RDCRecPtr   pRDC = RDCPTR(pScrn);   
     UCHAR       *pjDstXor, *pjSrcXor;
@@ -890,7 +863,7 @@ static void RDCLoadCursorARGB_HQ(ScrnInfoPtr pScrn, CursorPtr pCurs)
 #endif
 }
 
-static void RDCSetCursorPosition_HQ(ScrnInfoPtr pScrn, int x, int y)
+RDC_STATIC void RDCSetCursorPosition_HQ(ScrnInfoPtr pScrn, int x, int y)
 {
     RDCRecPtr    pRDC = RDCPTR(pScrn);
     DisplayModePtr mode = pRDC->ModePtr;

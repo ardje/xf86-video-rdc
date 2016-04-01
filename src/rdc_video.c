@@ -56,22 +56,9 @@
 #include "fourcc.h"
 
 
+#define _rdc_video_c_
 #include "rdc.h"
 
-
-static XF86VideoAdaptorPtr RDCSetupImageVideoOverlay(ScreenPtr);
-static void RDCStopVideo(ScrnInfoPtr,pointer,Bool);
-static int RDCSetPortAttribute(ScrnInfoPtr,Atom,INT32,pointer);
-static int RDCGetPortAttribute(ScrnInfoPtr,Atom,INT32*,pointer);
-static void RDCQueryBestSize(ScrnInfoPtr,Bool,short,short,short,short,unsigned int*,unsigned int*,pointer);
-static int RDCPutImage(ScrnInfoPtr,short,short,short,short,short,short,short,short,
-		               int,unsigned char*,short,short,Bool,RegionPtr,pointer,DrawablePtr);
-static int RDCQueryImageAttributesOverlay(ScrnInfoPtr,int,unsigned short*,unsigned short*,int*,int*);
-static FBLinearPtr RDCAllocateMemory(ScrnInfoPtr, FBLinearPtr, int);
-    
-static void RDCStopVideoPost(ScrnInfoPtr,pointer,Bool);
-static int RDCPutImageVPOST(ScrnInfoPtr,short,short,short,short,short,short,short,short,
-		               int,unsigned char*,short,short,Bool,RegionPtr,pointer,DrawablePtr);
 
 
 #define IMAGE_MAX_WIDTH		1920
@@ -182,8 +169,7 @@ RDC_EXPORT void RDCVideoInit(ScreenPtr pScreen)
 }
 
 
-static XF86VideoAdaptorPtr
-RDCSetupImageVideoOverlay(ScreenPtr pScreen)
+RDC_STATIC XF86VideoAdaptorPtr RDCSetupImageVideoOverlay(ScreenPtr pScreen)
 {
     ScrnInfoPtr pScrn = xf86Screens[pScreen->myNum];
     RDCRecPtr pRDC = RDCPTR(pScrn);
@@ -295,8 +281,7 @@ RDCSetupImageVideoOverlay(ScreenPtr pScreen)
     return adapt;
 }
 
-static void
-RDCStopVideo(ScrnInfoPtr pScrn, pointer data, Bool shutdown)
+RDC_STATIC void RDCStopVideo(ScrnInfoPtr pScrn, pointer data, Bool shutdown)
 {
     RDCRecPtr pRDC = RDCPTR(pScrn);
     RDCPortPrivPtr pXVPriv = (RDCPortPrivPtr)data;
@@ -329,12 +314,7 @@ RDCStopVideo(ScrnInfoPtr pScrn, pointer data, Bool shutdown)
     xf86DrvMsgVerb(0, X_INFO, DefaultLevel, "==RDCStopVideo()  Exit==\n");
 }
 
-static int
-RDCSetPortAttribute(
-        ScrnInfoPtr pScrn,
-		Atom attribute, 
-		INT32 value, 
-		pointer data)
+RDC_STATIC int RDCSetPortAttribute( ScrnInfoPtr pScrn, Atom attribute, INT32 value, pointer data)
 {
     RDCRecPtr  pRDC = RDCPTR(pScrn);
     RDCPortPrivPtr pXVPriv = (RDCPortPrivPtr)data;
@@ -377,12 +357,7 @@ RDCSetPortAttribute(
     return ReturnValue;
 }
 
-static int
-RDCGetPortAttribute(
-        ScrnInfoPtr pScrn,
-		Atom attribute, 
-		INT32 * value, 
-		pointer data)
+RDC_STATIC int RDCGetPortAttribute( ScrnInfoPtr pScrn, Atom attribute, INT32 * value, pointer data)
 {
     RDCRecPtr  pRDC = RDCPTR(pScrn);
     RDCPortPrivPtr pXVPriv = (RDCPortPrivPtr)data;
@@ -421,12 +396,7 @@ RDCGetPortAttribute(
     return ReturnValue;
 }
 
-static void
-RDCQueryBestSize(ScrnInfoPtr pScrn,
-		  Bool motion,
-		  short vid_w, short vid_h,
-		  short drw_w, short drw_h,
-		  unsigned int *p_w, unsigned int *p_h, pointer data)
+RDC_STATIC void RDCQueryBestSize(ScrnInfoPtr pScrn, Bool motion, short vid_w, short vid_h, short drw_w, short drw_h, unsigned int *p_w, unsigned int *p_h, pointer data)
 {
     xf86DrvMsgVerb(0, X_INFO, DefaultLevel, "==RDCQueryBestSize()  Entry==\n");
 
@@ -437,16 +407,7 @@ RDCQueryBestSize(ScrnInfoPtr pScrn,
 }
 
 
-static int
-RDCPutImage(ScrnInfoPtr pScrn,
-	     short src_x, short src_y,
-	     short drw_x, short drw_y,
-	     short src_w, short src_h,
-	     short drw_w, short drw_h,
-	     int id, unsigned char *buf,
-	     short width, short height,
-	     Bool sync, RegionPtr clipBoxes, pointer data,
-	     DrawablePtr pDraw)
+RDC_STATIC int RDCPutImage(ScrnInfoPtr pScrn, short src_x, short src_y, short drw_x, short drw_y, short src_w, short src_h, short drw_w, short drw_h, int id, unsigned char *buf, short width, short height, Bool sync, RegionPtr clipBoxes, pointer data, DrawablePtr pDraw)
 {
     RDCRecPtr  pRDC = RDCPTR(pScrn);
     RDCPortPrivPtr  pRDCPortPriv = (RDCPortPrivPtr)data;
@@ -620,10 +581,7 @@ RDCPutImage(ScrnInfoPtr pScrn,
     return Success;
 }
 
-static int
-RDCQueryImageAttributesOverlay(ScrnInfoPtr pScrn,int id,
-				               unsigned short *w, unsigned short *h,
-				               int *pitches, int *offsets)
+RDC_STATIC int RDCQueryImageAttributesOverlay(ScrnInfoPtr pScrn,int id, unsigned short *w, unsigned short *h, int *pitches, int *offsets)
 {
     int size = 0, chromasize = 0;
     
@@ -703,11 +661,7 @@ RDCQueryImageAttributesOverlay(ScrnInfoPtr pScrn,int id,
 }
 
 
-static FBLinearPtr
-RDCAllocateMemory(
-    ScrnInfoPtr pScrn,
-    FBLinearPtr PackedBuf,
-    int size)
+RDC_STATIC FBLinearPtr RDCAllocateMemory( ScrnInfoPtr pScrn, FBLinearPtr PackedBuf, int size)
 {
     ScreenPtr pScreen;
     FBLinearPtr newBuf;
@@ -993,8 +947,7 @@ RDC_EXPORT void RDCCopyFOURCC(RDCRecPtr  pRDC, unsigned char* pSrcStart, RDCPort
     xf86DrvMsgVerb(0, X_INFO, DefaultLevel, "==RDCCopyFOURCC()  Exit==\n");
 }
 
-static void
-RDCStopVideoPost(ScrnInfoPtr pScrn, pointer data, Bool shutdown)
+RDC_STATIC void RDCStopVideoPost(ScrnInfoPtr pScrn, pointer data, Bool shutdown)
 {
     RDCRecPtr pRDC = RDCPTR(pScrn);
     RDCPortPrivPtr pXVPriv = (RDCPortPrivPtr)data;
@@ -2110,16 +2063,7 @@ RDC_EXPORT void RDCAllocateVPOSTMem(ScrnInfoPtr pScrn, RDCPortPrivPtr pRDCPortPr
         pVPHwInfo->ulVP_SrcBuf[i] = pRDCPortPriv->PackedBufOffset[i];    
 }
 
-static int
-RDCPutImageVPOST(ScrnInfoPtr pScrn,
-	     short src_x, short src_y,
-	     short drw_x, short drw_y,
-	     short src_w, short src_h,
-	     short drw_w, short drw_h,
-	     int id, unsigned char *buf,
-	     short width, short height,
-	     Bool sync, RegionPtr clipBoxes, pointer data,
-	     DrawablePtr pDraw)
+RDC_STATIC int RDCPutImageVPOST(ScrnInfoPtr pScrn, short src_x, short src_y, short drw_x, short drw_y, short src_w, short src_h, short drw_w, short drw_h, int id, unsigned char *buf, short width, short height, Bool sync, RegionPtr clipBoxes, pointer data, DrawablePtr pDraw)
 {
     RDCRecPtr       pRDC = RDCPTR(pScrn);
     RDCPortPrivPtr  pRDCPortPriv = (RDCPortPrivPtr)data;

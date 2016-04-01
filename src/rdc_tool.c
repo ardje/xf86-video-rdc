@@ -54,6 +54,7 @@
 #include "xf86Cursor.h"
 
 
+#define _rdc_tool_c_
 #include "rdc.h"
 #include "rdc_extension.h"
 

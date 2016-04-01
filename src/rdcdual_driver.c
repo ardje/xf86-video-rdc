@@ -56,6 +56,7 @@
 #include "xf86Pci.h"
 
 
+#define _rdcdual_driver_c_
 #include "rdc.h"
 
 #include "CInt10FunProto.h"
@@ -64,18 +65,11 @@
 
 
 
-static Bool RDCPreInitDual(ScrnInfoPtr pScrn, int flags);
-static Bool RDCScreenInitDual(int Index, ScreenPtr pScreen, int argc, char **argv);
-static Bool RDCEnterVTDual(int scrnIndex, int flags);
-static void RDCLeaveVTDual(int scrnIndex, int flags);
-static void RDCFreeScreenDual(int scrnIndex, int flags);
-static ModeStatus RDCValidModeDual(int scrnIndex, DisplayModePtr mode, Bool verbose, int flags);
 
 #define MAX_WIDTH  4096
 #define MAX_HEIGHT 1440
 
-static Bool
-RDCCreateScreenResources(ScreenPtr pScreen)
+RDC_STATIC Bool RDCCreateScreenResources(ScreenPtr pScreen)
 {
    ScrnInfoPtr pScrn = xf86Screens[pScreen->myNum];
    RDCRecPtr pRDC = RDCPTR(pScrn);
@@ -88,9 +82,7 @@ RDCCreateScreenResources(ScreenPtr pScreen)
    return TRUE;
 }
 
-static void
-RDCBlockHandler(int i,
-		 pointer blockData, pointer pTimeout, pointer pReadmask)
+RDC_STATIC void RDCBlockHandler(int i, pointer blockData, pointer pTimeout, pointer pReadmask)
 {
     ScreenPtr pScreen = screenInfo.screens[i];
     ScrnInfoPtr pScrn = xf86Screens[i];
@@ -128,8 +120,7 @@ RDCCursorInitDual(ScreenPtr pScreen)
                              HARDWARE_CURSOR_BIT_ORDER_MSBFIRST));
 }
 
-static int
-rdc_output_clones (ScrnInfoPtr pScrn, int type_mask)
+RDC_STATIC int rdc_output_clones (ScrnInfoPtr pScrn, int type_mask)
 {
     xf86CrtcConfigPtr	config = XF86_CRTC_CONFIG_PTR (pScrn);
     int			o;
@@ -146,8 +137,7 @@ rdc_output_clones (ScrnInfoPtr pScrn, int type_mask)
 }
 
 
-static void
-RDCSetupOutputs(ScrnInfoPtr pScrn)
+RDC_STATIC void RDCSetupOutputs(ScrnInfoPtr pScrn)
 {
    xf86CrtcConfigPtr	config = XF86_CRTC_CONFIG_PTR (pScrn);
    RDCRecPtr pRDC = RDCPTR(pScrn);
@@ -180,7 +170,7 @@ RDCSetupOutputs(ScrnInfoPtr pScrn)
 
 static int uxa_pixmap_index;
 
-static Bool rdc_xf86crtc_resize(ScrnInfoPtr scrn, int width, int height)
+RDC_STATIC Bool rdc_xf86crtc_resize(ScrnInfoPtr scrn, int width, int height)
 {
     PixmapPtr   pixmap;
     int i;
@@ -226,8 +216,7 @@ static const xf86CrtcConfigFuncsRec rdc_xf86crtc_config_funcs = {
 };
 
 
-static Bool
-rdc_user_modesetting_init(ScrnInfoPtr pScrn)
+RDC_STATIC Bool rdc_user_modesetting_init(ScrnInfoPtr pScrn)
 {
     RDCRecPtr pRDC = RDCPTR(pScrn);
     int i, num_pipe;
@@ -257,8 +246,7 @@ rdc_user_modesetting_init(ScrnInfoPtr pScrn)
     return TRUE;
 }
 
-static void
-RDCPreInitCrtcConfig(ScrnInfoPtr pScrn)
+RDC_STATIC void RDCPreInitCrtcConfig(ScrnInfoPtr pScrn)
 {      
     
     xf86CrtcConfigInit(pScrn, &rdc_xf86crtc_config_funcs);
@@ -268,8 +256,7 @@ RDCPreInitCrtcConfig(ScrnInfoPtr pScrn)
 
 
 
-static Bool
-RDCPreInitDual(ScrnInfoPtr pScrn, int flags)
+RDC_STATIC Bool RDCPreInitDual(ScrnInfoPtr pScrn, int flags)
 {
     EntityInfoPtr pEnt;
     vbeInfoPtr pVbe;
@@ -997,8 +984,7 @@ RDCPreInitDual(ScrnInfoPtr pScrn, int flags)
 }
 
 
-static Bool
-RDCScreenInitDual(int scrnIndex, ScreenPtr pScreen, int argc, char **argv)
+RDC_STATIC Bool RDCScreenInitDual(int scrnIndex, ScreenPtr pScreen, int argc, char **argv)
 {
     ScrnInfoPtr pScrn;
     RDCRecPtr pRDC;
@@ -1244,8 +1230,7 @@ RDC_EXPORT void RDCAdjustFrameDual(int scrnIndex, int x, int y, int flags)
 }
 
         
-static Bool
-RDCEnterVTDual(int scrnIndex, int flags)
+RDC_STATIC Bool RDCEnterVTDual(int scrnIndex, int flags)
 {
     ScrnInfoPtr pScrn = xf86Screens[scrnIndex];
     RDCRecPtr pRDC = RDCPTR(pScrn);
@@ -1275,8 +1260,7 @@ RDCEnterVTDual(int scrnIndex, int flags)
 }
 
 
-static void
-RDCLeaveVTDual(int scrnIndex, int flags)
+RDC_STATIC void RDCLeaveVTDual(int scrnIndex, int flags)
 {
     ScrnInfoPtr pScrn = xf86Screens[scrnIndex];
     vgaHWPtr hwp = VGAHWPTR(pScrn);
@@ -1305,8 +1289,7 @@ RDCLeaveVTDual(int scrnIndex, int flags)
     xf86DrvMsgVerb(pScrn->scrnIndex, X_INFO, DefaultLevel, "==Exit RDCLeaveVT() Normal Exit== \n");
 }
 
-static void
-RDCFreeScreenDual(int scrnIndex, int flags)
+RDC_STATIC void RDCFreeScreenDual(int scrnIndex, int flags)
 {
     xf86DrvMsgVerb(scrnIndex, X_INFO, DefaultLevel, "==Enter RDCFreeScreen()== \n");
     
@@ -1317,8 +1300,7 @@ RDCFreeScreenDual(int scrnIndex, int flags)
     xf86DrvMsgVerb(scrnIndex, X_INFO, DefaultLevel, "==Exit1 RDCFreeScreen()== \n");
 }
 
-static ModeStatus
-RDCValidModeDual(int scrnIndex, DisplayModePtr mode, Bool verbose, int flags)
+RDC_STATIC ModeStatus RDCValidModeDual(int scrnIndex, DisplayModePtr mode, Bool verbose, int flags)
 {
     ScrnInfoPtr pScrn = xf86Screens[scrnIndex];
     RDCRecPtr pRDC = RDCPTR(pScrn);

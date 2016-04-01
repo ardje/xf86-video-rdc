@@ -1,6 +1,8 @@
 /*
- * Prototypes for TV.c
+ * External prototypes for TV.c
  */
+#ifndef _TV_h_
+#define _TV_h_
 extern BYTE bSetFS473TimingReg(BYTE bDisplayPath, WORD wModeNum);
 extern BYTE bSetSAA7105TimingReg(BYTE bDisplayPath, WORD wModeNum);
 extern BYTE Get_TV_CONNECTION_TYPE();
@@ -27,6 +29,15 @@ extern void Set_TV_TYPE(BYTE ucTVType);
 extern void UpdatePLLByTVEnc(DWORD dwPixelClock);
 extern void vSetFS473CCRSLevel(BYTE bCCRSLevel);
 extern void WriteFS473I2CData(BYTE ucIndex, WORD wData);
+#endif
+/*
+ * Static prototypes for TV.c
+ */
+#ifdef _TV_c_
+#endif
+
 
 #undef RDC_EXPORT
 #define RDC_EXPORT
+#undef RDC_STATIC
+#define RDC_STATIC static

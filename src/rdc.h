@@ -145,7 +145,7 @@ typedef enum {
     OPTION_DOWN_SCALE
 } RDCOpts;
 
-#ifdef _DRIVER_C_
+#ifdef _rdc_driver_c_
 static const OptionInfoRec RDCOptions[] = {
     {OPTION_NOACCEL,       "NoAccel",       OPTV_BOOLEAN,  {0}, TRUE},
     {OPTION_MMIO2D,        "MMIO2D",        OPTV_BOOLEAN,  {0}, FALSE},   
@@ -831,6 +831,7 @@ typedef struct _RDCOutputPrivateRec {
 #define STRINGIZE(x) STRINGIZE_DETAIL(x)
 #define rdcLog(msg) xf86DrvMsgVerb(0, X_INFO, 0,__FILE__ "(" STRINGIZE(__LINE__) "): " msg "\n")
 
+#include "rdc_driver_proto.h"
 #include "rdc_accel_proto.h"
 #include "rdc_driver_proto.h"
 #include "HDMI_proto.h"

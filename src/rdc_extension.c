@@ -62,6 +62,7 @@
 #include "extnsionst.h" 
 #include "dixstruct.h"  
 
+#define _rdc_extension_c_
 #include "rdc_extension.h"
 #include "gamma_proto.h"
 
@@ -81,7 +82,7 @@ ULONG *inBufPtr, *outBufPtr ;
 int g_ScreenNumber;
 
 
-static int ProcRDCGFXQueryVersion (ClientPtr client)
+RDC_STATIC int ProcRDCGFXQueryVersion (ClientPtr client)
 {        
     xRDCGFXQueryVersionReply rep;
     register int n;
@@ -107,7 +108,7 @@ static int ProcRDCGFXQueryVersion (ClientPtr client)
 
 
 
-static int ProcRDCGFXCommand(ClientPtr client)
+RDC_STATIC int ProcRDCGFXCommand(ClientPtr client)
 {
     xRDCGFXCommandReq *req = (xRDCGFXCommandReq*)client->requestBuffer;    register int     n;
     int          i, ret;    
@@ -144,11 +145,11 @@ static int ProcRDCGFXCommand(ClientPtr client)
     return client->noClientException;
 }
 
-static void RDCGFXResetProc(ExtensionEntry* extEntry)
+RDC_STATIC void RDCGFXResetProc(ExtensionEntry* extEntry)
 {    
 }
 
-static int ProcRDCGFXDispatch(ClientPtr client)
+RDC_STATIC int ProcRDCGFXDispatch(ClientPtr client)
 {   
     REQUEST(xReq);
     switch(stuff->data)

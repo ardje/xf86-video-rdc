@@ -1,6 +1,8 @@
 /*
- * Prototypes for rdc_vgatool.c
+ * External prototypes for rdc_vgatool.c
  */
+#ifndef _rdc_vgatool_h_
+#define _rdc_vgatool_h_
 extern Bool bRDCRegInit(ScrnInfoPtr pScrn);
 extern Bool RDCCheckCapture(ScrnInfoPtr pScrn);
 extern Bool RDCFilterModeByBandWidth(ScrnInfoPtr pScrn, DisplayModePtr mode);
@@ -21,6 +23,15 @@ extern void vRDCLoadPalette(ScrnInfoPtr pScrn, int numColors, int *indices, LOCO
 extern void vRDCOpenKey(ScrnInfoPtr pScrn);
 extern void vSetDispalyStartAddress(xf86CrtcPtr crtc, int x, int y);
 extern void vSetStartAddressCRT1(RDCRecPtr pRDC, ULONG base);
+#endif
+/*
+ * Static prototypes for rdc_vgatool.c
+ */
+#ifdef _rdc_vgatool_c_
+#endif
+
 
 #undef RDC_EXPORT
 #define RDC_EXPORT
+#undef RDC_STATIC
+#define RDC_STATIC static

@@ -62,26 +62,10 @@
 
 #include "xf86Pci.h"
 
-#define _DRIVER_C_
+#define _rdc_driver_c_
 #include "rdc.h"
 
 #include "CInt10FunProto.h"
-
-static void RDCIdentify(int flags);
-RDC_EXPORT const OptionInfoRec *RDCAvailableOptions(int chipid, int busid);
-#if XSERVER_LIBPCIACCESS
-static Bool rdc_pci_probe (DriverPtr drv, int entity_num, struct pci_device *dev, intptr_t match_data);
-#else
-static Bool RDCProbe(DriverPtr drv, int flags);
-#endif
-static Bool RDCPreInit(ScrnInfoPtr pScrn, int flags);
-static Bool RDCScreenInit(ScreenPtr pScreen, int argc, char **argv);
-static Bool RDCEnterVT(ScrnInfoPtr pScrn);
-static void RDCLeaveVT(ScrnInfoPtr pScrn);
-static void RDCFreeScreen(ScrnInfoPtr pScrn);
-static ModeStatus RDCValidMode(ScrnInfoPtr pScrn, DisplayModePtr mode, Bool verbose, int flags);
-
-
 
 
 #if XSERVER_LIBPCIACCESS
@@ -244,8 +228,7 @@ static XF86ModuleVersionInfo RDCVersRec = {
 
 _X_EXPORT XF86ModuleData rdcModuleData = { &RDCVersRec, RDCSetup, NULL };
 
-static pointer
-RDCSetup(pointer module, pointer opts, int *errmaj, int *errmin)
+RDC_STATIC pointer RDCSetup(pointer module, pointer opts, int *errmaj, int *errmin)
 {
     static Bool setupDone = FALSE;
 
@@ -282,8 +265,7 @@ RDCSetup(pointer module, pointer opts, int *errmaj, int *errmin)
 #endif    
 
 
-static void
-RDCIdentify(int flags)
+RDC_STATIC void RDCIdentify(int flags)
 {
     xf86DrvMsgVerb(0, X_INFO, DefaultLevel, "==Enter RDCIdentify()== \n");
     xf86PrintChipsets(RDC_NAME, "Driver for RDC Graphics Chipsets", RDCChipsets);
@@ -298,10 +280,7 @@ RDC_EXPORT const OptionInfoRec * RDCAvailableOptions(int chipid, int busid)
 
 #if XSERVER_LIBPCIACCESS
 
-static Bool rdc_pci_probe (DriverPtr		driver,
-			   int		        entity_num,
-			   struct pci_device	*device,
-			   intptr_t		match_data)
+RDC_STATIC Bool rdc_pci_probe (DriverPtr		driver, int		        entity_num, struct pci_device	*device, intptr_t		match_data)
 {
     ScrnInfoPtr	    pScrn = NULL;
     EntityInfoPtr   entity;
@@ -353,8 +332,7 @@ static Bool rdc_pci_probe (DriverPtr		driver,
 }
 #else
 
-static Bool
-RDCProbe(DriverPtr drv, int flags)
+RDC_STATIC Bool RDCProbe(DriverPtr drv, int flags)
 {
     int i, numUsed, numDevSections, *usedChips;
     Bool foundScreen = FALSE;
@@ -425,8 +403,7 @@ RDCProbe(DriverPtr drv, int flags)
 #endif
 
 
-static Bool
-RDCPreInit(ScrnInfoPtr pScrn, int flags)
+RDC_STATIC Bool RDCPreInit(ScrnInfoPtr pScrn, int flags)
 {
     EntityInfoPtr pEnt;
     vbeInfoPtr pVbe;
@@ -1225,8 +1202,7 @@ RDCPreInit(ScrnInfoPtr pScrn, int flags)
 }
 
 
-static Bool
-RDCScreenInit(ScreenPtr pScreen, int argc, char **argv)
+RDC_STATIC Bool RDCScreenInit(ScreenPtr pScreen, int argc, char **argv)
 {
     ScrnInfoPtr pScrn=xf86ScreenToScrn(pScreen);
     RDCRecPtr pRDC;
@@ -1583,8 +1559,7 @@ RDC_EXPORT void RDCAdjustFrame(ScrnInfoPtr pScrn, int x, int y)
 }
 
         
-static Bool
-RDCEnterVT(ScrnInfoPtr pScrn)
+RDC_STATIC Bool RDCEnterVT(ScrnInfoPtr pScrn)
 {
     RDCRecPtr pRDC = RDCPTR(pScrn);
 
@@ -1637,8 +1612,7 @@ RDCEnterVT(ScrnInfoPtr pScrn)
 }
 
 
-static void
-RDCLeaveVT(ScrnInfoPtr pScrn)
+RDC_STATIC void RDCLeaveVT(ScrnInfoPtr pScrn)
 {
     vgaHWPtr hwp = VGAHWPTR(pScrn);
     RDCRecPtr pRDC = RDCPTR(pScrn);
@@ -1666,8 +1640,7 @@ RDCLeaveVT(ScrnInfoPtr pScrn)
     xf86DrvMsgVerb(pScrn->scrnIndex, X_INFO, DefaultLevel, "==Exit RDCLeaveVT() Normal Exit== \n");
 }
 
-static void
-RDCFreeScreen(ScrnInfoPtr pScrn)
+RDC_STATIC void RDCFreeScreen(ScrnInfoPtr pScrn)
 {
     xf86DrvMsgVerb(pScrn->scrnIndex, X_INFO, DefaultLevel, "==Enter RDCFreeScreen()== \n");
     
@@ -1678,8 +1651,7 @@ RDCFreeScreen(ScrnInfoPtr pScrn)
     xf86DrvMsgVerb(pScrn->scrnIndex, X_INFO, DefaultLevel, "==Exit1 RDCFreeScreen()== \n");
 }
 
-static ModeStatus
-RDCValidMode(ScrnInfoPtr pScrn, DisplayModePtr mode, Bool verbose, int flags)
+RDC_STATIC ModeStatus RDCValidMode(ScrnInfoPtr pScrn, DisplayModePtr mode, Bool verbose, int flags)
 {
     RDCRecPtr pRDC = RDCPTR(pScrn);
     CBIOS_ARGUMENTS *pCBiosArguments = pRDC->pCBIOSExtension->pCBiosArguments;

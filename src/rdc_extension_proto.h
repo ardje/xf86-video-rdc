@@ -1,6 +1,8 @@
 /*
- * Prototypes for rdc_extension.c
+ * External prototypes for rdc_extension.c
  */
+#ifndef _rdc_extension_h_
+#define _rdc_extension_h_
 extern int EC_QueryLCDPWM(RDCRecPtr pRDC, char *level);
 extern int EC_SetLCDPWM(RDCRecPtr pRDC, char *level);
 extern int RDCGFXUtilityProc(xRDCGFXCommandReq* req);
@@ -9,6 +11,19 @@ extern void CBIOS_SetTVEncDispRegModify(RDCRecPtr pRDC, PTV_Disp_Info pTVDispInf
 extern void GetFS473PositionFromVBIOS(RDCRecPtr pRDC);
 extern void GetSAA7105CCRSLevel(UCHAR ucI2Cport, UCHAR ucDevAddress, UCHAR *Level);
 extern void RDCDisplayExtensionInit(ScrnInfoPtr pScrn);
+#endif
+/*
+ * Static prototypes for rdc_extension.c
+ */
+#ifdef _rdc_extension_c_
+RDC_STATIC int ProcRDCGFXCommand(ClientPtr client);
+RDC_STATIC int ProcRDCGFXDispatch(ClientPtr client);
+RDC_STATIC int ProcRDCGFXQueryVersion (ClientPtr client);
+RDC_STATIC void RDCGFXResetProc(ExtensionEntry* extEntry);
+#endif
+
 
 #undef RDC_EXPORT
 #define RDC_EXPORT
+#undef RDC_STATIC
+#define RDC_STATIC static

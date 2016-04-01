@@ -1,6 +1,8 @@
 /*
- * Prototypes for CInt10.c
+ * External prototypes for CInt10.c
  */
+#ifndef _CInt10_h_
+#define _CInt10_h_
 extern BYTE AlignDataToLSB(BYTE Data, BYTE Mask);
 extern BYTE AlignDataToMask(BYTE Data, BYTE Mask);
 extern BYTE bHDMIUnscan(BYTE ucHDMIType);
@@ -199,6 +201,15 @@ extern WORD GetVDisplayEnd(BYTE DisplayPath);
 extern WORD Get_VESA_MODE(BYTE DisplayPath);
 extern WORD ReadRegFromHW(REG_OP *pRegOp);
 extern WORD TransDevIDtoBit(BYTE DeviceIndex);
+#endif
+/*
+ * Static prototypes for CInt10.c
+ */
+#ifdef _CInt10_c_
+#endif
+
 
 #undef RDC_EXPORT
 #define RDC_EXPORT
+#undef RDC_STATIC
+#define RDC_STATIC static
