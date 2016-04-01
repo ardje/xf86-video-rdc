@@ -66,56 +66,9 @@
 #include "rdc.h"
 
 #include "CInt10FunProto.h"
-extern MODE_INFO VESATable;
-
-
-
-#if !XSERVER_LIBPCIACCESS
-extern Bool RDCMapMem(ScrnInfoPtr pScrn);
-#endif
-extern Bool RDCUnmapMem(ScrnInfoPtr pScrn);
-extern Bool RDCMapMMIO(ScrnInfoPtr pScrn);
-extern void RDCUnmapMMIO(ScrnInfoPtr pScrn);
-extern Bool RDCMapVBIOS(ScrnInfoPtr pScrn);
-extern Bool RDCUnmapVBIOS(ScrnInfoPtr pScrn);
-
-extern void vRDCOpenKey(ScrnInfoPtr pScrn);
-extern Bool bRDCRegInit(ScrnInfoPtr pScrn);
-extern ULONG GetVRAMInfo(ScrnInfoPtr pScrn);
-extern Bool RDCCheckCapture(ScrnInfoPtr pScrn);
-extern Bool RDCFilterModeByBandWidth(ScrnInfoPtr pScrn, DisplayModePtr mode);
-extern ULONG RDCGetMemBandWidth(ScrnInfoPtr pScrn);
-extern void vRDCLoadPalette(ScrnInfoPtr pScrn, int numColors, int *indices, LOCO *colors, VisualPtr pVisual);
-extern void RDCDisplayPowerManagementSet(ScrnInfoPtr pScrn, int PowerManagementMode, int flags);
-extern void vSetStartAddressCRT1(RDCRecPtr pRDC, ULONG base);
-extern Bool RDCSetMode(ScrnInfoPtr pScrn, DisplayModePtr mode);
-
-extern Bool RDCAccelInit(ScreenPtr pScreen);
-
-extern Bool RDCCursorInit(ScreenPtr pScreen);
-extern DisplayModePtr RDCBuildModePool(ScrnInfoPtr pScrn);
-extern void RDCVideoInit(ScreenPtr pScreen);
-
-extern Bool bInitCMDQInfo(ScrnInfoPtr pScrn, RDCRecPtr pRDC);
-extern Bool bEnableCMDQ(RDCRecPtr pRDC);
-extern Bool bCRInitCMDQInfo(ScrnInfoPtr pScrn, RDCRecPtr pRDC);
-extern Bool bCREnableCMDQ(RDCRecPtr pRDC);
-
-extern Bool bCREnable2D(RDCRecPtr pRDC);
-extern void vCRDisable2D(RDCRecPtr pRDC);
-extern void vCRWaitEngIdle(RDCRecPtr pRDC);
-
-extern Bool bEnable2D(RDCRecPtr pRDC);
-extern void vDisable2D(RDCRecPtr pRDC);
-extern void vWaitEngIdle(RDCRecPtr pRDC);
-extern void CreateEDIDDetailedTimingList(UCHAR *ucEdidBuffer, ULONG ulEdidBufferSize, EDID_DETAILED_TIMING *pEDIDDetailedTiming);
-extern CBStatus CBIOS_SetEDIDToModeTable(ScrnInfoPtr pScrn, EDID_DETAILED_TIMING *pEDIDDetailedTiming);
-extern void RDCInitpScrnDual(ScrnInfoPtr pScrn);
-
-
 
 static void RDCIdentify(int flags);
-const OptionInfoRec *RDCAvailableOptions(int chipid, int busid);
+RDC_EXPORT const OptionInfoRec *RDCAvailableOptions(int chipid, int busid);
 #if XSERVER_LIBPCIACCESS
 static Bool rdc_pci_probe (DriverPtr drv, int entity_num, struct pci_device *dev, intptr_t match_data);
 #else
@@ -123,33 +76,12 @@ static Bool RDCProbe(DriverPtr drv, int flags);
 #endif
 static Bool RDCPreInit(ScrnInfoPtr pScrn, int flags);
 static Bool RDCScreenInit(ScreenPtr pScreen, int argc, char **argv);
-Bool RDCSwitchMode(ScrnInfoPtr pScrn, DisplayModePtr mode);
-void RDCAdjustFrame(ScrnInfoPtr pScrn, int x, int y);
 static Bool RDCEnterVT(ScrnInfoPtr pScrn);
 static void RDCLeaveVT(ScrnInfoPtr pScrn);
 static void RDCFreeScreen(ScrnInfoPtr pScrn);
 static ModeStatus RDCValidMode(ScrnInfoPtr pScrn, DisplayModePtr mode, Bool verbose, int flags);
 
 
-Bool RDCGetRec(ScrnInfoPtr pScrn);
-void RDCFreeRec(ScrnInfoPtr pScrn);
-Bool RDCSaveScreen(ScreenPtr pScreen, Bool unblack);
-Bool RDCCloseScreen(ScreenPtr pScreen);
-void RDCSave(ScrnInfoPtr pScrn);
-void RDCRestore(ScrnInfoPtr pScrn);
-void RDCProbeDDC(ScrnInfoPtr pScrn, int index);
-xf86MonPtr RDCDoDDC(ScrnInfoPtr pScrn, int index);
-void vFillRDCModeInfo (ScrnInfoPtr pScrn);
-Bool RDCModeInit(ScrnInfoPtr pScrn, DisplayModePtr mode);
-void RDCSetHWCaps(RDCRecPtr pRDC);
-
-Bool RDCRandRGetInfo(ScrnInfoPtr pScrn, Rotation *rotations);
-Bool RDCRandRSetConfig(ScrnInfoPtr pScrn, xorgRRConfig *config);
-Bool RDCDriverFunc(ScrnInfoPtr pScrn, xorgDriverFuncOp op, pointer data);
-void RDCApertureInit(ScrnInfoPtr pScrn);
-void TurnDirectAccessFBON(ScrnInfoPtr pScrn, Bool bTurnOn);
-void RDCPointerMoved(ScrnInfoPtr pScrn, int x, int y);
-void vUpdateHDMIFakeMode(ScrnInfoPtr pScrn);
 
 
 #if XSERVER_LIBPCIACCESS
@@ -358,8 +290,7 @@ RDCIdentify(int flags)
     xf86DrvMsgVerb(1, X_INFO, DefaultLevel, "==Exit RDCIdentify()== \n");
 }
 
-const OptionInfoRec *
-RDCAvailableOptions(int chipid, int busid)
+RDC_EXPORT const OptionInfoRec * RDCAvailableOptions(int chipid, int busid)
 {
     xf86DrvMsgVerb(0, X_INFO, DefaultLevel, "==Enter RDCAvailableOptions()== return RDCOptions\n");
     return RDCOptions;
@@ -1534,7 +1465,7 @@ rdcLog("meeh");
     return TRUE;
 } 
 
-Bool RDCSwitchMode(ScrnInfoPtr pScrn, DisplayModePtr mode)
+RDC_EXPORT Bool RDCSwitchMode(ScrnInfoPtr pScrn, DisplayModePtr mode)
 {
     RDCRecPtr pRDC = RDCPTR(pScrn);
     Bool RetStatus = FALSE;
@@ -1547,8 +1478,7 @@ Bool RDCSwitchMode(ScrnInfoPtr pScrn, DisplayModePtr mode)
     return RetStatus;
 }
 
-void
-RDCAdjustFrame(ScrnInfoPtr pScrn, int x, int y)
+RDC_EXPORT void RDCAdjustFrame(ScrnInfoPtr pScrn, int x, int y)
 {
     RDCRecPtr   pRDC  = RDCPTR(pScrn);
     ULONG base;
@@ -1858,8 +1788,7 @@ RDCValidMode(ScrnInfoPtr pScrn, DisplayModePtr mode, Bool verbose, int flags)
 
 
 
-Bool
-RDCGetRec(ScrnInfoPtr pScrn)
+RDC_EXPORT Bool RDCGetRec(ScrnInfoPtr pScrn)
 {
     xf86DrvMsgVerb(pScrn->scrnIndex, X_INFO, DefaultLevel, "==Enter RDCGetRec()== \n");
 
@@ -1874,8 +1803,7 @@ RDCGetRec(ScrnInfoPtr pScrn)
     return TRUE;
 }
 
-void
-RDCFreeRec(ScrnInfoPtr pScrn)
+RDC_EXPORT void RDCFreeRec(ScrnInfoPtr pScrn)
 {
     xf86DrvMsgVerb(pScrn->scrnIndex, X_INFO, DefaultLevel, "==Enter RDCFreeRec()== \n");
     
@@ -1897,8 +1825,7 @@ RDCFreeRec(ScrnInfoPtr pScrn)
     xf86DrvMsgVerb(pScrn->scrnIndex, X_INFO, DefaultLevel, "==Exit3 RDCFreeRec()== \n");
 }
 
-Bool
-RDCSaveScreen(ScreenPtr pScreen, Bool unblack)
+RDC_EXPORT Bool RDCSaveScreen(ScreenPtr pScreen, Bool unblack)
 {
     Bool RetStatus;
     xf86DrvMsgVerb(0, X_INFO, DefaultLevel, "==Enter RDCSaveScreen(unblack = %d)== \n", unblack);
@@ -1909,8 +1836,7 @@ RDCSaveScreen(ScreenPtr pScreen, Bool unblack)
     return RetStatus;
 }
 
-Bool
-RDCCloseScreen(ScreenPtr pScreen)
+RDC_EXPORT Bool RDCCloseScreen(ScreenPtr pScreen)
 {
     ScrnInfoPtr pScrn = xf86ScreenToScrn(pScreen);
     vgaHWPtr hwp = VGAHWPTR(pScrn);
@@ -1975,8 +1901,7 @@ RDCCloseScreen(ScreenPtr pScreen)
     return RetStatus;
 }
 
-void
-RDCSave(ScrnInfoPtr pScrn)
+RDC_EXPORT void RDCSave(ScrnInfoPtr pScrn)
 {
     RDCRecPtr pRDC;
     vgaRegPtr vgaReg;
@@ -2006,8 +1931,7 @@ RDCSave(ScrnInfoPtr pScrn)
     xf86DrvMsgVerb(pScrn->scrnIndex, X_INFO, DefaultLevel, "==Exit RDCSave()== \n");
 }
 
-void
-RDCRestore(ScrnInfoPtr pScrn)
+RDC_EXPORT void RDCRestore(ScrnInfoPtr pScrn)
 {
     RDCRecPtr pRDC;
     vgaRegPtr vgaReg;
@@ -2045,8 +1969,7 @@ RDCRestore(ScrnInfoPtr pScrn)
     xf86DrvMsgVerb(pScrn->scrnIndex, X_INFO, DefaultLevel, "==Exit1 RDCRestore()== \n");    
 }
 
-void
-RDCProbeDDC(ScrnInfoPtr pScrn, int index)
+RDC_EXPORT void RDCProbeDDC(ScrnInfoPtr pScrn, int index)
 {
     vbeInfoPtr pVbe;
  
@@ -2062,8 +1985,7 @@ RDCProbeDDC(ScrnInfoPtr pScrn, int index)
     xf86DrvMsgVerb(pScrn->scrnIndex, X_INFO, DefaultLevel, "==Exit RDCProbeDDC()== \n");
 }
 
-xf86MonPtr
-RDCDoDDC(ScrnInfoPtr pScrn, int index)
+RDC_EXPORT xf86MonPtr RDCDoDDC(ScrnInfoPtr pScrn, int index)
 {
     vbeInfoPtr pVbe;
     xf86MonPtr MonInfo = NULL;
@@ -2114,8 +2036,7 @@ RDCDoDDC(ScrnInfoPtr pScrn, int index)
     return MonInfo;
 }
 
-void
-vFillRDCModeInfo (ScrnInfoPtr pScrn)
+RDC_EXPORT void vFillRDCModeInfo (ScrnInfoPtr pScrn)
 {
     RDCRecPtr pRDC;
 
@@ -2132,8 +2053,7 @@ vFillRDCModeInfo (ScrnInfoPtr pScrn)
     xf86DrvMsgVerb(pScrn->scrnIndex, X_INFO, DefaultLevel, "==Exit1 vFillRDCModeInfo()== \n");
 }
 
-Bool
-RDCModeInit(ScrnInfoPtr pScrn, DisplayModePtr mode)
+RDC_EXPORT Bool RDCModeInit(ScrnInfoPtr pScrn, DisplayModePtr mode)
 {
     vgaHWPtr hwp;
     RDCRecPtr pRDC;
@@ -2499,7 +2419,7 @@ RDCModeInit(ScrnInfoPtr pScrn, DisplayModePtr mode)
     return TRUE;
 }
 
-void RDCSetHWCaps(RDCRecPtr pRDC)
+RDC_EXPORT void RDCSetHWCaps(RDCRecPtr pRDC)
 {
     xf86DrvMsgVerb(0, X_INFO, DefaultLevel, "==RDCSetHWCaps() Entry==\n");
 
@@ -2548,8 +2468,7 @@ void RDCSetHWCaps(RDCRecPtr pRDC)
 }
 
 
-Bool
-RDCRandRGetInfo(ScrnInfoPtr pScrn, Rotation *rotations)
+RDC_EXPORT Bool RDCRandRGetInfo(ScrnInfoPtr pScrn, Rotation *rotations)
 {
     xf86DrvMsgVerb(pScrn->scrnIndex, X_INFO, DefaultLevel, "RDCRandRGetInfo\n");
     
@@ -2558,8 +2477,7 @@ RDCRandRGetInfo(ScrnInfoPtr pScrn, Rotation *rotations)
     return TRUE;
 }
 
-Bool
-RDCRandRSetConfig(ScrnInfoPtr pScrn, xorgRRConfig *config)
+RDC_EXPORT Bool RDCRandRSetConfig(ScrnInfoPtr pScrn, xorgRRConfig *config)
 {
     xf86DrvMsgVerb(pScrn->scrnIndex, X_INFO, DefaultLevel, "RDCRandRSetConfig\n");
     RDCRecPtr   pRDC = RDCPTR(pScrn);
@@ -2701,8 +2619,7 @@ RDCRandRSetConfig(ScrnInfoPtr pScrn, xorgRRConfig *config)
 
 
 
-Bool
-RDCDriverFunc(ScrnInfoPtr pScrn, xorgDriverFuncOp op, pointer data)
+RDC_EXPORT Bool RDCDriverFunc(ScrnInfoPtr pScrn, xorgDriverFuncOp op, pointer data)
 {
     xf86DrvMsgVerb(pScrn->scrnIndex, X_INFO, DefaultLevel, "RDCDriverFunc Operation: %d\n", op);
     
@@ -2718,7 +2635,7 @@ RDCDriverFunc(ScrnInfoPtr pScrn, xorgDriverFuncOp op, pointer data)
     return FALSE;
 }
 
-void RDCApertureInit(ScrnInfoPtr pScrn)
+RDC_EXPORT void RDCApertureInit(ScrnInfoPtr pScrn)
 {
     RDCRecPtr pRDC = RDCPTR(pScrn);
     *ROTAP_CTL0             = 0;
@@ -2737,7 +2654,7 @@ void RDCApertureInit(ScrnInfoPtr pScrn)
 
 }
 
-void TurnDirectAccessFBON(ScrnInfoPtr pScrn, Bool bTurnOn)
+RDC_EXPORT void TurnDirectAccessFBON(ScrnInfoPtr pScrn, Bool bTurnOn)
 {
     RDCRecPtr   pRDC = RDCPTR(pScrn);
     uint32_t ulNBID = 0x0, ulValue = 0x0;
@@ -2772,13 +2689,12 @@ void TurnDirectAccessFBON(ScrnInfoPtr pScrn, Bool bTurnOn)
 }
 
 
-void
-RDCPointerMoved(ScrnInfoPtr pScrn, int x, int y)
+RDC_EXPORT void RDCPointerMoved(ScrnInfoPtr pScrn, int x, int y)
 {
 
 }
 
-void vUpdateHDMIFakeMode(ScrnInfoPtr pScrn)
+RDC_EXPORT void vUpdateHDMIFakeMode(ScrnInfoPtr pScrn)
 {
     WORD wHSize, wVSize;
     RDCRecPtr pRDC;
