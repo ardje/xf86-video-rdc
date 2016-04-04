@@ -175,42 +175,36 @@ RDC_STATIC void rdc_crtc_gamma_set(xf86CrtcPtr crtc, CARD16 *red, CARD16 *green,
     RDCCrtcPrivatePtr rdc_crtc = crtc->driver_private;
 }
 
-void
-rdc_crtc_set_cursor_colors (xf86CrtcPtr crtc, int bg, int fg)
+RDC_EXTERN void rdc_crtc_set_cursor_colors (xf86CrtcPtr crtc, int bg, int fg)
 {
     ScrnInfoPtr		scrn = crtc->scrn;
 
 }
 
-void
-rdc_crtc_set_cursor_position (xf86CrtcPtr crtc, int x, int y)
+RDC_EXTERN void rdc_crtc_set_cursor_position (xf86CrtcPtr crtc, int x, int y)
 {
     ScrnInfoPtr		scrn = crtc->scrn;
 
 }
 
-void
-rdc_crtc_show_cursor (xf86CrtcPtr crtc)
+RDC_EXTERN void rdc_crtc_show_cursor (xf86CrtcPtr crtc)
 {
     ScrnInfoPtr		scrn = crtc->scrn;
 
 }
 
-void
-rdc_crtc_hide_cursor (xf86CrtcPtr crtc)
+RDC_EXTERN void rdc_crtc_hide_cursor (xf86CrtcPtr crtc)
 {
     ScrnInfoPtr		scrn = crtc->scrn; 
 }
 
-void 
-rdc_crtc_load_cursor_image (xf86CrtcPtr crtc, CARD8 *image)
+RDC_EXTERN void rdc_crtc_load_cursor_image (xf86CrtcPtr crtc, CARD8 *image)
 {
     ScrnInfoPtr		scrn = crtc->scrn;
 }
 
 #ifdef ARGB_CURSOR
-void
-rdc_crtc_load_cursor_argb (xf86CrtcPtr crtc, CARD32 *image)
+RDC_EXTERN void rdc_crtc_load_cursor_argb (xf86CrtcPtr crtc, CARD32 *image)
 {
     RDCRecPtr		    pRDC = RDCPTR(crtc->scrn);
     RDCCrtcPrivatePtr	rdc_crtc = RDCCrtcPrivate(crtc);

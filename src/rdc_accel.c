@@ -347,9 +347,11 @@ RDC_STATIC void RDCSetupForScreenToScreenCopy(ScrnInfoPtr pScrn, int xdir, int y
 #endif
 
         
+#if !CR_FENCE_ID
         if (pRDC->IoctlCR)
             FireCRCMDQ(pRDC->iFBDev, pCMDQ, 2);
         else
+#endif
             mUpdateWritePointer;
     }
     else
@@ -478,9 +480,11 @@ RDC_STATIC void RDCSubsequentScreenToScreenCopy(ScrnInfoPtr pScrn, int x1, int y
 #endif
 
         
+#if !CR_FENCE_ID
         if (pRDC->IoctlCR)
             FireCRCMDQ(pRDC->iFBDev, pCMDQ, 6);
         else
+#endif
             mUpdateWritePointer;
     
     }
@@ -560,9 +564,11 @@ RDC_STATIC void RDCSetupForSolidFill(ScrnInfoPtr pScrn, int color, int rop, unsi
 #endif
 
         
+#if !CR_FENCE_ID
         if (pRDC->IoctlCR)
             FireCRCMDQ(pRDC->iFBDev, pCMDQ, 2);
         else
+#endif
             mUpdateWritePointer;
     }
     else
@@ -667,9 +673,11 @@ RDC_STATIC void RDCSubsequentSolidFillRect(ScrnInfoPtr pScrn, int dst_x, int dst
 #endif
       
         
+#if !CR_FENCE_ID
         if (pRDC->IoctlCR)
             FireCRCMDQ(pRDC->iFBDev, pCMDQ, 4);
         else
+#endif
             mUpdateWritePointer;
                 
     }
@@ -753,9 +761,11 @@ RDC_STATIC void RDCSetupForSolidLine(ScrnInfoPtr pScrn, int color, int rop, unsi
 #endif
 
         
+#if !CR_FENCE_ID
         if (pRDC->IoctlCR)
             FireCRCMDQ(pRDC->iFBDev, pCMDQ, 3);
         else
+#endif
             mUpdateWritePointer;
     }
     else
@@ -921,9 +931,11 @@ RDC_STATIC void RDCSubsequentSolidHorVertLine(ScrnInfoPtr pScrn, int x, int y, i
 #endif
       
         
+#if !CR_FENCE_ID
         if (pRDC->IoctlCR)
             FireCRCMDQ(pRDC->iFBDev, pCMDQ, 4);
         else
+#endif
             mUpdateWritePointer;
                
     }
@@ -1019,9 +1031,11 @@ RDC_STATIC void RDCSetupForDashedLine(ScrnInfoPtr pScrn, int fg, int bg, int rop
 #endif
 
         
+#if !CR_FENCE_ID
         if (pRDC->IoctlCR)
             FireCRCMDQ(pRDC->iFBDev, pCMDQ, 5);
         else
+#endif
             mUpdateWritePointer;
     }
     else
@@ -1107,9 +1121,11 @@ RDC_STATIC void RDCSetupForMonoPatternFill(ScrnInfoPtr pScrn, int patx, int paty
 #endif
 
         
+#if !CR_FENCE_ID
         if (pRDC->IoctlCR)
             FireCRCMDQ(pRDC->iFBDev, pCMDQ, 5);
         else
+#endif
             mUpdateWritePointer;
     }
     else
@@ -1185,9 +1201,11 @@ RDC_STATIC void RDCSubsequentMonoPatternFill(ScrnInfoPtr pScrn, int patx, int pa
 #endif
       
         
+#if !CR_FENCE_ID
         if (pRDC->IoctlCR)
             FireCRCMDQ(pRDC->iFBDev, pCMDQ, 4);
         else
+#endif
             mUpdateWritePointer;
               
     }
@@ -1280,9 +1298,11 @@ RDC_STATIC void RDCSetupForColor8x8PatternFill(ScrnInfoPtr pScrn, int patx, int 
 #endif
 
         
+#if !CR_FENCE_ID
         if (pRDC->IoctlCR)
             FireCRCMDQ(pRDC->iFBDev, pCMDQ, (1 + ulPatSize/4));
         else
+#endif
             mUpdateWritePointer;
     }
     else
@@ -1362,9 +1382,11 @@ RDC_STATIC void RDCSubsequentColor8x8PatternFillRect(ScrnInfoPtr pScrn, int patx
 #endif
       
         
+#if !CR_FENCE_ID
         if (pRDC->IoctlCR)
             FireCRCMDQ(pRDC->iFBDev, pCMDQ, 4);
         else
+#endif
             mUpdateWritePointer;
                 
     }
@@ -1455,9 +1477,11 @@ RDC_STATIC void RDCSetupForCPUToScreenColorExpandFill(ScrnInfoPtr pScrn, int fg,
 #endif
 
         
+#if !CR_FENCE_ID
         if (pRDC->IoctlCR)
             FireCRCMDQ(pRDC->iFBDev, pCMDQ, 3);
         else
+#endif
             mUpdateWritePointer;
     }
     else
@@ -1535,9 +1559,11 @@ RDC_STATIC void RDCSubsequentCPUToScreenColorExpandFill(ScrnInfoPtr pScrn, int d
 #endif
       
         
+#if !CR_FENCE_ID
         if (pRDC->IoctlCR)
             FireCRCMDQ(pRDC->iFBDev, pCMDQ, 5);
         else
+#endif
             mUpdateWritePointer;
                
     }
@@ -1630,9 +1656,11 @@ RDC_STATIC void RDCSetupForScreenToScreenColorExpandFill(ScrnInfoPtr pScrn, int 
 #endif
 
         
+#if !CR_FENCE_ID
         if (pRDC->IoctlCR)
             FireCRCMDQ(pRDC->iFBDev, pCMDQ, 3);
         else
+#endif
             mUpdateWritePointer;
     }
     else
@@ -1719,9 +1747,11 @@ RDC_STATIC void RDCSubsequentScreenToScreenColorExpandFill(ScrnInfoPtr pScrn, in
 #endif
       
         
+#if !CR_FENCE_ID
         if (pRDC->IoctlCR)
             FireCRCMDQ(pRDC->iFBDev, pCMDQ, 6);
         else
+#endif
             mUpdateWritePointer;
        
     }
@@ -1786,9 +1816,11 @@ RDC_STATIC void RDCSetClippingRectangle(ScrnInfoPtr pScrn, int left, int top, in
 #endif
 
         
+#if !CR_FENCE_ID
         if (pRDC->IoctlCR)
             FireCRCMDQ(pRDC->iFBDev, pCMDQ, 2);
         else
+#endif
             mUpdateWritePointer;
     }
     else
@@ -1910,9 +1942,11 @@ RDC_STATIC void RDCSubsequentSolidTwoPointLine(ScrnInfoPtr pScrn, int x1, int y1
 #endif
               
         
+#if !CR_FENCE_ID
         if (pRDC->IoctlCR)
             FireCRCMDQ(pRDC->iFBDev, pCMDQ, 5);
         else
+#endif
             mUpdateWritePointer;               
 
         
@@ -2007,9 +2041,11 @@ RDC_STATIC void RDCSubsequentDashedTwoPointLine(ScrnInfoPtr pScrn, int x1, int y
 #endif
               
         
+#if !CR_FENCE_ID
         if (pRDC->IoctlCR)
             FireCRCMDQ(pRDC->iFBDev, pCMDQ, 5);
         else
+#endif
             mUpdateWritePointer; 
 
         
@@ -2118,9 +2154,11 @@ RDC_EXPORT int RDCAccelMarkSync(ScreenPtr pScreen)
         pSingleCMD->PKT_SC_dwData[0] = (ULONG) wFence;
 #endif
         
+#if !CR_FENCE_ID
         if (pRDC->IoctlCR)
             FireCRCMDQ(pRDC->iFBDev, pCMDQ, 3);
         else
+#endif
             mUpdateWritePointer; 
     }
 
@@ -2236,9 +2274,11 @@ RDC_STATIC void RDCExaSolid(PixmapPtr pPixmap, int x1, int y1, int x2, int y2)
     xf86DrvMsgVerb(0, X_INFO, DefaultLevel,"==Varible RDCExaSolid ulDstX=%d, ulDstY=%d ,ulDstPitch=%d == \n",pRDC->Hw2Dinfo.ulDstX,pRDC->Hw2Dinfo.ulDstY,pRDC->Hw2Dinfo.ulDstPitch);  
     xf86DrvMsgVerb(0, X_INFO, DefaultLevel,"==Varible RDCExaSolid pRDC->Hw2Dinfo.ulDstBase=%d == \n",pRDC->Hw2Dinfo.ulDstBase);  
     
+#if !CR_FENCE_ID
     if (pRDC->IoctlCR)
         FireCRCMDQ(pRDC->iFBDev, pCMDQ, 6);
     else
+#endif
         mUpdateWritePointer;
     xf86DrvMsgVerb(0, X_INFO, DefaultLevel,"==Exit RDCExaSolid== \n");
 }
@@ -2381,9 +2421,11 @@ RDC_STATIC void RDCExaCopy( PixmapPtr pDstPixmap, int srcX, int srcY, int dstX, 
 #endif
 
     
+#if !CR_FENCE_ID
     if (pRDC->IoctlCR)
         FireCRCMDQ(pRDC->iFBDev, pCMDQ, 8);
     else
+#endif
         mUpdateWritePointer;
     
     xf86DrvMsgVerb(0, X_INFO, DefaultLevel, "==Exit RDCExaCopy==\n");

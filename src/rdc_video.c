@@ -1018,9 +1018,11 @@ RDC_STATIC void RDCStopVideoPost(ScrnInfoPtr pScrn, pointer data, Bool shutdown)
             pSingleCMD->PKT_SC_dwHeader  = (ULONG) PKT_VIDEO_CMD_HEADER | VP_STREAM_CTL_I;
             pSingleCMD->PKT_SC_dwData[0] = 0x0;  
             
+#if !CR_FENCE_ID
             if (pRDC->IoctlCR)
                 FireCRCMDQ(pRDC->iFBDev, pCMDQ, 10);
             else
+#endif
                 mUpdateWritePointer;
         }
         
@@ -1417,9 +1419,11 @@ RDC_EXPORT UpdateOverlay(RDCRecPtr pRDC, VIDHWINFOPtr pVIDHwInfo, int iSrcBufInd
             pSingleCMD->PKT_SC_dwData[0] = (ULONG) wFence;
 #endif
             
+#if !CR_FENCE_ID
             if (pRDC->IoctlCR)
                 FireCRCMDQ(pRDC->iFBDev, pCMDQ, 12);
             else
+#endif
                 mUpdateWritePointer;
         }
     }
@@ -1460,9 +1464,11 @@ RDC_EXPORT UpdateOverlay(RDCRecPtr pRDC, VIDHWINFOPtr pVIDHwInfo, int iSrcBufInd
             pSingleCMD->PKT_SC_dwData[0] = (ULONG) wFence;
 #endif
             
+#if !CR_FENCE_ID
             if (pRDC->IoctlCR)
                 FireCRCMDQ(pRDC->iFBDev, pCMDQ, 2);
             else
+#endif
                 mUpdateWritePointer;
         }
     }
@@ -1613,9 +1619,11 @@ RDC_EXPORT void RDCUpdateVideo(RDCRecPtr pRDC, RDCPortPrivPtr pRDCPortPriv, BYTE
             pSingleCMD->PKT_SC_dwData[0] = VDPS_FIFO_THRESHOLD;
 
             
+#if !CR_FENCE_ID
             if (pRDC->IoctlCR)
                 FireCRCMDQ(pRDC->iFBDev, pCMDQ, 4);
             else
+#endif
                 mUpdateWritePointer;
         }
         pRDC->OverlayStatus.bOverlayEnable = TRUE;
@@ -1865,9 +1873,11 @@ RDC_EXPORT void RDCUpdateVideo(RDCRecPtr pRDC, RDCPortPrivPtr pRDCPortPriv, BYTE
                     pSingleCMD->PKT_SC_dwData[0] = (ULONG) wFence;
 #endif
                     
+#if !CR_FENCE_ID
                     if (pRDC->IoctlCR)
                         FireCRCMDQ(pRDC->iFBDev, pCMDQ, 12);
                     else
+#endif
                         mUpdateWritePointer;
                 }
             }
@@ -1937,9 +1947,11 @@ RDC_EXPORT void RDCUpdateVideo(RDCRecPtr pRDC, RDCPortPrivPtr pRDCPortPriv, BYTE
                     pSingleCMD->PKT_SC_dwData[0] = (ULONG) wFence;
 #endif
                     
+#if !CR_FENCE_ID
                     if (pRDC->IoctlCR)
                         FireCRCMDQ(pRDC->iFBDev, pCMDQ, 12);
                     else
+#endif
                         mUpdateWritePointer;
                 }
             }

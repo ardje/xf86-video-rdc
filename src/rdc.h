@@ -87,7 +87,7 @@
 
 #define     Accel_2D_DEBUG          1
 #define     HWC_DEBUG               1
-#define     CR_FENCE_ID             0
+#define     CR_FENCE_ID             1
 
 
 #ifndef PCI_VENDOR_RDC
@@ -145,7 +145,8 @@ typedef enum {
     OPTION_DOWN_SCALE
 } RDCOpts;
 
-#ifdef _rdc_driver_c_
+// What the fuck code...
+#if defined( _rdc_driver_c_) || defined(_rdcdual_driver_c_)
 static const OptionInfoRec RDCOptions[] = {
     {OPTION_NOACCEL,       "NoAccel",       OPTV_BOOLEAN,  {0}, TRUE},
     {OPTION_MMIO2D,        "MMIO2D",        OPTV_BOOLEAN,  {0}, FALSE},   
@@ -185,6 +186,8 @@ static PciChipsets RDCPciChipsets[] = {
     {PCI_CHIP_M2200, PCI_CHIP_M2200, RES_SHARED_VGA},
     {-1,              -1,              RES_UNDEFINED }
 };
+#else
+extern const OptionInfoRec RDCOptions[];
 #endif
 
 
