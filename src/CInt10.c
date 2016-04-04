@@ -3108,7 +3108,7 @@ RDC_EXPORT void CBIOSGetVBIOSRomDeviceID(PCBIOS_Extension pCBIOSExtension)
 RDC_EXPORT void CBIOSInitialDataFromVBIOS(PCBIOS_Extension pCBIOSExtension)
 {
     pRelated_IOAddress = pCBIOSExtension->pjIOAddress;
-    RL2D("pRelated_IOAddress:%p\n",pRelated_IOAddress)
+    RL2D("pRelated_IOAddress:%p\n",pRelated_IOAddress);
     
     
     CBIOSGetVBIOSVersion(pCBIOSExtension);

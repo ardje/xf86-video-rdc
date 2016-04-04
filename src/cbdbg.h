@@ -36,7 +36,8 @@
 #include "xf86.h"
 #define STRINGIZE_DETAIL(x) #x
 #define STRINGIZE(x) STRINGIZE_DETAIL(x)
-#define RL2D(n,...) xf86DrvMsgVerb(0, X_INFO, 0,__FILE__ "(" STRINGIZE(__LINE__) "): " __VA_ARGS__)
-#define CBIOSDebugPrint(n) RL2D n 
+#define RL2D(...) xf86DrvMsgVerb(0, X_INFO, 0,__FILE__ "(" STRINGIZE(__LINE__) "): " __VA_ARGS__)
+#define RL2DSTRIP(n,...) RL2D(__VA_ARGS__)
+#define CBIOSDebugPrint(n) RL2DSTRIP n 
 #endif
 
