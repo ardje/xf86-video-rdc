@@ -107,6 +107,7 @@ _X_EXPORT DriverRec RDC = {
 };
 
 
+#ifdef RDC_GARBAGE
 const char *vgahwSymbols[] = {
     "vgaHWFreeHWRec",
     "vgaHWGetHWRec",
@@ -189,6 +190,7 @@ static const char *exaSymbols[] = {
   NULL
 };
 
+#ifdef HAVE_XAA
 const char *xaaSymbols[] = {
     "XAACreateInfoRec",
     "XAADestroyInfoRec",
@@ -197,6 +199,7 @@ const char *xaaSymbols[] = {
     "XAAPatternROP",
     NULL
 };
+#endif
 
 const char *ramdacSymbols[] = {
     "xf86CreateCursorInfoRec",
@@ -205,7 +208,7 @@ const char *ramdacSymbols[] = {
     NULL
 };
 
-
+#endif
 #ifdef XFree86LOADER
 
 static MODULESETUPPROTO(RDCSetup);
@@ -671,14 +674,18 @@ RDC_STATIC Bool RDCPreInit(ScrnInfoPtr pScrn, int flags)
     {
     	if((s = (char *)xf86GetOptValString(pRDC->Options, OPTION_ACCELMETHOD))) 
     	{
+#ifdef HAVE_XAA
     	    if(!xf86NameCmp(s,"XAA")) 
     	    {
     		    pRDC->useEXA = FALSE;
     	    }
     	    else if(!xf86NameCmp(s,"EXA"))
     	    {
+#endif
     		    pRDC->useEXA = TRUE;
+#ifdef HAVE_XAA
     	    }
+#endif
     	}
         
         pRDC->noAccel = FALSE; 
@@ -1336,20 +1343,15 @@ RDC_STATIC Bool RDCScreenInit(ScreenPtr pScreen, int argc, char **argv)
     miDCInitialize(pScreen, xf86GetPointerScreenFuncs());
 
     
-rdcLog("meeh");
     if (!pRDC->noHWC)
     {
-rdcLog("meeh");
         if (!RDCCursorInit(pScreen)) 
         {
-rdcLog("meeh");
             xf86DrvMsg(pScrn->scrnIndex, X_ERROR, "Hardware cursor initialization failed\n");
             pRDC->noHWC = TRUE;                      
         }
-rdcLog("meeh");
     }
 
-rdcLog("meeh");
     if (pRDC->bRandRRotation)
     {
         xf86DrvMsgVerb(0, X_INFO, DefaultLevel, "assign pScrn->DriverFunc\n");
@@ -2064,6 +2066,7 @@ RDC_EXPORT Bool RDCModeInit(ScrnInfoPtr pScrn, DisplayModePtr mode)
         {
             pRDC->DeviceInfo.MonitorSize.ulHorMaxResolution = pCBiosArguments->DX;
             pRDC->DeviceInfo.MonitorSize.ulVerMaxResolution = pCBiosArguments->Edx >> 16;
+	    xf86DrvMsgVerb(pScrn->scrnIndex, X_INFO, ErrorLevel, " Query LCD Panel Size Mode result: %ld,%ld \n",pRDC->DeviceInfo.MonitorSize.ulHorMaxResolution,pRDC->DeviceInfo.MonitorSize.ulVerMaxResolution);
         }
         else
         {

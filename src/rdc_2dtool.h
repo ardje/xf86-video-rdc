@@ -81,11 +81,6 @@
 #define     CR_BUFFER_READPORT          0x40C
 #define     CR_BUFFER_END               0x410
 #define     CR_ENG_STATUS               0x414
-#define     CRENG_CRRESET               BIT11
-#define     CRENG_2DIDLE                BIT12
-#define     CRENG_DMAIDLE               BIT13
-#define     CRENG_VPOSTIDEL             BIT14
-#define     CRENG_CRIDLE                BIT15
 
 
 

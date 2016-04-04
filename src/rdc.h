@@ -87,7 +87,7 @@
 
 #define     Accel_2D_DEBUG          1
 #define     HWC_DEBUG               1
-#define     CR_FENCE_ID             1
+#define     CR_FENCE_ID             0
 
 
 #ifndef PCI_VENDOR_RDC
@@ -832,8 +832,12 @@ typedef struct _RDCOutputPrivateRec {
  
 #define STRINGIZE_DETAIL(x) #x
 #define STRINGIZE(x) STRINGIZE_DETAIL(x)
-#define rdcLog(msg) xf86DrvMsgVerb(0, X_INFO, 0,__FILE__ "(" STRINGIZE(__LINE__) "): " msg "\n")
-
+#define RL(msg) xf86DrvMsgVerb(0, X_INFO, 0,__FILE__ "(" STRINGIZE(__LINE__) "): " msg)
+#if Accel_2D_DEBUG 
+#define RL2D(...) xf86DrvMsgVerb(0, X_INFO, 0,__FILE__ "(" STRINGIZE(__LINE__) "): " __VA_ARGS__)
+#else
+#define RL2D(...)
+#endif
 #include "rdc_driver_proto.h"
 #include "rdc_accel_proto.h"
 #include "rdc_driver_proto.h"

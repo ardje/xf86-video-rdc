@@ -2083,11 +2083,11 @@ RDC_EXPORT void RDCAccelWaitMarker(ScreenPtr pScreen, int marker)
       unsigned int Write=pRDC->lastMaker; 
       unsigned int Read=0; 
       unsigned int Marker= uMarker;
-
+        RL2D("Busy waiting for queue to be finished");
         while (1)
         {
-            xf86DrvMsgVerb(0, X_INFO, DefaultLevel, "==Variable Write=%ld, Read=%ld, Marker=%ld== \n",Write,Read,Marker);
-            Read=*(ULONG*)MMIOREG_2D_FENCE >> 16;
+            Read=*(volatile ULONG*)MMIOREG_2D_FENCE >> 16;
+            RL2D( "==Variable Write=%08lx, Read=%08lx, Marker=%08lx== \n",Write,Read,Marker);
             if ( (Write<Read) && (Read<Marker) )
                continue;
             else if ( (Marker<=Write) && (Write<Read) )

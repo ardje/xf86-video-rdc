@@ -386,6 +386,7 @@ RDC_EXPORT void vCRWaitEngIdle(RDCRecPtr pRDC)
         int ioctlPara[2];
         int ret_val;
         int status = 0;
+        RL2D("Using busywait IOCTL to wait");
 
         while (!status)
         {
@@ -401,12 +402,14 @@ RDC_EXPORT void vCRWaitEngIdle(RDCRecPtr pRDC)
     else
     {
         volatile ULONG  ulReadPointor, ulWritePointor, ulEngState;
+        RL2D("Using busywait MMIO to wait");
         
         do
         {
             ulWritePointor = *((volatile ULONG*)(pRDC->CMDQInfo.pjWritePort));
             ulReadPointor = *((volatile ULONG*)(pRDC->CMDQInfo.pjReadPort));
             ulEngState = *((volatile ULONG*)(pRDC->CMDQInfo.pjEngStatePort));
+            RL2D("WP:%08lx, RP:%08lx, ES:%08lx\n",ulWritePointor,ulReadPointor,ulEngState);
         }
         while ((ulWritePointor != ulReadPointor) ||
                (ulEngState & (CR_2D_IDLE|CR_DMA_IDLE|CR_VIDEO_IDLE|CR_CR_IDLE)));
