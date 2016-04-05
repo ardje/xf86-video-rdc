@@ -1351,7 +1351,8 @@ RDC_STATIC Bool RDCScreenInit(ScreenPtr pScreen, int argc, char **argv)
         if (!RDCCursorInit(pScreen)) 
         {
             xf86DrvMsg(pScrn->scrnIndex, X_ERROR, "Hardware cursor initialization failed\n");
-            pRDC->noHWC = TRUE;                      
+            pRDC->noHWC = TRUE;
+            return FALSE;
         }
     }
 
