@@ -922,9 +922,9 @@ RDC_STATIC Bool RDCPreInit(ScrnInfoPtr pScrn, int flags)
 
 
         
-        if (pRDC->ENGCaps & ENG_CAP_CR_SUPPORT)
+        if ((!pRDC->noAccel) && (!pRDC->MMIO2D)  && (pRDC->ENGCaps & ENG_CAP_CR_SUPPORT))
         {
-            xf86DrvMsgVerb(0, X_INFO, ErrorLevel, "Reserve CommandQ buffer\n");
+            xf86DrvMsgVerb(0, X_INFO, ErrorLevel, "Reserving 2D CMDQ\n");
 
             pRDC->CMDQInfo.ulCMDQSize = DEFAULT_CMDQ_SIZE;   
             pRDC->AvailableFBsize = pRDC->AvailableFBsize - pRDC->CMDQInfo.ulCMDQSize;
@@ -1153,6 +1153,7 @@ RDC_STATIC Bool RDCPreInit(ScrnInfoPtr pScrn, int flags)
     else
         SetIndexRegMask(COLOR_CRTC_INDEX, 0x90, ~BIT4, 0);
 
+    // This is new from m12. We might have to remove it or not...
     if(pRDC->noAccel)
     {        
         SetIndexRegMask(COLOR_CRTC_INDEX, 0xA4, 0xFE, 0x00);       
