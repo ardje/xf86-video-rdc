@@ -1166,6 +1166,11 @@ RDC_STATIC Bool RDCPreInit(ScrnInfoPtr pScrn, int flags)
 #if XSERVER_LIBPCIACCESS
     dev = pci_device_find_by_slot(0, 0, 0, 0);
     pci_device_cfg_read_u32(dev, &ulNBID, 0x00);  
+    if(R3308NBID == ulNBID) {
+        RL("R3308NBID == ulNBID, it has some trueth\n");
+    } else {
+        RL("R3308NBID != ulNBID, it was %08lx\n",ulNBID);
+    }
     pci_device_cfg_read_u32(dev, &ulValue, 0x48);
 
     if (ulValue & DirectAccessFB)

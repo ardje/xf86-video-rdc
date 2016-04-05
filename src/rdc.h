@@ -827,7 +827,7 @@ typedef struct _RDCOutputPrivateRec {
  
 #define STRINGIZE_DETAIL(x) #x
 #define STRINGIZE(x) STRINGIZE_DETAIL(x)
-#define RL(msg) xf86DrvMsgVerb(0, X_INFO, 0,__FILE__ "(" STRINGIZE(__LINE__) "): " msg)
+#define RL(...) xf86DrvMsgVerb(0, X_INFO, 0,__FILE__ "(" STRINGIZE(__LINE__) "): " __VA_ARGS__)
 #if Accel_2D_DEBUG 
 #define RL2D(...) xf86DrvMsgVerb(0, X_INFO, 0,__FILE__ "(" STRINGIZE(__LINE__) "): " __VA_ARGS__)
 #else
