@@ -165,7 +165,13 @@ RDC_EXPORT Bool RDCMapVBIOS(ScrnInfoPtr pScrn)
     
     if (pRDC->ulROMType == 0)
     {
+#if XSERVER_LIBPCIACCESS
+        pci_device_map_legacy(pRDC->PciInfo, BIOS_ROM_PHY_BASE, BIOS_ROM_SIZE, PCI_DEV_MAP_FLAG_WRITABLE,
+            (void **)&pRDC->BIOSVirtualAddr);
+#else
         pRDC->BIOSVirtualAddr = xf86MapVidMem(pScrn->scrnIndex, VIDMEM_READONLY, BIOS_ROM_PHY_BASE, BIOS_ROM_SIZE);
+#endif
+
 
         
         VenID = *(USHORT*)(pRDC->BIOSVirtualAddr+0x40);
@@ -258,7 +264,11 @@ RDC_EXPORT Bool RDCUnmapVBIOS(ScrnInfoPtr pScrn)
 
     if (pRDC->ulROMType == 1)
     {
+#if XSERVER_LIBPCIACCESS
+        pci_device_unmap_legacy(pRDC->PciInfo,  pRDC->BIOSVirtualAddr, BIOS_ROM_SIZE);
+#else
         xf86UnMapVidMem(pScrn->scrnIndex, (pointer) pRDC->BIOSVirtualAddr, BIOS_ROM_SIZE);
+#endif
     }
     else if (pRDC->ulROMType == 2)
     {
