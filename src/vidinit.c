@@ -1,31 +1,23 @@
-/*
+/* 
  * Copyright (C) 2009 RDC Semiconductor Co.,Ltd
- * All Rights Reserved.
  *
- * Permission is hereby granted, free of charge, to any person obtaining a
- * copy of this software and associated documentation files (the
- * "Software"), to deal in the Software without restriction, including
- * without limitation the rights to use, copy, modify, merge, publish,
- * distribute, sub license, and/or sell copies of the Software, and to
- * permit persons to whom the Software is furnished to do so, subject to
- * the following conditions:
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
- * The above copyright notice and this permission notice (including the
- * next paragraph) shall be included in all copies or substantial portions
- * of the Software.
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
  *
- * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS
- * OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
- * MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NON-INFRINGEMENT.
- * IN NO EVENT SHALL PRECISION INSIGHT AND/OR ITS SUPPLIERS BE LIABLE FOR
- * ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,
- * TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE
- * SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+ * You should have received a copy of the GNU General Public License
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  * For technical support : 
  *     <rdc_xorg@rdc.com.tw>
  */
- 
+
 #include "rdc.h"
 
 void QDec2Hex( Cofe *RGB )
@@ -223,14 +215,25 @@ unsigned long CMD(Cofe *RGB, int op)
 	return Reg;
 }
 
+void CheckBoundary(float *pfValue, float fMin, float fMax)
+{
+    if (*pfValue > fMax)
+        *pfValue = fMax;
+    else if (*pfValue < fMin)
+        *pfValue = fMin;
+};
+
 void SetVIDColor(RDCRecPtr pRDC)
 {
+    POVERLAY_STATUS lpOverlayStatus;
     LPVIDCOLORENHANCE lpVidColor;
     Cofe    VidColCofe;
     float   fPI, fContrast, fSaturation, fHue, fBrightness;
     float   fCIncrement, fSIncrement, fHIncrement, fBIncrement;
-    
-    lpVidColor = &(pRDC->OverlayStatus.VidColorEnhance);
+    PKT_SC  *pSingleCMD;
+
+    lpOverlayStatus = &(pRDC->OverlayStatus);
+    lpVidColor = &(lpOverlayStatus->VidColorEnhance);
 
     fPI = (float)(PI/180);
 
@@ -271,14 +274,18 @@ void SetVIDColor(RDCRecPtr pRDC)
     }
 
     
+    if(fContrast < 0)
+        fContrast = 0;
+
+    
     
     if (lpVidColor->ulScaleHue & 0xFFFFFF00)
-    {// Negative
+    {
         fHue = (float)(0-lpVidColor->ulScaleHue);
         fHue = -fHue;
     }
     else
-    {// Positive
+    {
         fHue = (float) lpVidColor->ulScaleHue;
     }
     
@@ -314,6 +321,12 @@ void SetVIDColor(RDCRecPtr pRDC)
         fSIncrement = (float)((1.-0.) / (128.-0.));
         fSaturation = 1 - fSIncrement * (10000-fSaturation)/78;
     }
+
+    
+    CheckBoundary(&fBrightness, -128, 127);
+    CheckBoundary(&fHue, -180, 180);
+    CheckBoundary(&fContrast, 0, 255);
+    CheckBoundary(&fSaturation, 0, 255);
     
     
     VidColCofe.A1 = fContrast;
@@ -333,11 +346,114 @@ void SetVIDColor(RDCRecPtr pRDC)
     
     QDec2Hex(&VidColCofe);
 
-    *(volatile unsigned long *)(pRDC->MMIOVirtualAddr + VDP_COLOR_ENHANCE_CTL1) = CMD(&VidColCofe, 1);
-    *(volatile unsigned long *)(pRDC->MMIOVirtualAddr + VDP_COLOR_ENHANCE_CTL2) = CMD(&VidColCofe, 2);
-    *(volatile unsigned long *)(pRDC->MMIOVirtualAddr + VDP_COLOR_ENHANCE_CTL3) = CMD(&VidColCofe, 3);
-    *(volatile unsigned long *)(pRDC->MMIOVirtualAddr + VDP_COLOR_ENHANCE_CTL4) = CMD(&VidColCofe, 4);
-    *(volatile unsigned long *)(pRDC->MMIOVirtualAddr + VDP_CTL) |= BIT17 ;
-    *(volatile unsigned long *)(pRDC->MMIOVirtualAddr + VDP_REG_UPDATE_MOD_SELECT) |= BIT7 ;
+    lpVidColor->ulFact1 = CMD(&VidColCofe, 1);
+    lpVidColor->ulFact2 = CMD(&VidColCofe, 2);
+    lpVidColor->ulFact3 = CMD(&VidColCofe, 3);
+    lpVidColor->ulFact4 = CMD(&VidColCofe, 4);
+
+    if((lpVidColor->ulFact1 == 0x200)&&
+       (lpVidColor->ulFact2 == 0x80000)&&
+       (lpVidColor->ulFact3 == 0x20000000)&&
+       (lpVidColor->ulFact4 == 0))
+    {
+        pRDC->bColorEnhanceOn = FALSE;       
+
+        lpOverlayStatus->ulVidDispCtrl &= ~VDPS_COLOR_HNHANCE ;
+    }
+    else
+    {
+        pRDC->bColorEnhanceOn = TRUE;       
+
+        if (DEVICE_ID(pRDC->PciInfo) == PCI_CHIP_M2010)
+        {
+            lpOverlayStatus->ulVidDispCtrl |= VDPS_COLOR_HNHANCE ;
+            pRDC->bVPColorEnhance = FALSE;
+        }
+        else
+            pRDC->bVPColorEnhance = TRUE;
+    };
+
+    if(pRDC->MMIOVPost)
+    {
+        if (pRDC->bVPColorEnhance) 
+        {
+            *(volatile unsigned long *)(pRDC->MMIOVirtualAddr + VP_COLOR_ENHANCE_CTL1) = lpVidColor->ulFact1;
+            *(volatile unsigned long *)(pRDC->MMIOVirtualAddr + VP_COLOR_ENHANCE_CTL2) = lpVidColor->ulFact2;
+            *(volatile unsigned long *)(pRDC->MMIOVirtualAddr + VP_COLOR_ENHANCE_CTL3) = lpVidColor->ulFact3;
+            *(volatile unsigned long *)(pRDC->MMIOVirtualAddr + VP_COLOR_ENHANCE_CTL4) = lpVidColor->ulFact4;
+            *(volatile unsigned long *)(pRDC->MMIOVirtualAddr + VP_CSC_CTL) |= BIT28;
+        }
+        else 
+        {
+            *(volatile unsigned long *)(pRDC->MMIOVirtualAddr + VDP_COLOR_ENHANCE_CTL1) = lpVidColor->ulFact1;
+            *(volatile unsigned long *)(pRDC->MMIOVirtualAddr + VDP_COLOR_ENHANCE_CTL2) = lpVidColor->ulFact2;
+            *(volatile unsigned long *)(pRDC->MMIOVirtualAddr + VDP_COLOR_ENHANCE_CTL3) = lpVidColor->ulFact3;
+            *(volatile unsigned long *)(pRDC->MMIOVirtualAddr + VDP_COLOR_ENHANCE_CTL4) = lpVidColor->ulFact4;
+            *(volatile unsigned long *)(pRDC->MMIOVirtualAddr + VDP_CTL) |= lpOverlayStatus->ulVidDispCtrl;
+            *(volatile unsigned long *)(pRDC->MMIOVirtualAddr + VDP_REG_UPDATE_MOD_SELECT) |= VDPS_FIRE ;
+        };
+    }
+    else
+    {
+        if (pRDC->bVPColorEnhance) 
+        {
+            pSingleCMD = (PPKT_SC)pjRequestCMDQ(pRDC, PKT_SINGLE_LENGTH*6);
+            
+            pSingleCMD->PKT_SC_dwHeader  = (ULONG) CR_LOCK_ID; 
+            pSingleCMD->PKT_SC_dwData[0] = CR_LOCK_VIDEO;  
+            pSingleCMD++;
+
+            
+            pSingleCMD->PKT_SC_dwHeader  = (ULONG) PKT_VIDEO_CMD_HEADER | VP_COLOR_ENHANCE_CTL1_I;
+            pSingleCMD->PKT_SC_dwData[0] = lpVidColor->ulFact1;
+            pSingleCMD++;
+            pSingleCMD->PKT_SC_dwHeader  = (ULONG) PKT_VIDEO_CMD_HEADER | VP_COLOR_ENHANCE_CTL2_I;
+            pSingleCMD->PKT_SC_dwData[0] = lpVidColor->ulFact2;
+            pSingleCMD++;
+            pSingleCMD->PKT_SC_dwHeader  = (ULONG) PKT_VIDEO_CMD_HEADER | VP_COLOR_ENHANCE_CTL3_I;
+            pSingleCMD->PKT_SC_dwData[0] = lpVidColor->ulFact3;
+            pSingleCMD++;
+            pSingleCMD->PKT_SC_dwHeader  = (ULONG) PKT_VIDEO_CMD_HEADER | VP_COLOR_ENHANCE_CTL4_I;
+            pSingleCMD->PKT_SC_dwData[0] = lpVidColor->ulFact4;
+            pSingleCMD++;
+
+            
+            pSingleCMD->PKT_SC_dwHeader  = (ULONG) PKT_VIDEO_CMD_HEADER | VP_CSC_CTL_I;
+            pSingleCMD->PKT_SC_dwData[0] = BIT28;
+            
+            mUpdateWritePointer;
+        }
+        else 
+        {
+            pSingleCMD = (PPKT_SC)pjRequestCMDQ(pRDC, PKT_SINGLE_LENGTH*7);
+            
+            pSingleCMD->PKT_SC_dwHeader  = (ULONG) CR_LOCK_ID; 
+            pSingleCMD->PKT_SC_dwData[0] = CR_LOCK_VIDEO;  
+            pSingleCMD++;
+
+            
+            pSingleCMD->PKT_SC_dwHeader  = (ULONG) PKT_VIDEO_CMD_HEADER | VDP_COLOR_ENHANCE_CTL1_I;
+            pSingleCMD->PKT_SC_dwData[0] = lpVidColor->ulFact1;
+            pSingleCMD++;
+            pSingleCMD->PKT_SC_dwHeader  = (ULONG) PKT_VIDEO_CMD_HEADER | VDP_COLOR_ENHANCE_CTL2_I;
+            pSingleCMD->PKT_SC_dwData[0] = lpVidColor->ulFact2;
+            pSingleCMD++;
+            pSingleCMD->PKT_SC_dwHeader  = (ULONG) PKT_VIDEO_CMD_HEADER | VDP_COLOR_ENHANCE_CTL3_I;
+            pSingleCMD->PKT_SC_dwData[0] = lpVidColor->ulFact3;
+            pSingleCMD++;
+            pSingleCMD->PKT_SC_dwHeader  = (ULONG) PKT_VIDEO_CMD_HEADER | VDP_COLOR_ENHANCE_CTL4_I;
+            pSingleCMD->PKT_SC_dwData[0] = lpVidColor->ulFact4;
+            pSingleCMD++;
+
+            
+            pSingleCMD->PKT_SC_dwHeader  = (ULONG) PKT_VIDEO_CMD_HEADER | VDP_CTL_I;
+            pSingleCMD->PKT_SC_dwData[0] = lpOverlayStatus->ulVidDispCtrl;
+            pSingleCMD++;
+            pSingleCMD->PKT_SC_dwHeader  = (ULONG) PKT_VIDEO_CMD_HEADER | VDP_REG_UPDATE_MOD_SELECT_I;
+            pSingleCMD->PKT_SC_dwData[0] = VDPS_FIRE;
+            
+            mUpdateWritePointer;
+        };
+    }
 }
 

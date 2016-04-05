@@ -73,8 +73,8 @@ LTLIBRARIES = $(rdc_drv_la_LTLIBRARIES)
 rdc_drv_la_LIBADD =
 am_rdc_drv_la_OBJECTS = rdc_2dtool.lo rdc_accel.lo rdc_cursor.lo \
 	rdc_driver.lo rdc_mode.lo rdc_tool.lo rdc_vgatool.lo \
-	rdc_video.lo rdc_extension.lo CInt10.lo gamma.lo saa7105.lo \
-	vidinit.lo
+	rdc_video.lo vidinit.lo rdc_extension.lo gamma.lo CInt10.lo \
+	HDMI.lo TV.lo
 rdc_drv_la_OBJECTS = $(am_rdc_drv_la_OBJECTS)
 rdc_drv_la_LINK = $(LIBTOOL) --tag=CC $(AM_LIBTOOLFLAGS) \
 	$(LIBTOOLFLAGS) --mode=link $(CCLD) $(AM_CFLAGS) $(CFLAGS) \
@@ -99,13 +99,13 @@ DISTFILES = $(DIST_COMMON) $(DIST_SOURCES) $(TEXINFOS) $(EXTRA_DIST)
 ACLOCAL = aclocal -I /home/pub/Xorg/1.7.5/share/aclocal
 ADMIN_MAN_DIR = $(mandir)/man$(ADMIN_MAN_SUFFIX)
 ADMIN_MAN_SUFFIX = 8
-AMTAR = ${SHELL} /home/jason/Desktop/Xorg/driver/xf86-video-rdc/missing --run tar
+AMTAR = ${SHELL} /home/jason/Desktop/Xorg/driver/M2012/missing --run tar
 APP_MAN_DIR = $(mandir)/man$(APP_MAN_SUFFIX)
 APP_MAN_SUFFIX = 1
 AR = ar
-AUTOCONF = ${SHELL} /home/jason/Desktop/Xorg/driver/xf86-video-rdc/missing --run autoconf
-AUTOHEADER = ${SHELL} /home/jason/Desktop/Xorg/driver/xf86-video-rdc/missing --run autoheader
-AUTOMAKE = ${SHELL} /home/jason/Desktop/Xorg/driver/xf86-video-rdc/missing --run automake-1.10
+AUTOCONF = ${SHELL} /home/jason/Desktop/Xorg/driver/M2012/missing --run autoconf
+AUTOHEADER = ${SHELL} /home/jason/Desktop/Xorg/driver/M2012/missing --run autoheader
+AUTOMAKE = ${SHELL} /home/jason/Desktop/Xorg/driver/M2012/missing --run automake-1.10
 AWK = gawk
 CC = gcc
 CCDEPMODE = depmode=gcc3
@@ -147,7 +147,7 @@ LIB_MAN_SUFFIX = 3
 LN_S = ln -s
 LTLIBOBJS = 
 MAINT = 
-MAKEINFO = ${SHELL} /home/jason/Desktop/Xorg/driver/xf86-video-rdc/missing --run makeinfo
+MAKEINFO = ${SHELL} /home/jason/Desktop/Xorg/driver/M2012/missing --run makeinfo
 MISC_MAN_DIR = $(mandir)/man$(MISC_MAN_SUFFIX)
 MISC_MAN_SUFFIX = 7
 MKDIR_P = /bin/mkdir -p
@@ -168,10 +168,10 @@ STRIP = strip
 VERSION = 0.80
 XORG_CFLAGS = -fvisibility=hidden -I/home/pub/Xorg/1.7.5/include/xorg -I/home/pub/Xorg/1.7.5/include/pixman-1 -I/home/pub/Xorg/1.7.5/include  
 XORG_LIBS = -L/home/pub/Xorg/1.7.5/lib -lpixman-1 -lpciaccess  
-abs_builddir = /home/jason/Desktop/Xorg/driver/xf86-video-rdc/src
-abs_srcdir = /home/jason/Desktop/Xorg/driver/xf86-video-rdc/src
-abs_top_builddir = /home/jason/Desktop/Xorg/driver/xf86-video-rdc
-abs_top_srcdir = /home/jason/Desktop/Xorg/driver/xf86-video-rdc
+abs_builddir = /home/jason/Desktop/Xorg/driver/M2012/src
+abs_srcdir = /home/jason/Desktop/Xorg/driver/M2012/src
+abs_top_builddir = /home/jason/Desktop/Xorg/driver/M2012
+abs_top_srcdir = /home/jason/Desktop/Xorg/driver/M2012
 ac_ct_CC = gcc
 ac_ct_CXX = g++
 ac_ct_F77 = gfortran
@@ -200,7 +200,7 @@ host_vendor = pc
 htmldir = ${docdir}
 includedir = ${prefix}/include
 infodir = ${datarootdir}/info
-install_sh = $(SHELL) /home/jason/Desktop/Xorg/driver/xf86-video-rdc/install-sh
+install_sh = $(SHELL) /home/jason/Desktop/Xorg/driver/M2012/install-sh
 libdir = ${exec_prefix}/lib
 libexecdir = ${exec_prefix}/libexec
 localedir = ${datarootdir}/locale
@@ -231,19 +231,20 @@ rdc_drv_la_LTLIBRARIES = rdc_drv.la
 rdc_drv_la_LDFLAGS = -module -avoid-version 
 rdc_drv_ladir = ${exec_prefix}/lib/xorg/modules/drivers
 rdc_drv_la_SOURCES = \
-	rdc_2dtool.c 	\
-	rdc_accel.c 	\
-	rdc_cursor.c 	\
-	rdc_driver.c 	\
-	rdc_mode.c 	\
-	rdc_tool.c 	\
-	rdc_vgatool.c 	\
+	rdc_2dtool.c \
+	rdc_accel.c \
+	rdc_cursor.c \
+	rdc_driver.c \
+	rdc_mode.c \
+	rdc_tool.c \
+	rdc_vgatool.c \
 	rdc_video.c	\
+	vidinit.c \
 	rdc_extension.c \
-	CInt10.c \
 	gamma.c \
-	saa7105.c \
-	vidinit.c
+	CInt10.c \
+	HDMI.c \
+	TV.c
 
 all: all-am
 
@@ -315,6 +316,8 @@ distclean-compile:
 	-rm -f *.tab.c
 
 include ./$(DEPDIR)/CInt10.Plo
+include ./$(DEPDIR)/HDMI.Plo
+include ./$(DEPDIR)/TV.Plo
 include ./$(DEPDIR)/gamma.Plo
 include ./$(DEPDIR)/rdc_2dtool.Plo
 include ./$(DEPDIR)/rdc_accel.Plo
@@ -325,7 +328,6 @@ include ./$(DEPDIR)/rdc_mode.Plo
 include ./$(DEPDIR)/rdc_tool.Plo
 include ./$(DEPDIR)/rdc_vgatool.Plo
 include ./$(DEPDIR)/rdc_video.Plo
-include ./$(DEPDIR)/saa7105.Plo
 include ./$(DEPDIR)/vidinit.Plo
 
 .c.o:

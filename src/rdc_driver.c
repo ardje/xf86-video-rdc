@@ -1,31 +1,23 @@
-/*
+/* 
  * Copyright (C) 2009 RDC Semiconductor Co.,Ltd
- * All Rights Reserved.
  *
- * Permission is hereby granted, free of charge, to any person obtaining a
- * copy of this software and associated documentation files (the
- * "Software"), to deal in the Software without restriction, including
- * without limitation the rights to use, copy, modify, merge, publish,
- * distribute, sub license, and/or sell copies of the Software, and to
- * permit persons to whom the Software is furnished to do so, subject to
- * the following conditions:
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
- * The above copyright notice and this permission notice (including the
- * next paragraph) shall be included in all copies or substantial portions
- * of the Software.
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
  *
- * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS
- * OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
- * MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NON-INFRINGEMENT.
- * IN NO EVENT SHALL PRECISION INSIGHT AND/OR ITS SUPPLIERS BE LIABLE FOR
- * ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,
- * TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE
- * SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+ * You should have received a copy of the GNU General Public License
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  * For technical support : 
  *     <rdc_xorg@rdc.com.tw>
  */
- 
+
 
 #ifdef HAVE_CONFIG_H
 #include <config.h>
@@ -63,7 +55,13 @@
 #include "xf86Cursor.h"
 
 
+#include "xf86Pci.h"
+
+
 #include "rdc.h"
+
+#include "CInt10FunProto.h"
+extern MODE_INFO VESATable;
 
 
 #if !XSERVER_LIBPCIACCESS
@@ -78,6 +76,7 @@ extern Bool RDCUnmapVBIOS(ScrnInfoPtr pScrn);
 extern void vRDCOpenKey(ScrnInfoPtr pScrn);
 extern Bool bRDCRegInit(ScrnInfoPtr pScrn);
 extern ULONG GetVRAMInfo(ScrnInfoPtr pScrn);
+extern Bool RDCCheckCapture(ScrnInfoPtr pScrn);
 extern Bool RDCFilterModeByBandWidth(ScrnInfoPtr pScrn, DisplayModePtr mode);
 extern ULONG RDCGetMemBandWidth(ScrnInfoPtr pScrn);
 extern void vRDCLoadPalette(ScrnInfoPtr pScrn, int numColors, int *indices, LOCO *colors, VisualPtr pVisual);
@@ -90,6 +89,21 @@ extern Bool RDCAccelInit(ScreenPtr pScreen);
 extern Bool RDCCursorInit(ScreenPtr pScreen);
 extern DisplayModePtr RDCBuildModePool(ScrnInfoPtr pScrn);
 extern void RDCVideoInit(ScreenPtr pScreen);
+
+extern Bool bInitCMDQInfo(ScrnInfoPtr pScrn, RDCRecPtr pRDC);
+extern Bool bEnableCMDQ(RDCRecPtr pRDC);
+extern Bool bCRInitCMDQInfo(ScrnInfoPtr pScrn, RDCRecPtr pRDC);
+extern Bool bCREnableCMDQ(RDCRecPtr pRDC);
+
+extern Bool bCREnable2D(RDCRecPtr pRDC);
+extern void vCRDisable2D(RDCRecPtr pRDC);
+extern void vCRWaitEngIdle(RDCRecPtr pRDC);
+
+extern Bool bEnable2D(RDCRecPtr pRDC);
+extern void vDisable2D(RDCRecPtr pRDC);
+extern void vWaitEngIdle(RDCRecPtr pRDC);
+extern void CreateEDIDDetailedTimingList(UCHAR *ucEdidBuffer, ULONG ulEdidBufferSize, EDID_DETAILED_TIMING *pEDIDDetailedTiming);
+extern CBStatus CBIOS_SetEDIDToModeTable(ScrnInfoPtr pScrn, EDID_DETAILED_TIMING *pEDIDDetailedTiming);
 
 
 static void RDCIdentify(int flags);
@@ -125,15 +139,9 @@ static Bool RDCRandRGetInfo(ScrnInfoPtr pScrn, Rotation *rotations);
 static Bool RDCRandRSetConfig(ScrnInfoPtr pScrn, xorgRRConfig *config);
 static Bool RDCDriverFunc(ScrnInfoPtr pScrn, xorgDriverFuncOp op, pointer data);
 static void RDCApertureInit(ScrnInfoPtr pScrn);
-
-
-
-
-
-
-
-
-
+static void TurnDirectAccessFBON(ScrnInfoPtr pScrn, Bool bTurnOn);
+static void RDCPointerMoved(int index, int x, int y);
+void vUpdateHDMIFakeMode(ScrnInfoPtr pScrn);
 
 
 #if XSERVER_LIBPCIACCESS
@@ -145,6 +153,8 @@ static const struct pci_id_match rdc_device_match[] = {
    RDC_DEVICE_MATCH (PCI_CHIP_M2010_A0, 0 ),
    RDC_DEVICE_MATCH (PCI_CHIP_M2011, 0 ),
    RDC_DEVICE_MATCH (PCI_CHIP_M2012, 0 ),
+   RDC_DEVICE_MATCH (PCI_CHIP_M2013, 0 ),
+   RDC_DEVICE_MATCH (PCI_CHIP_M2200, 0 ),
     { 0, 0, 0 },
 };
 #endif
@@ -176,6 +186,8 @@ static SymTabRec RDCChipsets[] = {
     {PCI_CHIP_M2010, "M2010"},
     {PCI_CHIP_M2011, "M2011"},
     {PCI_CHIP_M2012, "M2012"},
+    {PCI_CHIP_M2013, "M2013"},
+    {PCI_CHIP_M2200, "M2200"},
     {-1,              NULL}
 };
 
@@ -184,6 +196,8 @@ static PciChipsets RDCPciChipsets[] = {
     {PCI_CHIP_M2010_A0, PCI_CHIP_M2010_A0, RES_SHARED_VGA},
     {PCI_CHIP_M2011, PCI_CHIP_M2011, RES_SHARED_VGA},
     {PCI_CHIP_M2012, PCI_CHIP_M2012, RES_SHARED_VGA},
+    {PCI_CHIP_M2013, PCI_CHIP_M2013, RES_SHARED_VGA},
+    {PCI_CHIP_M2200, PCI_CHIP_M2200, RES_SHARED_VGA},
     {-1,              -1,              RES_UNDEFINED }
 };
 
@@ -196,7 +210,10 @@ typedef enum {
     OPTION_DBG_SELECT,
     OPTION_NO_DDC,
     OPTION_ACCELMETHOD,
-    OPTION_RANDRROTATION    
+    OPTION_HRATIO,
+    OPTION_VRATIO,
+    OPTION_RANDRROTATION,    
+    OPTION_DOWN_SCALE
 } RDCOpts;
 
 static const OptionInfoRec RDCOptions[] = {
@@ -207,7 +224,10 @@ static const OptionInfoRec RDCOptions[] = {
     {OPTION_ENG_CAPS,   "ENGCaps",      OPTV_INTEGER,   {0},    FALSE},                    
     {OPTION_NO_DDC,     "NoDDC",        OPTV_BOOLEAN,   {0},    FALSE},
     {OPTION_ACCELMETHOD, "AccelMethod", OPTV_STRING,    {0},    FALSE},
+    {OPTION_HRATIO,   "HRatio",         OPTV_INTEGER,    {0},    FALSE},
+    {OPTION_VRATIO,   "VRatio",         OPTV_INTEGER,    {0},    FALSE},    
     {OPTION_RANDRROTATION, "RandRRotation", OPTV_BOOLEAN,    {0},    FALSE},
+    {OPTION_DOWN_SCALE, "DownScale", OPTV_BOOLEAN,    {0},    FALSE},
     {-1,                NULL,           OPTV_NONE,      {0},    FALSE}
 };
 
@@ -331,7 +351,7 @@ static XF86ModuleVersionInfo RDCVersRec = {
     {0, 0, 0, 0}
 };
 
-_X_EXPORT XF86ModuleData rdcModuleData = { &RDCVersRec, RDCSetup, NULL };
+_X_EXPORT XF86ModuleData rdcm12ModuleData = { &RDCVersRec, RDCSetup, NULL };
 
 static pointer
 RDCSetup(pointer module, pointer opts, int *errmaj, int *errmin)
@@ -396,7 +416,7 @@ static Bool rdc_pci_probe (DriverPtr		driver,
     ScrnInfoPtr	    pScrn = NULL;
     EntityInfoPtr   entity;
 
-    xf86DrvMsgVerb(0, X_INFO, DefaultLevel, "==Enter rdc_pci_probe== \n");
+    xf86DrvMsgVerb(0, X_INFO, ErrorLevel, "==Enter rdc_pci_probe== \n");
 
     pScrn = xf86ConfigPciEntity (pScrn, 0, entity_num, RDCPciChipsets,
 				NULL,
@@ -416,6 +436,8 @@ static Bool rdc_pci_probe (DriverPtr		driver,
         case PCI_CHIP_M2010_A0:
         case PCI_CHIP_M2011:
         case PCI_CHIP_M2012:
+        case PCI_CHIP_M2013:
+        case PCI_CHIP_M2200:
             pScrn->PreInit = RDCPreInit;
             pScrn->ScreenInit = RDCScreenInit;
             pScrn->SwitchMode = RDCSwitchMode;
@@ -431,7 +453,7 @@ static Bool rdc_pci_probe (DriverPtr		driver,
 	}
     }
 
-    xf86DrvMsgVerb(0, X_INFO, DefaultLevel, "==Exit rdc_pci_probe== \n");
+    xf86DrvMsgVerb(0, X_INFO, ErrorLevel, "==Exit rdc_pci_probe== \n");
     return pScrn != NULL;
 }
 #else
@@ -443,19 +465,19 @@ RDCProbe(DriverPtr drv, int flags)
     Bool foundScreen = FALSE;
     GDevPtr *devSections;   
 
-    xf86DrvMsgVerb(0, X_INFO, DefaultLevel, "==Enter RDCProbe== \n");
+    xf86DrvMsgVerb(0, X_INFO, ErrorLevel, "==Enter RDCProbe== \n");
 
     
     if ((numDevSections = xf86MatchDevice(RDC_DRIVER_NAME, &devSections)) <= 0)
     {
-        xf86DrvMsgVerb(0, X_INFO, 0, "==Exit1 RDCProbe()== return FALSE\n");
+        xf86DrvMsg(0, X_ERROR, "==Exit1 RDCProbe()== return FALSE\n");
         return FALSE;
     }
 
     
     if (xf86GetPciVideoInfo() == NULL)
     {
-        xf86DrvMsgVerb(0, X_INFO, 0, "==Exit2 RDCProbe()== return FALSE\n");
+        xf86DrvMsg(0, X_ERROR, "==Exit2 RDCProbe()== return FALSE\n");
         return FALSE;
     }
 
@@ -502,7 +524,7 @@ RDCProbe(DriverPtr drv, int flags)
 
     xfree(usedChips);
 
-    xf86DrvMsgVerb(0, X_INFO, DefaultLevel, "==Exit3 RDCProbe()== return(foundScreen=%X)\n", foundScreen);
+    xf86DrvMsgVerb(0, X_INFO, ErrorLevel, "==Exit3 RDCProbe()== return(foundScreen=%X)\n", foundScreen);
     return foundScreen;
 }
 #endif
@@ -524,8 +546,12 @@ RDCPreInit(ScrnInfoPtr pScrn, int flags)
     MessageType from;
     int     maxPitch = 0; 
     int     maxHeight = 0; 
+    uint32_t   ulNBID, ulValue;
+#if XSERVER_LIBPCIACCESS
+    struct pci_device *dev;
+#endif
+    xf86DrvMsgVerb(pScrn->scrnIndex, X_INFO, ErrorLevel, "==Enter RDCPreInit()==\n");
 
-    xf86DrvMsgVerb(pScrn->scrnIndex, X_INFO, DefaultLevel, "==Enter RDCPreInit()==\n");
     
     if (pScrn->numEntities != 1)
     {
@@ -584,6 +610,14 @@ RDCPreInit(ScrnInfoPtr pScrn, int flags)
         xf86DrvMsgVerb(pScrn->scrnIndex, X_INFO, ErrorLevel, "==Exit6 RDCPreInit()== return FALSE\n");
         return FALSE;
     }
+
+    
+    if (!xf86LoadSubModule(pScrn, "ramdac"))
+    {
+        RDCFreeRec(pScrn);
+        xf86DrvMsgVerb(0, X_INFO, ErrorLevel, "==Exit23 RDCPreInit()== return FALSE\n");
+        return FALSE;
+    }
         
     
     if (!vgaHWGetHWRec(pScrn))
@@ -628,7 +662,8 @@ RDCPreInit(ScrnInfoPtr pScrn, int flags)
             break;
 
         default:
-            xf86DrvMsg(pScrn->scrnIndex, X_ERROR,
+            xf86DrvMsg(pScrn->scrnIndex, 
+                       X_ERROR,
                        "Given bpp (%d) is not supported by RDC driver\n",
                        pScrn->bitsPerPixel);
             xf86DrvMsgVerb(pScrn->scrnIndex, X_INFO, ErrorLevel, "==Exit10 RDCPreInit()== return FALSE\n");
@@ -679,10 +714,25 @@ RDCPreInit(ScrnInfoPtr pScrn, int flags)
     pRDC->pEnt    = xf86GetEntityInfo(pScrn->entityList[0]);
     pRDC->PciInfo = xf86GetPciInfoForEntity(pRDC->pEnt->index);
 #if !XSERVER_LIBPCIACCESS
-    pRDC->PciTag  = pciTag(pRDC->PciInfo->bus, pRDC->PciInfo->device,
+    pRDC->PciTag  = pciTag(pRDC->PciInfo->bus, 
+                           pRDC->PciInfo->device,
                            pRDC->PciInfo->func);
 #endif
-
+    
+    pRDC->noHWC = FALSE; 
+    pRDC->MMIOVPost = FALSE;
+    pRDC->noAccel = FALSE;
+    pRDC->MMIO2D = FALSE;
+    pRDC->AccelInfoPtr = NULL;
+    pRDC->HWCInfoPtr = NULL;
+    pRDC->ENGCaps = 0;
+    pRDC->DeviceInfo.ScalerConfig.EnableDownScaling = FALSE;
+    pRDC->bRandRRotation = FALSE;
+    pRDC->rotate = RR_Rotate_0;
+    
+    
+    RDCSetHWCaps(pRDC);
+        
     
     xf86CollectOptions(pScrn, NULL);   
     if (!(pRDC->Options = xalloc(sizeof(RDCOptions))))
@@ -694,17 +744,108 @@ RDCPreInit(ScrnInfoPtr pScrn, int flags)
     memcpy(pRDC->Options, RDCOptions, sizeof(RDCOptions));
     xf86ProcessOptions(pScrn->scrnIndex, pScrn->options, pRDC->Options);
 
+    if (!xf86GetOptValULong(pRDC->Options, OPTION_ENG_CAPS, &pRDC->ENGCaps)) 
+    {
+        xf86DrvMsgVerb(pScrn->scrnIndex, X_INFO, InfoLevel, "No ENG Capability options found\n");          
+    }
+    
+    xf86DrvMsgVerb(pScrn->scrnIndex, X_INFO, InfoLevel, " pRDC->ENGCaps = 0x%x\n", pRDC->ENGCaps);
+
+    
     if (xf86ReturnOptValBool(pRDC->Options, OPTION_RANDRROTATION, FALSE))
     {
         xf86DrvMsgVerb(0, X_INFO, DefaultLevel, "Option RandRRotation = true\n");
         pRDC->bRandRRotation = TRUE;
         pRDC->rotate = RR_Rotate_0;
     }
+
+    
+    
+    if (xf86ReturnOptValBool(pRDC->Options, OPTION_DOWN_SCALE, FALSE))
+    {
+        xf86DrvMsgVerb(0, X_INFO, DefaultLevel, "Option DownScale = true\n");
+        pRDC->DeviceInfo.ScalerConfig.EnableDownScaling = TRUE;
+    }
+
+    
+    if (xf86ReturnOptValBool(pRDC->Options, OPTION_MMIO2D, FALSE)) 
+    {
+        pRDC->MMIO2D = TRUE;
+    }
+
+    
+    pRDC->bHRatio = pRDC->bVRatio = 100;
+    if (!xf86GetOptValULong(pRDC->Options, OPTION_HRATIO, &pRDC->bHRatio)) 
+    {
+        xf86DrvMsgVerb(pScrn->scrnIndex, X_INFO, InfoLevel, "No HDMI underscan horizotal ratio options found\n");          
+    }
     else
     {
-        xf86DrvMsgVerb(0, X_INFO, DefaultLevel, "Option RandRRotation = FALSE\n");
-        pRDC->bRandRRotation = FALSE;
+        if(pRDC->bHRatio > 100)
+            pRDC->bHRatio = 100;
+        xf86DrvMsgVerb(pScrn->scrnIndex, X_INFO, InfoLevel, "HDMI underscan horizotal ratio %d\n",pRDC->bHRatio); 
     }
+
+    if (!xf86GetOptValULong(pRDC->Options, OPTION_VRATIO, &pRDC->bVRatio)) 
+    {
+        xf86DrvMsgVerb(pScrn->scrnIndex, X_INFO, InfoLevel, "No HDMI underscan vertical ratio options found\n");          
+    }
+    else
+    {      
+        if(pRDC->bVRatio > 100)
+            pRDC->bVRatio = 100;
+        xf86DrvMsgVerb(pScrn->scrnIndex, X_INFO, InfoLevel, "HDMI underscan vertical ratio %d\n",pRDC->bVRatio);    
+    }
+    
+    
+    if (!xf86ReturnOptValBool(pRDC->Options, OPTION_NOACCEL, FALSE) && (!pRDC->bRandRRotation))
+    {
+    	if((s = (char *)xf86GetOptValString(pRDC->Options, OPTION_ACCELMETHOD))) 
+    	{
+    	    if(!xf86NameCmp(s,"XAA")) 
+    	    {
+    		    pRDC->useEXA = FALSE;
+    	    }
+    	    else if(!xf86NameCmp(s,"EXA"))
+    	    {
+    		    pRDC->useEXA = TRUE;
+    	    }
+    	}
+        
+        pRDC->noAccel = FALSE; 
+    }
+    else
+    {
+        xf86DrvMsgVerb(0, X_INFO, ErrorLevel, "X-config option disable 2D Accelerator \n");
+        pRDC->noAccel = TRUE; 
+    }
+
+    if (!(pRDC->ENGCaps & ENG_CAP_2D))
+    {
+        xf86DrvMsgVerb(0, X_INFO, ErrorLevel, "Engine Caps disable 2D Accelerator \n");
+        pRDC->noAccel = TRUE;
+    }
+    
+    
+    if (!xf86ReturnOptValBool(pRDC->Options, OPTION_SW_CURSOR, FALSE))
+    { 
+        xf86DrvMsgVerb(pScrn->scrnIndex, X_INFO, ErrorLevel, "Using Hardware Cursor\n");
+        
+        pRDC->noHWC = FALSE;  
+        pRDC->HWCInfo.HWC_NUM = DEFAULT_HWC_NUM;
+        
+        if (!xf86GetOptValInteger(pRDC->Options, OPTION_HWC_NUM, &pRDC->HWCInfo.HWC_NUM))
+        {
+            xf86DrvMsgVerb(pScrn->scrnIndex, X_INFO, InfoLevel, "No HWC_NUM options found\n");          
+        }    
+    }
+    else
+    {
+        xf86DrvMsgVerb(0, X_INFO, ErrorLevel, "X-config option disable Cursor Accelerator \n");
+        pRDC->noHWC = TRUE;
+        pRDC->HWCInfo.HWC_NUM = 0;
+    }
+    
     
     if (pRDC->pEnt->device->chipset && *pRDC->pEnt->device->chipset)
     {
@@ -714,26 +855,33 @@ RDCPreInit(ScrnInfoPtr pScrn, int flags)
     else if (pRDC->pEnt->device->chipID >= 0)
     {
         pScrn->chipset = (char *)xf86TokenToString(RDCChipsets,
-                          pRDC->pEnt->device->chipID);
+                                                   pRDC->pEnt->device->chipID);
         from = X_CONFIG;
-        xf86DrvMsgVerb(pScrn->scrnIndex, X_CONFIG, DefaultLevel, "ChipID override: 0x%04X\n",
-                   pRDC->pEnt->device->chipID);
+        xf86DrvMsgVerb(pScrn->scrnIndex, 
+                       X_CONFIG, DefaultLevel, 
+                       "ChipID override: 0x%04X\n",
+                       pRDC->pEnt->device->chipID);
     }
     else 
     {
         from = X_PROBED;
         pScrn->chipset = (char *)xf86TokenToString(RDCChipsets,
-                          DEVICE_ID(pRDC->PciInfo));
+                                                   DEVICE_ID(pRDC->PciInfo));
     }
    
     if (pRDC->pEnt->device->chipRev >= 0)
     {
-        xf86DrvMsgVerb(pScrn->scrnIndex, X_CONFIG, DefaultLevel, "ChipRev override: %d\n",
-        pRDC->pEnt->device->chipRev);
+        xf86DrvMsgVerb(pScrn->scrnIndex, 
+                       X_CONFIG, DefaultLevel, 
+                       "ChipRev override: %d\n",
+                       pRDC->pEnt->device->chipRev);
     }
 
-    xf86DrvMsgVerb(pScrn->scrnIndex, from, DefaultLevel, "Chipset: \"%s\"\n",
-               (pScrn->chipset != NULL) ? pScrn->chipset : "Unknown rdc");
+    xf86DrvMsgVerb(pScrn->scrnIndex, 
+                   from, 
+                   DefaultLevel, 
+                   "Chipset: \"%s\"\n",
+                   (pScrn->chipset != NULL) ? pScrn->chipset : "Unknown rdc");
 
     
 #if XF86_VERSION_CURRENT < XF86_VERSION_NUMERIC(4,2,99,0,0)
@@ -743,11 +891,8 @@ RDCPreInit(ScrnInfoPtr pScrn, int flags)
 #endif
      
 #if XSERVER_LIBPCIACCESS
-    VGAHWPTR(pScrn)->PIOOffset = pRDC->PIOOffset = pRDC->IODBase + pRDC->PciInfo->regions[2].base_addr - 0x380;
     pRDC->RelocateIO = (IOADDRESS)(pRDC->PciInfo->regions[2].base_addr + pRDC->IODBase);
-#else
-    VGAHWPTR(pScrn)->PIOOffset = pRDC->PIOOffset = pRDC->IODBase + pRDC->PciInfo->ioBase[2] - 0x380;
-    
+#else    
     pRDC->RelocateIO = (IOADDRESS)(pRDC->PciInfo->ioBase[2] + pRDC->IODBase);
 #endif
     
@@ -773,8 +918,10 @@ RDCPreInit(ScrnInfoPtr pScrn, int flags)
         }
     }
 
-    xf86DrvMsgVerb(pScrn->scrnIndex, X_INFO, InfoLevel, "Linear framebuffer at 0x%lX\n",
-               (unsigned long) pRDC->FBPhysAddr);
+    xf86DrvMsgVerb(pScrn->scrnIndex, 
+                   X_INFO, InfoLevel, 
+                   "Linear framebuffer at 0x%lX\n",
+                   (unsigned long)pRDC->FBPhysAddr);
 
     if (pRDC->pEnt->device->IOBase != 0) 
     {
@@ -800,25 +947,144 @@ RDCPreInit(ScrnInfoPtr pScrn, int flags)
     
     xf86DrvMsgVerb(pScrn->scrnIndex, X_INFO, InfoLevel, "IO registers at addr 0x%lX\n",
                (unsigned long) pRDC->MMIOPhysAddr);
-          
-    pScrn->videoRam = GetVRAMInfo(pScrn) / 1024;
-    from = X_DEFAULT;
-
-
-    if (pRDC->pEnt->device->videoRam) 
-    {
-        pScrn->videoRam = pRDC->pEnt->device->videoRam;
-        from = X_CONFIG;
-    }
-
-    pRDC->FbMapSize = pScrn->videoRam * 1024;
-    pRDC->AvailableFBsize = pRDC->FbMapSize;
-    
     pRDC->MMIOMapSize = DEFAULT_MMIO_SIZE;
 
+    if (!RDCMapMMIO(pScrn)) 
+    {
+        xf86DrvMsg(pScrn->scrnIndex, X_ERROR, "Map Memory Map IO Failed \n");
+        xf86DrvMsgVerb(pScrn->scrnIndex, X_INFO, ErrorLevel, "==Exit19 RDCPreInit()== return FALSE\n");
+        return FALSE;
+    } 
     
-    pRDC->MemoryBandwidth = RDCGetMemBandWidth(pScrn);
+    if (!RDCMapVBIOS(pScrn))
+    {
+        xf86DrvMsg(pScrn->scrnIndex, X_ERROR, "==Exit RDCPreInit()==Map VBIOS Failed \n");
+        return FALSE;
+    }
+    
+    
+    if (!(pRDC->pCBIOSExtension = xalloc(sizeof(CBIOS_Extension))))
+    {      
+        RDCFreeRec(pScrn);
+        xf86DrvMsgVerb(pScrn->scrnIndex, X_INFO, ErrorLevel, "==Exit25 RDCPreInit()== return FALSE\n");
+        return FALSE;
+    }      
+    memset(pRDC->pCBIOSExtension, 0, sizeof(CBIOS_Extension));
 
+    
+    if (!(pRDC->pCBIOSExtension->pCBiosArguments = xalloc(sizeof(CBIOS_ARGUMENTS))))
+    {      
+        RDCFreeRec(pScrn);
+        xf86DrvMsgVerb(pScrn->scrnIndex, X_INFO, ErrorLevel, "==Exit26 RDCPreInit()== return FALSE\n");
+        return FALSE;
+    }
+    pRDC->pCBIOSExtension->pjIOAddress            = pRDC->MMIOVirtualAddr;
+    pRDC->pCBIOSExtension->pjROMLinearAddr        = pRDC->BIOSVirtualAddr;
+    
+    xf86DrvMsgVerb(pScrn->scrnIndex, X_INFO, DefaultLevel, " Initial parameters from VGA BIOS rom \n");
+    
+    
+    CBIOSInitialDataFromVBIOS(pRDC->pCBIOSExtension);
+    
+    if(pRDC->pCBIOSExtension->wDeviceID == M2012_DEVICE_ID)
+    {
+        pRDC->pCBIOSExtension->pfnCBIOS_TransVGAPLL  = ClockToPLLF9003A;
+        pRDC->pCBIOSExtension->pfnCBIOS_SetVGAPLLReg = SetF9003APLLReg;
+    }
+    else 
+    {
+        pRDC->pCBIOSExtension->pfnCBIOS_TransVGAPLL  = ClockToPLLF4002A;
+        pRDC->pCBIOSExtension->pfnCBIOS_SetVGAPLLReg = SetF4002APLLReg;
+    }
+
+    
+    {
+        
+        CBIOS_ARGUMENTS *pCBiosArguments = pRDC->pCBIOSExtension->pCBiosArguments;
+        
+        xf86DrvMsgVerb(pScrn->scrnIndex, X_INFO, DefaultLevel, " CBIOS Query Bios Info\n");
+        
+        memset(pCBiosArguments, 0, sizeof(CBIOS_ARGUMENTS));
+        pCBiosArguments->Eax = OEMFunction;
+        pCBiosArguments->Ebx = QueryBiosInfo;
+
+        
+        CInt10(pRDC->pCBIOSExtension);
+        
+        if(pCBiosArguments->AX == VBEFunctionCallSuccessful)
+        {
+            
+            
+            pScrn->videoRam =  ((ULONG)(pCBiosArguments->Ecx & 0xFFFF) >> 4)*256;
+            if(pRDC->pCBIOSExtension->wDeviceID==PCI_CHIP_M2200)
+                pScrn->videoRam = 4096;
+        }
+        else
+            pScrn->videoRam = GetVRAMInfo(pScrn)/1024;
+            
+        xf86DrvMsgVerb(pScrn->scrnIndex, X_INFO, ErrorLevel, " Video Memory Size= %d MB\n",pScrn->videoRam/1024);
+
+        from = X_DEFAULT;
+
+        if (pRDC->pEnt->device->videoRam) 
+        {
+            pScrn->videoRam = pRDC->pEnt->device->videoRam;
+            from = X_CONFIG;
+        }
+
+        pRDC->FbMapSize = pScrn->videoRam * 1024;
+        pRDC->AvailableFBsize = pRDC->FbMapSize;        
+    
+        
+        
+        if (RDCCheckCapture(pScrn))
+        {
+            xf86DrvMsgVerb(0, X_INFO, ErrorLevel, "Reserved Capture buffer\n");
+            
+            
+            if (pRDC->FbMapSize < VIDEOMEM_SIZE_16M)
+            {
+                xf86DrvMsgVerb(0, X_INFO, ErrorLevel, "Video Memory in not enough for Capture & Xorg\n");
+                return FALSE;
+            }
+
+            
+            
+            
+            pRDC->AvailableFBsize -= CAPTURE_BUFFER_SIZE;
+        }
+
+
+        
+        if ((!pRDC->noAccel) &&
+            (!pRDC->MMIO2D)  &&
+            (pRDC->ENGCaps & ENG_CAP_2D))
+        {
+            xf86DrvMsgVerb(0, X_INFO, ErrorLevel, "Reserved 2D CMDQ\n");
+
+            pRDC->CMDQInfo.ulCMDQSize = DEFAULT_CMDQ_SIZE;   
+            pRDC->AvailableFBsize = pRDC->AvailableFBsize - pRDC->CMDQInfo.ulCMDQSize;
+            pRDC->CMDQInfo.ulCMDQOffsetAddr = pRDC->AvailableFBsize;
+        }
+
+        
+        if (!pRDC->noHWC)
+        {
+            xf86DrvMsgVerb(0, X_INFO, ErrorLevel, "Reserved Cursor Buffer\n");
+            
+            if (pRDC->ENGCaps & ENG_CAP_HWC_MMIO)
+                pRDC->AvailableFBsize = 
+                    pRDC->AvailableFBsize - (HQ_HWC_SIZE)*pRDC->HWCInfo.HWC_NUM;
+            else
+                pRDC->AvailableFBsize = 
+                    pRDC->AvailableFBsize - (HWC_SIZE+HWC_SIGNATURE_SIZE)*pRDC->HWCInfo.HWC_NUM;
+                
+            pRDC->HWCInfo.ulHWCOffsetAddr = pRDC->AvailableFBsize;
+        }
+
+        xf86DrvMsgVerb(pScrn->scrnIndex, X_INFO, ErrorLevel, " Available memory size= %d B\n",pRDC->AvailableFBsize);
+    }
+    
     
     if (!RDCMapMem(pScrn))
     {
@@ -826,41 +1092,51 @@ RDCPreInit(ScrnInfoPtr pScrn, int flags)
         xf86DrvMsgVerb(pScrn->scrnIndex, X_INFO, ErrorLevel, "==Exit18 RDCPreInit()== return FALSE\n");
         return FALSE;
     }
-   
-    if (!RDCMapMMIO(pScrn)) 
-    {
-        xf86DrvMsg(pScrn->scrnIndex, X_ERROR, "Map Memory Map IO Failed \n");
-        xf86DrvMsgVerb(pScrn->scrnIndex, X_INFO, ErrorLevel, "==Exit19 RDCPreInit()== return FALSE\n");
-        return FALSE;
-    }
-
-    if (!RDCMapVBIOS(pScrn))
-    {
-        xf86DrvMsg(pScrn->scrnIndex, X_ERROR, "==Exit RDCPreInit()==Map VBIOS Failed \n");
-        return FALSE;
-    }
+    pRDC->pCBIOSExtension->pVideoVirtualAddress   = (ULONG*)(pRDC->FBVirtualAddr);
+    pRDC->pCBIOSExtension->pVideoPhysicialAddress = pRDC->FBPhysAddr;
 
     
     {
-        CBIOS_ARGUMENTS CBiosArguments;
-        CBIOS_Extension CBiosExtension;
-     
-        CBiosExtension.pCBiosArguments = &CBiosArguments;
-        CBiosExtension.IOAddress = (USHORT)(pRDC->RelocateIO);
-        CBiosExtension.VideoVirtualAddress = (ULONG)(pRDC->FBVirtualAddr);
+        
+        CBIOS_ARGUMENTS *pCBiosArguments = pRDC->pCBIOSExtension->pCBiosArguments;
+        
+        xf86DrvMsgVerb(pScrn->scrnIndex, X_INFO, DefaultLevel, " CBIOS Set HDMI Type\n");
+        
+#if XSERVER_LIBPCIACCESS
+        dev = pci_device_find_by_slot(0, 0, 0, 0);
+        pci_device_cfg_read_u32(dev, &ulValue, CIDOffset);
+#else
+        ulValue = pciReadLong(pciTag(0, 0, 0), CIDOffset);
+#endif
+        xf86DrvMsg(pScrn->scrnIndex, X_ERROR, "Customer ID = 0x%x\n",ulValue);
+        
+        
+        memset(pCBiosArguments, 0, sizeof(CBIOS_ARGUMENTS));
+        pCBiosArguments->Eax = OEMFunction;
+        pCBiosArguments->Ebx = SetHDMIType;
 
-        CBiosArguments.reg.x.AX = OEMFunction;
-        CBiosArguments.reg.x.BX = CINT10DataInit;
-        CBiosArguments.reg.ex.ECX = (ULONG)pRDC->BIOSVirtualAddr;
-        CInt10(&CBiosExtension);
+        if (ulValue == DMPDX2)
+            pCBiosArguments->CL = HDMI720P;
+        else
+            pCBiosArguments->CL = HDMI1080P;
+
+        xf86DrvMsg(pScrn->scrnIndex, X_ERROR, "HDMI Type = 0x%x\n",pCBiosArguments->CL);
+            
+         
+        CInt10(pRDC->pCBIOSExtension);
     }
+
+    
+    vUpdateHDMIFakeMode(pScrn);
+    
+    
+    pRDC->MemoryBandwidth = RDCGetMemBandWidth(pScrn);
     
     pScrn->memPhysBase = (ULONG)pRDC->FBPhysAddr;
     pScrn->fbOffset = 0;
 
     
     pScrn->monitor->DDC = RDCDoDDC(pScrn, pRDC->pEnt->index);    
-
 
     
     pScrn->modePool = RDCBuildModePool(pScrn);
@@ -879,55 +1155,56 @@ RDCPreInit(ScrnInfoPtr pScrn, int flags)
     clockRanges->interlaceAllowed = FALSE;
     clockRanges->doubleScanAllowed = FALSE;
 
-    xf86DrvMsgVerb(0, X_INFO, 0, "Before xf86ValidateModes()\n");
-    xf86DrvMsgVerb(0, X_INFO, 0, " pScrn->modes = 0x%x\n", pScrn->modes);
-    xf86DrvMsgVerb(0, X_INFO, 0, " pScrn->modePool = 0x%x\n", pScrn->modePool);
-    xf86DrvMsgVerb(0, X_INFO, 0, " pScrn->display->modes = 0x%x\n", pScrn->display->modes);
-    xf86DrvMsgVerb(0, X_INFO, 0, " *pScrn->display->modes = %s\n", *pScrn->display->modes);
-    xf86DrvMsgVerb(0, X_INFO, 0, " pScrn->bitsPerPixel = %d\n", pScrn->bitsPerPixel);
-    xf86DrvMsgVerb(0, X_INFO, 0, " pScrn->display->virtualX = %d\n", pScrn->display->virtualX);
-    xf86DrvMsgVerb(0, X_INFO, 0, " pScrn->display->virtualY = %d\n", pScrn->display->virtualY);
-    xf86DrvMsgVerb(0, X_INFO, 0, " pRDC->FbMapSize = 0x%x\n", pRDC->FbMapSize);
-    xf86DrvMsgVerb(0, X_INFO, 0, " pScrn->virtualX = %d\n", pScrn->virtualX);
-    xf86DrvMsgVerb(0, X_INFO, 0, " pScrn->virtualY = %d\n", pScrn->virtualY);
+    xf86DrvMsgVerb(0, X_INFO, ErrorLevel, "Before xf86ValidateModes()\n");
+    xf86DrvMsgVerb(0, X_INFO, InternalLevel, " pScrn->modes = 0x%x\n", pScrn->modes);
+    xf86DrvMsgVerb(0, X_INFO, InternalLevel, " pScrn->modePool = 0x%x\n", pScrn->modePool);
+    xf86DrvMsgVerb(0, X_INFO, InternalLevel, " pScrn->display->modes = 0x%x\n", pScrn->display->modes);
+    xf86DrvMsgVerb(0, X_INFO, InternalLevel, " *pScrn->display->modes = %s\n", *pScrn->display->modes);
+    xf86DrvMsgVerb(0, X_INFO, InternalLevel, " pScrn->bitsPerPixel = %d\n", pScrn->bitsPerPixel);
+    xf86DrvMsgVerb(0, X_INFO, InternalLevel, " pScrn->display->virtualX = %d\n", pScrn->display->virtualX);
+    xf86DrvMsgVerb(0, X_INFO, InternalLevel, " pScrn->display->virtualY = %d\n", pScrn->display->virtualY);
+    xf86DrvMsgVerb(0, X_INFO, InternalLevel, " pRDC->FbMapSize = 0x%x\n", pRDC->FbMapSize);
+    xf86DrvMsgVerb(0, X_INFO, ErrorLevel, " pScrn->virtualX = %d\n", pScrn->virtualX);
+    xf86DrvMsgVerb(0, X_INFO, ErrorLevel, " pScrn->virtualY = %d\n", pScrn->virtualY);
 
-#ifdef FPGA
-    i = xf86ValidateModes(pScrn, pScrn->modePool,
-                          pScrn->display->modes, clockRanges,
-                          0, 320, 1024, 8 * pScrn->bitsPerPixel,
-                          200, 768,
-                          pScrn->display->virtualX, pScrn->display->virtualY,
-                          pRDC->FbMapSize, LOOKUP_BEST_REFRESH);
-#else
-    if (pRDC->bRandRRotation)
+    maxPitch = pRDC->ulMaxPitch;
+    maxHeight = pRDC->ulMaxHeight;
+    
+    if ((pRDC->bRandRRotation) &&
+        (maxPitch > 1280))
     {
         maxPitch = 1280;
         maxHeight = 1024;
     }
-    else
-    {
-        maxPitch = 1920;
-        maxHeight = 1200;
-    }
+    xf86DrvMsgVerb(0, X_INFO, ErrorLevel, "Max Pitch = %d\n", maxPitch);
+    xf86DrvMsgVerb(0, X_INFO, ErrorLevel, "Max Height = %d\n", maxHeight);
     
-    i = xf86ValidateModes(pScrn, pScrn->modePool,
-                          pScrn->display->modes, clockRanges,
-                          0, 320, maxPitch, 8 * pScrn->bitsPerPixel,
-                          200, maxHeight,
-                          pScrn->display->virtualX, pScrn->display->virtualY,
-                          pRDC->FbMapSize, LOOKUP_BEST_REFRESH);
-#endif
-    xf86DrvMsgVerb(0, X_INFO, 0, "After xf86ValidateModes()\n");
-    xf86DrvMsgVerb(0, X_INFO, 0, " pScrn->modes = 0x%x\n", pScrn->modes);
-    xf86DrvMsgVerb(0, X_INFO, 0, " pScrn->modePool = 0x%x\n", pScrn->modePool);
-    xf86DrvMsgVerb(0, X_INFO, 0, " pScrn->display->modes = 0x%x\n", pScrn->display->modes);
-    xf86DrvMsgVerb(0, X_INFO, 0, " *pScrn->display->modes = %s\n", *pScrn->display->modes);
-    xf86DrvMsgVerb(0, X_INFO, 0, " pScrn->bitsPerPixel = %d\n", pScrn->bitsPerPixel);
-    xf86DrvMsgVerb(0, X_INFO, 0, " pScrn->display->virtualX = %d\n", pScrn->display->virtualX);
-    xf86DrvMsgVerb(0, X_INFO, 0, " pScrn->display->virtualY = %d\n", pScrn->display->virtualY);
-    xf86DrvMsgVerb(0, X_INFO, 0, " pRDC->FbMapSize = 0x%x\n", pRDC->FbMapSize);
-    xf86DrvMsgVerb(0, X_INFO, 0, " pScrn->virtualX = %d\n", pScrn->virtualX);
-    xf86DrvMsgVerb(0, X_INFO, 0, " pScrn->virtualY = %d\n", pScrn->virtualY);
+    i = xf86ValidateModes(pScrn, 
+                          pScrn->modePool,
+                          pScrn->display->modes, 
+                          clockRanges,
+                          0, 
+                          320, 
+                          maxPitch, 
+                          8 * pScrn->bitsPerPixel,
+                          200, 
+                          maxHeight,
+                          pScrn->display->virtualX, 
+                          pScrn->display->virtualY,
+                          pRDC->AvailableFBsize, 
+                          LOOKUP_BEST_REFRESH);
+                          
+    xf86DrvMsgVerb(0, X_INFO, ErrorLevel, "After xf86ValidateModes()\n");
+    xf86DrvMsgVerb(0, X_INFO, InternalLevel, " pScrn->modes = 0x%x\n", pScrn->modes);
+    xf86DrvMsgVerb(0, X_INFO, InternalLevel, " pScrn->modePool = 0x%x\n", pScrn->modePool);
+    xf86DrvMsgVerb(0, X_INFO, InternalLevel, " pScrn->display->modes = 0x%x\n", pScrn->display->modes);
+    xf86DrvMsgVerb(0, X_INFO, InternalLevel, " *pScrn->display->modes = %s\n", *pScrn->display->modes);
+    xf86DrvMsgVerb(0, X_INFO, InternalLevel, " pScrn->bitsPerPixel = %d\n", pScrn->bitsPerPixel);
+    xf86DrvMsgVerb(0, X_INFO, InternalLevel, " pScrn->display->virtualX = %d\n", pScrn->display->virtualX);
+    xf86DrvMsgVerb(0, X_INFO, InternalLevel, " pScrn->display->virtualY = %d\n", pScrn->display->virtualY);
+    xf86DrvMsgVerb(0, X_INFO, InternalLevel, " pRDC->FbMapSize = 0x%x\n", pRDC->FbMapSize);
+    xf86DrvMsgVerb(0, X_INFO, ErrorLevel, " pScrn->virtualX = %d\n", pScrn->virtualX);
+    xf86DrvMsgVerb(0, X_INFO, ErrorLevel, " pScrn->virtualY = %d\n", pScrn->virtualY);
 
     if (i == -1)
     {
@@ -954,34 +1231,8 @@ RDCPreInit(ScrnInfoPtr pScrn, int flags)
  
     xf86SetDpi(pScrn, 0, 0);
 
-    pRDC->AvailableFBsize -= CAPTURE_BUFFER_SIZE;
- 
-    
-    pRDC->noAccel = TRUE;
-    pRDC->AccelInfoPtr = NULL; 
-    pRDC->CMDQInfo.ulCMDQSize = 0;      
-
-    if (pRDC->bRandRRotation)
-    {
-        RDCApertureInit(pScrn);
-    }      
-
-    
-#ifdef    Accel_2D
-    if (!xf86ReturnOptValBool(pRDC->Options, OPTION_NOACCEL, FALSE))
-    {
-    	if((s = (char *)xf86GetOptValString(pRDC->Options, OPTION_ACCELMETHOD))) 
-    	{
-    	    if(!xf86NameCmp(s,"XAA")) 
-    	    {
-    		    pRDC->useEXA = FALSE;
-    	    }
-    	    else if(!xf86NameCmp(s,"EXA"))
-    	    {
-    		    pRDC->useEXA = TRUE;
-    	    }
-    	}
-
+    if (!pRDC->noAccel)
+    {        
     	if (pRDC->useEXA)
         {
     	    XF86ModReqInfo req;
@@ -994,6 +1245,7 @@ RDCPreInit(ScrnInfoPtr pScrn, int flags)
             if (!LoadSubModule(pScrn->module, "exa", NULL, NULL, NULL, &req,
     		                   &errmaj, &errmin)) 
     		{
+                xf86DrvMsgVerb(0, X_INFO, ErrorLevel, "Load EXA Module FALSE\n");
         		LoaderErrorMsg(NULL, "exa", errmaj, errmin);
         		RDCFreeRec(pScrn);
         		return FALSE;
@@ -1008,69 +1260,71 @@ RDCPreInit(ScrnInfoPtr pScrn, int flags)
                 return FALSE;
             }       
         }
-        
-        pRDC->noAccel = FALSE; 
-       
-        pRDC->MMIO2D = TRUE;
-#ifndef    MMIO_2D                   
-        if (!xf86ReturnOptValBool(pRDC->Options, OPTION_MMIO2D, FALSE)) 
-        {
-            pRDC->CMDQInfo.ulCMDQSize = DEFAULT_CMDQ_SIZE;   
-            pRDC->AvailableFBsize = pRDC->AvailableFBsize - pRDC->CMDQInfo.ulCMDQSize;
-            pRDC->CMDQInfo.ulCMDQOffsetAddr = pRDC->AvailableFBsize;
-            pRDC->MMIO2D = FALSE;        
-        }    
-#endif
+    }
 
-        pRDC->ENGCaps = ENG_CAP_ALL;
-        if (!xf86GetOptValInteger(pRDC->Options, OPTION_ENG_CAPS, &pRDC->ENGCaps)) 
-        {
-            xf86DrvMsgVerb(pScrn->scrnIndex, X_INFO, InfoLevel, "No ENG Capability options found\n");          
-        }
-   }
-#endif   
 
-    
-    RDCSetHWCaps(pRDC);
-    
-    
-    pRDC->noHWC = TRUE; 
-    pRDC->HWCInfoPtr = NULL;
-#ifdef HWC   
-    if (!xf86ReturnOptValBool(pRDC->Options, OPTION_SW_CURSOR, FALSE))
+    if (pRDC->bRandRRotation)
     {
-        if (!xf86LoadSubModule(pScrn, "ramdac"))
-        {
-            RDCFreeRec(pScrn);
-            xf86DrvMsgVerb(0, X_INFO, ErrorLevel, "==Exit23 RDCPreInit()== return FALSE\n");
-            return FALSE;
-        }
-      
-        pRDC->noHWC = FALSE;  
-        pRDC->HWCInfo.HWC_NUM = DEFAULT_HWC_NUM;
-        
-        if (!xf86GetOptValInteger(pRDC->Options, OPTION_HWC_NUM, &pRDC->HWCInfo.HWC_NUM))
-        {
-            xf86DrvMsgVerb(pScrn->scrnIndex, X_INFO, InfoLevel, "No HWC_NUM options found\n");          
-        }    
+        pRDC->rotate = RR_Rotate_0;
+        RDCApertureInit(pScrn);
+    }      
 
-        if (pRDC->ENGCaps & ENG_CAP_HWC_MMIO)
-            pRDC->AvailableFBsize = 
-                pRDC->AvailableFBsize - (HQ_HWC_SIZE)*pRDC->HWCInfo.HWC_NUM;
-        else
-            pRDC->AvailableFBsize = 
-                pRDC->AvailableFBsize - (HWC_SIZE+HWC_SIGNATURE_SIZE)*pRDC->HWCInfo.HWC_NUM;
-                
-        pRDC->HWCInfo.ulHWCOffsetAddr = pRDC->AvailableFBsize;
-    }    
+    if (pRDC->ENGCaps & ENG_CAP_CR_SUPPORT)
+    {
+        pRDC->CMDQInfo.Disable2D = vCRDisable2D;
+        pRDC->CMDQInfo.Enable2D = bCREnable2D ;
+        pRDC->CMDQInfo.WaitEngIdle = vCRWaitEngIdle;
+    }
+    else if(pRDC->ENGCaps & ENG_CAP_2D)
+    {
+        pRDC->CMDQInfo.Disable2D = vDisable2D;
+        pRDC->CMDQInfo.Enable2D = bEnable2D;
+        pRDC->CMDQInfo.WaitEngIdle = vWaitEngIdle;
+    }else 
+    {
+        pRDC->CMDQInfo.Disable2D   = NULL;
+        pRDC->CMDQInfo.Enable2D    = NULL;
+        pRDC->CMDQInfo.WaitEngIdle = NULL;
+    }
+    
+    
+    if (pRDC->DeviceInfo.ScalerConfig.EnableDownScaling)
+        SetIndexRegMask(COLOR_CRTC_INDEX, 0x90, ~BIT4, BIT4);
+    else
+        SetIndexRegMask(COLOR_CRTC_INDEX, 0x90, ~BIT4, 0);
+        
+
+    
+    pRDC->bDirectAccessFB = FALSE;
+#if XSERVER_LIBPCIACCESS
+    dev = pci_device_find_by_slot(0, 0, 0, 0);
+    pci_device_cfg_read_u32(dev, &ulNBID, 0x00);
+    if(R3308NBID == ulNBID)
+    {   
+        pci_device_cfg_read_u32(dev, &ulValue, 0x48);
+        if (ulValue & DirectAccessFB)
+            pRDC->bDirectAccessFB = TRUE;
+    }
+#else
+    ulNBID = pciReadLong(pciTag(0, 0, 0), 0x00);
+    if(R3308NBID == ulNBID)
+    {   
+        ulValue = pciReadLong(pciTag(0, 0, 0), 0x48);
+        if (ulValue & DirectAccessFB)
+            pRDC->bDirectAccessFB = TRUE;
+    }
 #endif
 
+    
+    pRDC->TVEncoderInfo[0].TVOut_HSize = 640;
+    pRDC->TVEncoderInfo[0].TVOut_VSize = 480;
+    
     
 #ifndef XSERVER_LIBPCIACCESS
     xf86SetOperatingState(resVgaIo, pRDC->pEnt->index, ResUnusedOpr);
     xf86SetOperatingState(resVgaMem, pRDC->pEnt->index, ResDisableOpr);
 #endif
-    xf86DrvMsgVerb(pScrn->scrnIndex, X_INFO, DefaultLevel, "==Exit24 RDCPreInit()== return TRUE\n");
+    xf86DrvMsgVerb(pScrn->scrnIndex, X_INFO, ErrorLevel, "==Exit24 RDCPreInit()== return TRUE\n");
     return TRUE;
 }
 
@@ -1082,19 +1336,22 @@ RDCScreenInit(int scrnIndex, ScreenPtr pScreen, int argc, char **argv)
     RDCRecPtr pRDC;
     vgaHWPtr hwp;   
     VisualPtr visual;
- 
+    CBIOS_ARGUMENTS *pCBiosArguments;
+
     
     BoxRec FBMemBox;   
     int    AvailFBSize;     
 
-    xf86DrvMsgVerb(scrnIndex, X_INFO, DefaultLevel, "==Enter RDCScreenInit()== \n");
+    xf86DrvMsgVerb(scrnIndex, X_INFO, ErrorLevel, "==Enter RDCScreenInit()== \n");
     
     pScrn = xf86Screens[pScreen->myNum];
     pRDC = RDCPTR(pScrn);
     hwp = VGAHWPTR(pScrn);
       
-    
     AvailFBSize = pRDC->AvailableFBsize;
+
+    xf86DrvMsgVerb(scrnIndex, X_INFO, ErrorLevel, "virtual X = %d\n", pScrn->virtualX);
+    xf86DrvMsgVerb(scrnIndex, X_INFO, ErrorLevel, "virtual Y = %d\n", pScrn->virtualY);
 
     FBMemBox.x1 = 0;
     FBMemBox.y1 = 0;
@@ -1103,18 +1360,41 @@ RDCScreenInit(int scrnIndex, ScreenPtr pScreen, int argc, char **argv)
     if (FBMemBox.y2 <= 0)
         FBMemBox.y2 = 32767; 
     
-    xf86DrvMsgVerb(scrnIndex, X_INFO, InfoLevel, "AvailFBSize = %d\n", AvailFBSize);
-    xf86DrvMsgVerb(scrnIndex, X_INFO, InfoLevel, "FBMemBox: x1 = %d, y1 = %d, x2 = %d, y2 = %d\n",FBMemBox.x1, FBMemBox.y1, FBMemBox.x2, FBMemBox.y2);
-
-    if (!xf86InitFBManager(pScreen, &FBMemBox))
+    
+    
+    if (FBMemBox.y2 < pScrn->virtualY)
     {
-        xf86DrvMsg(scrnIndex, X_ERROR, "Failed to init memory manager\n");
+        xf86DrvMsgVerb(scrnIndex, X_INFO, ErrorLevel, "Available video memory < On Screen video memory\n");
         return FALSE;
-    }      
-       
+    }
+    
+    
+    
+    if (xf86InitFBManager(pScreen, &FBMemBox))
+    {        
+        int areaoffset = FBMemBox.y1 * pScrn->displayWidth; 
+        int size = (FBMemBox.y2 - pScrn->virtualY) * pScrn->displayWidth;
+
+        if (xf86InitFBManagerLinear(pScreen, areaoffset, size))
+        {
+            xf86DrvMsg(scrnIndex, X_INFO, "Using %ld bytes of offscreen memory for linear (offset=0x%x)\n", (AvailFBSize - areaoffset), areaoffset);
+        }
+        else
+        {
+            xf86DrvMsg(scrnIndex, X_ERROR, "xf86InitFBManagerLinear() failed \n");
+            return FALSE;
+        }
+    }
+    else
+    {
+        xf86DrvMsg(scrnIndex, X_ERROR, "xf86InitFBManager() failed \n");
+        return FALSE;
+    } 
+    
+    vgaHWSetMmioFuncs(hwp, pRDC->MMIOVirtualAddr, 0);   
     vgaHWGetIOBase(hwp);
  
-    vFillRDCModeInfo (pScrn);      
+    vFillRDCModeInfo(pScrn);      
  
     miClearVisualTypes();
 
@@ -1137,10 +1417,14 @@ RDCScreenInit(int scrnIndex, ScreenPtr pScreen, int argc, char **argv)
         case 8:
         case 16:
         case 32:
-            if (!fbScreenInit(pScreen, pRDC->FBVirtualAddr + pScrn->fbOffset,
-                              pScrn->virtualX, pScrn->virtualY,
-                              pScrn->xDpi, pScrn->yDpi,
-                              pScrn->displayWidth, pScrn->bitsPerPixel))
+            if (!fbScreenInit(pScreen, 
+                              pRDC->FBVirtualAddr + pScrn->fbOffset,
+                              pScrn->virtualX, 
+                              pScrn->virtualY,
+                              pScrn->xDpi, 
+                              pScrn->yDpi,
+                              pScrn->displayWidth, 
+                              pScrn->bitsPerPixel))
             {
                 xf86DrvMsgVerb(scrnIndex, X_INFO, ErrorLevel, "==RDCScreenInit() fbScreenInit fail== return FALSE\n");
                 return FALSE;
@@ -1174,16 +1458,14 @@ RDCScreenInit(int scrnIndex, ScreenPtr pScreen, int argc, char **argv)
  
     xf86SetBlackWhitePixels(pScreen);
 
-#ifdef Accel_2D
     if (!pRDC->noAccel)
     {
         if (!RDCAccelInit(pScreen))
         {
             xf86DrvMsg(scrnIndex, X_ERROR, "Hardware acceleration initialization failed\n");
-            pRDC->noAccel = TRUE;           
+            return FALSE;           
         }
     }
-#endif 
      
     miInitializeBackingStore(pScreen);
     xf86SetBackingStore(pScreen);
@@ -1197,7 +1479,7 @@ RDCScreenInit(int scrnIndex, ScreenPtr pScreen, int argc, char **argv)
         if (!RDCCursorInit(pScreen)) 
         {
             xf86DrvMsg(scrnIndex, X_ERROR, "Hardware cursor initialization failed\n");
-            pRDC->noHWC = TRUE;                      
+            return FALSE;
         }
     }
 
@@ -1205,6 +1487,7 @@ RDCScreenInit(int scrnIndex, ScreenPtr pScreen, int argc, char **argv)
     {
         xf86DrvMsgVerb(0, X_INFO, DefaultLevel, "assign pScrn->DriverFunc\n");
         pScrn->DriverFunc = RDCDriverFunc;
+        pScrn->PointerMoved = RDCPointerMoved;
     }      
     
     if (!miCreateDefColormap(pScreen))
@@ -1227,36 +1510,51 @@ RDCScreenInit(int scrnIndex, ScreenPtr pScreen, int argc, char **argv)
     pScreen->SaveScreen = RDCSaveScreen;
     pRDC->CloseScreen = pScreen->CloseScreen;
     pScreen->CloseScreen = RDCCloseScreen;
-#if 0
-    
-    UTRemoveRestartFlag(pBIOSInfo);
-#endif
+
     
     RDCDisplayExtensionInit(pScrn);
 
     
-    if (pRDC->ENGCaps & ENG_CAP_VIDEO_DISP)
+    if ((pRDC->ENGCaps & ENG_CAP_VIDEO_DISP) &&
+        (!pRDC->noAccel))
         RDCVideoInit(pScreen);
     
     if (serverGeneration == 1)
         xf86ShowUnusedOptions(pScrn->scrnIndex, pScrn->options);
 
-    
-#ifdef Accel_2D
-    if (!pRDC->noAccel)
+    if (pRDC->ENGCaps & ENG_CAP_CR_SUPPORT)
     {
-        if ((DEVICE_ID(pRDC->PciInfo) == PCI_CHIP_M2010) || (DEVICE_ID(pRDC->PciInfo) == PCI_CHIP_M2010_A0))
-        {
-            bInitCMDQInfo(pScrn, pRDC);
-        }
-        else
-        {
-            bCRInitCMDQInfo(pScrn, pRDC);
-        }
+        pRDC->CMDQInfo.InitCMDQInfo = bCRInitCMDQInfo;
+        pRDC->CMDQInfo.EnableCMDQ = bCREnableCMDQ;
     }
-#endif
+    else if(pRDC->ENGCaps & ENG_CAP_2D) 
+    {
+        pRDC->CMDQInfo.InitCMDQInfo = bInitCMDQInfo;
+        pRDC->CMDQInfo.EnableCMDQ = bEnableCMDQ;
+    }else
+    {
+        pRDC->CMDQInfo.InitCMDQInfo = NULL;
+        pRDC->CMDQInfo.EnableCMDQ   = NULL;
+    }
     
-    RDCSave(pScrn);     
+    RDCSave(pScrn);
+
+    
+    pCBiosArguments = pRDC->pCBIOSExtension->pCBiosArguments;
+    
+    
+    memset(pCBiosArguments, 0, sizeof(CBIOS_ARGUMENTS));
+    pCBiosArguments->AX = OEMFunction;
+    pCBiosArguments->BX = QueryDisplayPathInfo;
+    
+    
+    CInt10(pRDC->pCBIOSExtension);
+
+    pRDC->DeviceInfo.ucNewDeviceID = (pCBiosArguments->Ebx & 0xf0000) >> 16;
+    
+    
+    pRDC->CMDQInfo.bInitialized = FALSE;
+    
     if (!RDCModeInit(pScrn, pScrn->currentMode))
     {
         xf86DrvMsg(scrnIndex, X_ERROR, "Mode Init Failed \n");
@@ -1268,7 +1566,7 @@ RDCScreenInit(int scrnIndex, ScreenPtr pScreen, int argc, char **argv)
 
     EC_DetectCaps(pScrn, &(pRDC->ECChipInfo));
 
-    xf86DrvMsgVerb(scrnIndex, X_INFO, DefaultLevel, "==RDCScreenInit() Normal Exit==\n");
+    xf86DrvMsgVerb(scrnIndex, X_INFO, ErrorLevel, "==RDCScreenInit() Normal Exit==\n");
     return TRUE;
 } 
 
@@ -1278,7 +1576,7 @@ Bool RDCSwitchMode(int scrnIndex, DisplayModePtr mode, int flags)
     RDCRecPtr pRDC = RDCPTR(pScrn);
     Bool RetStatus = FALSE;
     
-    xf86DrvMsgVerb(pScrn->scrnIndex, X_INFO, DefaultLevel, "==Enter RDCSwitchMode()== \n");
+    xf86DrvMsgVerb(pScrn->scrnIndex, X_INFO, ErrorLevel, "==Enter RDCSwitchMode()== \n");
    
     RetStatus = RDCModeInit(pScrn, mode);
 
@@ -1293,6 +1591,8 @@ RDCAdjustFrame(int scrnIndex, int x, int y, int flags)
     RDCRecPtr   pRDC  = RDCPTR(pScrn);
     ULONG base;
     int rot_x, rot_y;
+    int iMaxHorCoor, iMaxVerCoor;
+    DisplayModePtr mode = pRDC->ModePtr;
 
     xf86DrvMsgVerb(scrnIndex, X_INFO, DefaultLevel, "==Enter RDCAdjustFrame(x = %d, y = %d)== \n", x, y);
 
@@ -1304,42 +1604,86 @@ RDCAdjustFrame(int scrnIndex, int x, int y, int flags)
     xf86DrvMsgVerb(pScrn->scrnIndex, X_INFO, InternalLevel, "  pRDC->VideoModeInfo.ScreenPitch = %d\n", pRDC->VideoModeInfo.ScreenPitch);
     xf86DrvMsgVerb(pScrn->scrnIndex, X_INFO, InternalLevel, "  pRDC->VideoModeInfo.Bpp = %d\n", pRDC->VideoModeInfo.Bpp);
 
-    
-    switch(pRDC->rotate)
+    if ((pRDC->DeviceInfo.ScalerConfig.EnableDownScaling) && (pRDC->DeviceInfo.ScalerConfig.EnableHorDownScaler))
     {
-        case RR_Rotate_0:
-            xf86DrvMsgVerb(pScrn->scrnIndex, X_INFO, DefaultLevel, " case RR_Rotate_0\n");
-            rot_x = x;
-            rot_y = y;
-            break;
+        if (mode->HDisplay > 1024)
+        {
+            iMaxHorCoor = 1024 - 1;
+        }
+        else
+        {
+            iMaxHorCoor = (int)mode->HDisplay - 1;
+        }
+    }
+    else
+    {
+        iMaxHorCoor = (int)pRDC->VideoModeInfo.ScreenWidth - 1;
+    }
 
-        case RR_Rotate_90:
-            xf86DrvMsgVerb(pScrn->scrnIndex, X_INFO, DefaultLevel, " case RR_Rotate_90\n");
-            rot_x = y;
-            rot_y = pScrn->displayWidth - pRDC->VideoModeInfo.ScreenHeight - x;
-            break;
+    if ((pRDC->DeviceInfo.ScalerConfig.EnableDownScaling) && (pRDC->DeviceInfo.ScalerConfig.EnableVerDownScaler))
+    {
+        if (mode->VDisplay > 768)
+        {
+            iMaxVerCoor = 768 - 1;
+        }
+        else
+        {
+            iMaxVerCoor = (int)mode->VDisplay - 1;
+        }
+    }
+    else
+    {
+        iMaxVerCoor = (int)pRDC->VideoModeInfo.ScreenHeight - 1;
+    }
 
-        case RR_Rotate_180:
-            xf86DrvMsgVerb(pScrn->scrnIndex, X_INFO, DefaultLevel, " case RR_Rotate_180\n");
-            rot_x = pScrn->displayWidth - pRDC->VideoModeInfo.ScreenWidth - x;
-            rot_y = pScrn->virtualY - pRDC->VideoModeInfo.ScreenHeight - y;
-            break;
+    if (pRDC->bRandRRotation)
+    {
+        switch(pRDC->rotate)
+        {
+            case RR_Rotate_0:
+                xf86DrvMsgVerb(pScrn->scrnIndex, X_INFO, DefaultLevel, " case RR_Rotate_0\n");
+                rot_x = x;
+                rot_y = y;
+                break;
+
+            case RR_Rotate_90:
+                xf86DrvMsgVerb(pScrn->scrnIndex, X_INFO, DefaultLevel, " case RR_Rotate_90\n");
+                rot_x = y;
+                rot_y = pScrn->displayWidth -1 - iMaxVerCoor - x;
+                break;
+
+            case RR_Rotate_180:
+                xf86DrvMsgVerb(pScrn->scrnIndex, X_INFO, DefaultLevel, " case RR_Rotate_180\n");
+                rot_x = pScrn->displayWidth - iMaxHorCoor - x -1 ;
+                rot_y = pScrn->virtualY - iMaxVerCoor - y - 1;
+                break;
 
 
-        case RR_Rotate_270:
-            xf86DrvMsgVerb(pScrn->scrnIndex, X_INFO, DefaultLevel, " case RR_Rotate_270\n");
-            rot_x = pScrn->displayWidth - pRDC->VideoModeInfo.ScreenWidth - y;
-            rot_y = x;
-            break;
+            case RR_Rotate_270:
+                xf86DrvMsgVerb(pScrn->scrnIndex, X_INFO, DefaultLevel, " case RR_Rotate_270\n");
+                rot_x = pScrn->displayWidth - iMaxHorCoor - y - 1;
+                rot_y = x;
+                break;
 
-        default:
-            xf86DrvMsgVerb(pScrn->scrnIndex, X_ERROR, ErrorLevel, "  Unexpected rotation in RDCAdjustFrame\n");
-            return;
+            default:
+                xf86DrvMsgVerb(pScrn->scrnIndex, X_ERROR, ErrorLevel, "  Unexpected rotation in RDCAdjustFrame\n");
+                return;
+        }
+    }
+    else
+    {
+        rot_x = x;
+        rot_y = y;
     }
     
     base = rot_y * pRDC->VideoModeInfo.ScreenPitch + 
            rot_x * pRDC->VideoModeInfo.Bpp;
 
+    if ((x == 0)&&(y ==0))
+    {
+        pRDC->ulVirtualDesktopOffset = base;
+    }
+    
     xf86DrvMsgVerb(pScrn->scrnIndex, X_INFO, InternalLevel, "  base = %x\n", base);
     vSetStartAddressCRT1(pRDC, base);
 
@@ -1353,7 +1697,7 @@ RDCEnterVT(int scrnIndex, int flags)
     ScrnInfoPtr pScrn = xf86Screens[scrnIndex];
     RDCRecPtr pRDC = RDCPTR(pScrn);
 
-    xf86DrvMsgVerb(pScrn->scrnIndex, X_INFO, DefaultLevel, "==Enter RDCEnterVT()== \n");
+    xf86DrvMsgVerb(pScrn->scrnIndex, X_INFO, ErrorLevel, "==Enter RDCEnterVT()== \n");
     if (!RDCModeInit(pScrn, pScrn->currentMode))
     {
         xf86DrvMsgVerb(pScrn->scrnIndex, X_INFO, ErrorLevel, "==Exit1 RDCEnterVT() RDCModeInit Fail== return FALSE\n");
@@ -1362,6 +1706,34 @@ RDCEnterVT(int scrnIndex, int flags)
 
     RDCAdjustFrame(scrnIndex, pScrn->frameX0, pScrn->frameY0, 0);
 
+    
+    if (pRDC->bRandRRotation)
+    {
+        switch(pRDC->rotate)
+        {
+            case RR_Rotate_0:
+                *(ULONG *)(pRDC->MMIOVirtualAddr + 0x8094) = 0x0;
+                break;
+
+            case RR_Rotate_90:
+                *(ULONG *)(pRDC->MMIOVirtualAddr + 0x8094) = 0x5;
+                break;
+
+            case RR_Rotate_180:
+                *(ULONG *)(pRDC->MMIOVirtualAddr + 0x8094) = 0x6;
+                break;
+
+            case RR_Rotate_270:
+                *(ULONG *)(pRDC->MMIOVirtualAddr + 0x8094) = 0x7;
+                break;
+
+            default:
+                xf86DrvMsgVerb(pScrn->scrnIndex, X_ERROR, ErrorLevel, "Unexpected rotation in RDCRandRSetConfig\n");
+                return FALSE;
+        }
+    }
+
+    
     xf86DrvMsgVerb(pScrn->scrnIndex, X_INFO, DefaultLevel, "==Exit2 RDCEnterVT() Normal Exit== return TRUE\n");
     return TRUE;
 }
@@ -1374,20 +1746,24 @@ RDCLeaveVT(int scrnIndex, int flags)
     vgaHWPtr hwp = VGAHWPTR(pScrn);
     RDCRecPtr pRDC = RDCPTR(pScrn);
     
-    xf86DrvMsgVerb(pScrn->scrnIndex, X_INFO, DefaultLevel, "==Enter RDCLeaveVT();== \n");
+    xf86DrvMsgVerb(pScrn->scrnIndex, X_INFO, ErrorLevel, "==Enter RDCLeaveVT();== \n");
     
-#ifdef HWC
-    if (!xf86ReturnOptValBool(pRDC->Options, OPTION_SW_CURSOR, FALSE))
-    {
+    if (!pRDC->noHWC)
         pRDC->HWCInfoPtr->HideCursor(pScrn);
-    }
-#endif
 
-#ifdef Accel_2D  
-    pRDC->CMDQInfo.Disable2D(pScrn, pRDC);
-#endif
-      
-    RDCRestore(pScrn);  
+    if ((!pRDC->noAccel) && pRDC->CMDQInfo.bInitialized)
+        pRDC->CMDQInfo.Disable2D(pRDC);
+
+    
+    if (pRDC->bRandRRotation)
+        *(ULONG *)(pRDC->MMIOVirtualAddr + 0x8094) = 0x0;
+
+
+    if (VBESetVBEMode(pRDC->pVbe, 3, NULL) == FALSE)
+    {
+        xf86DrvMsgVerb(pScrn->scrnIndex, X_INFO, ErrorLevel, "==RDCVBESetMode() Fail\n");
+    }
+    
     vgaHWLock(hwp);
     
     xf86DrvMsgVerb(pScrn->scrnIndex, X_INFO, DefaultLevel, "==Exit RDCLeaveVT() Normal Exit== \n");
@@ -1396,7 +1772,7 @@ RDCLeaveVT(int scrnIndex, int flags)
 static void
 RDCFreeScreen(int scrnIndex, int flags)
 {
-    xf86DrvMsgVerb(scrnIndex, X_INFO, DefaultLevel, "==Enter RDCFreeScreen()== \n");
+    xf86DrvMsgVerb(scrnIndex, X_INFO, ErrorLevel, "==Enter RDCFreeScreen()== \n");
     
     RDCFreeRec(xf86Screens[scrnIndex]);
     if (xf86LoaderCheckSymbol("vgaHWFreeHWRec"))
@@ -1408,29 +1784,27 @@ RDCFreeScreen(int scrnIndex, int flags)
 static ModeStatus
 RDCValidMode(int scrnIndex, DisplayModePtr mode, Bool verbose, int flags)
 {
-    Bool Flags = MODE_NOMODE;
-
     ScrnInfoPtr pScrn = xf86Screens[scrnIndex];
     RDCRecPtr pRDC = RDCPTR(pScrn);
-    CBIOS_ARGUMENTS CBiosArguments;
-    CBIOS_Extension CBiosExtension;
+    CBIOS_ARGUMENTS *pCBiosArguments = pRDC->pCBIOSExtension->pCBiosArguments;
     USHORT wLCDHorSize, wLCDVerSize;
     USHORT wVESAModeHorSize, wVESAModeVerSize;
 
-    xf86DrvMsgVerb(scrnIndex, X_INFO, DefaultLevel, "==Enter RDCValidMode() Verbose = %d, Flags = 0x%x==\n", 
+    xf86DrvMsgVerb(scrnIndex, X_INFO, ErrorLevel, "==Enter RDCValidMode() Verbose = %d, Flags = 0x%x==\n", 
                verbose, flags);
     xf86DrvMsgVerb(scrnIndex, X_INFO, DefaultLevel, "==Mode name=%s, Width=%d, Height=%d, Refresh reate=%f==\n", 
                mode->name, mode->HDisplay, mode->VDisplay, mode->VRefresh);
-
-    CBiosExtension.pCBiosArguments = &CBiosArguments;
-    CBiosExtension.IOAddress = (USHORT)(pRDC->RelocateIO);
-    CBiosExtension.VideoVirtualAddress = (ULONG)(pRDC->FBVirtualAddr);
-    CBiosArguments.reg.x.AX = OEMFunction;
-    CBiosArguments.reg.x.BX = QueryDisplayPathInfo;
-    CInt10(&CBiosExtension);
-    pRDC->DeviceInfo.ucDeviceID = (CBiosArguments.reg.ex.EBX & 0xf0000) >> 16;
     
+    
+    memset(pCBiosArguments, 0, sizeof(CBIOS_ARGUMENTS));
+    pCBiosArguments->AX = OEMFunction;
+    pCBiosArguments->BX = QueryDisplayPathInfo;
+    
+    
+    CInt10(pRDC->pCBIOSExtension);
 
+    pRDC->DeviceInfo.ucDeviceID = (pCBiosArguments->Ebx & 0xf0000) >> 16;
+    
     if (mode->Flags & V_INTERLACE)
     {
         if (verbose)
@@ -1442,7 +1816,7 @@ RDCValidMode(int scrnIndex, DisplayModePtr mode, Bool verbose, int flags)
         return MODE_NO_INTERLACE;
     }
 
-    if (pRDC->DeviceInfo.ucDeviceID == TVINDEX) 
+    if (pRDC->DeviceInfo.ucDeviceID == TVIndex) 
     {
         if (((mode->HDisplay == 640) && (mode->VDisplay == 480)) ||
             ((mode->HDisplay == 800) && (mode->VDisplay == 600)) ||
@@ -1453,16 +1827,37 @@ RDCValidMode(int scrnIndex, DisplayModePtr mode, Bool verbose, int flags)
         {
             return MODE_BAD;
         }
-                    
     }
     else
     {
-        if ((mode->HDisplay > 1680) || (mode->VDisplay > 1050))
+        if (((DEVICE_ID(pRDC->PciInfo) == PCI_CHIP_M2010) || (DEVICE_ID(pRDC->PciInfo) == PCI_CHIP_M2010_A0)))
         {
-            return MODE_BAD;
+            if ((mode->HDisplay > 1680) || (mode->VDisplay > 1050))
+            {
+                return MODE_BAD;
+            }
+            if ((mode->HDisplay >= 1280) && 
+                ((pScrn->bitsPerPixel > 16) || (mode->VRefresh > 62.0)))
+            {
+                return MODE_BAD;
+            }
         }
 
-        if ((mode->HDisplay < 640) || (mode->VDisplay < 480))
+        if (DEVICE_ID(pRDC->PciInfo) == PCI_CHIP_M2200)
+        {
+            if ((mode->HDisplay > 1024) || (mode->VDisplay > 768))
+            {
+                return MODE_BAD;
+            }
+            
+            if (mode->HDisplay == 1024 && pScrn->bitsPerPixel > 8)
+            {
+                return MODE_BAD;
+            }
+        }
+        
+        
+        if ((mode->HDisplay < 320) || (mode->VDisplay < 240))
         {
             return MODE_BAD;
         }
@@ -1472,20 +1867,21 @@ RDCValidMode(int scrnIndex, DisplayModePtr mode, Bool verbose, int flags)
             return MODE_BAD;
         }
         
-        if ((mode->HDisplay >= 1280) && 
-            ((pScrn->bitsPerPixel > 16) || (mode->VRefresh > 62.0)))
-        {
-            return MODE_BAD;
-        }
     }
     
     
     
     
     
-    Flags = RDCFilterModeByBandWidth(pScrn, mode);
 
-    return Flags;
+    if (DEVICE_ID(pRDC->PciInfo) == PCI_CHIP_M2010)
+    {
+        return  RDCFilterModeByBandWidth(pScrn, mode);
+    }
+    else
+    {
+        return MODE_OK;
+    }
 }            
 
 
@@ -1552,24 +1948,26 @@ RDCCloseScreen(int scrnIndex, ScreenPtr pScreen)
     
     xf86DrvMsgVerb(scrnIndex, X_INFO, DefaultLevel, "==Enter RDCCloseScreen(); Screen Index = 0x%x == \n",scrnIndex);
     
+    
+    if (pRDC->bRandRRotation)
+        *(ULONG *)(pRDC->MMIOVirtualAddr + 0x8094) = 0x0;
+        
     if (pScrn->vtSema == TRUE)
     {  
-#ifdef HWC
-        pRDC->HWCInfoPtr->HideCursor(pScrn);
-#endif
+        if (!pRDC->noHWC)
+            pRDC->HWCInfoPtr->HideCursor(pScrn);
           
-#ifdef Accel_2D  
-        pRDC->CMDQInfo.Disable2D(pScrn, pRDC);
-#endif
+        if ((!pRDC->noAccel) && pRDC->CMDQInfo.bInitialized)
+            pRDC->CMDQInfo.Disable2D(pRDC);
          
-        RDCRestore(pScrn);
+        if (VBESetVBEMode(pRDC->pVbe, 3, NULL) == FALSE)
+        {
+            xf86DrvMsgVerb(pScrn->scrnIndex, X_INFO, ErrorLevel, "==RDCVBESetMode() Fail\n");
+            return FALSE;
+        }
+        
         vgaHWLock(hwp);
 
-        if (pRDC->DeviceInfo.ucDeviceID == TVINDEX) 
-        {
-            UnLockCR0ToCR7();
-            LoadTVTiming(pRDC->DeviceInfo.ucDisplayPath, 0x3, pRDC->DeviceInfo.ucDeviceID); 
-        }
     }
 
     RDCUnmapMem(pScrn);
@@ -1594,7 +1992,7 @@ RDCCloseScreen(int scrnIndex, ScreenPtr pScreen)
     pScreen->CloseScreen = pRDC->CloseScreen;
     RetStatus = (*pScreen->CloseScreen) (scrnIndex, pScreen);
     
-    xf86DrvMsgVerb(scrnIndex, X_INFO, DefaultLevel, "==Exit1 RDCCloseScreen()== return(RetStatus=%X\n", RetStatus);
+    xf86DrvMsgVerb(scrnIndex, X_INFO, DefaultLevel, "==Exit1 RDCCloseScreen()== return(RetStatus=%X)\n", RetStatus);
     return RetStatus;
 }
 
@@ -1617,14 +2015,14 @@ RDCSave(ScrnInfoPtr pScrn)
     vRDCOpenKey(pScrn);
 
     
-    GetIndexReg(CRTC_PORT, 0xC0, RDCReg->ucPLLValue[0]);
-    GetIndexReg(CRTC_PORT, 0xC1, RDCReg->ucPLLValue[1]);
-    GetIndexReg(CRTC_PORT, 0xCF, RDCReg->ucPLLValue[2]);
+    GetIndexReg(COLOR_CRTC_INDEX, 0xC0, &(RDCReg->ucPLLValue[0]));
+    GetIndexReg(COLOR_CRTC_INDEX, 0xC1, &(RDCReg->ucPLLValue[1]));
+    GetIndexReg(COLOR_CRTC_INDEX, 0xCF, &(RDCReg->ucPLLValue[2]));
 
-    GetIndexReg(CRTC_PORT, 0xA3, RDCReg->ucCRA3);
-    GetIndexReg(SEQ_PORT, 0x58, RDCReg->ucSR58);
-    GetIndexReg(SEQ_PORT, 0x70, RDCReg->ucSR70);
-    GetIndexReg(SEQ_PORT, 0x74, RDCReg->ucSR74);
+    GetIndexReg(COLOR_CRTC_INDEX, 0xA3, &(RDCReg->ucCRA3));
+    GetIndexReg(SEQ_INDEX, 0x58, &(RDCReg->ucSR58));
+    GetIndexReg(SEQ_INDEX, 0x70, &(RDCReg->ucSR70));
+    GetIndexReg(SEQ_INDEX, 0x74, &(RDCReg->ucSR74));
 
     xf86DrvMsgVerb(pScrn->scrnIndex, X_INFO, DefaultLevel, "==Exit RDCSave()== \n");
 }
@@ -1651,19 +2049,19 @@ RDCRestore(ScrnInfoPtr pScrn)
     vRDCOpenKey(pScrn);
     
        
-    SetIndexReg(CRTC_PORT, 0xC0, RDCReg->ucPLLValue[0]);
-    SetIndexReg(CRTC_PORT, 0xC1, RDCReg->ucPLLValue[1]);
-    SetIndexReg(CRTC_PORT, 0xCF, RDCReg->ucPLLValue[2]);
+    SetIndexReg(COLOR_CRTC_INDEX, 0xC0, RDCReg->ucPLLValue[0]);
+    SetIndexReg(COLOR_CRTC_INDEX, 0xC1, RDCReg->ucPLLValue[1]);
+    SetIndexReg(COLOR_CRTC_INDEX, 0xCF, RDCReg->ucPLLValue[2]);
 
-    SetIndexRegMask(CRTC_PORT, 0xA3, ~0x20, RDCReg->ucCRA3 & 0x20);
+    SetIndexRegMask(COLOR_CRTC_INDEX, 0xA3, ~0x20, RDCReg->ucCRA3 & 0x20);
     
-    SetIndexRegMask(CRTC_PORT, 0xBB, 0xFF, 0);
+    SetIndexRegMask(COLOR_CRTC_INDEX, 0xBB, 0xFF, 0);
 
-    SetIndexReg(SEQ_PORT, 0x58, RDCReg->ucSR58);
+    SetIndexReg(SEQ_INDEX, 0x58, RDCReg->ucSR58);
 
-    SetIndexReg(SEQ_PORT, 0x70, RDCReg->ucSR70);
+    SetIndexReg(SEQ_INDEX, 0x70, RDCReg->ucSR70);
 
-    SetIndexReg(SEQ_PORT, 0x74, RDCReg->ucSR74);
+    SetIndexReg(SEQ_INDEX, 0x74, RDCReg->ucSR74);
 
     xf86DrvMsgVerb(pScrn->scrnIndex, X_INFO, DefaultLevel, "==Exit1 RDCRestore()== \n");    
 }
@@ -1706,7 +2104,18 @@ RDCDoDDC(ScrnInfoPtr pScrn, int index)
     {
         MonInfo = vbeDoEDID(pVbe, NULL);
         xf86PrintEDID(MonInfo);
-        xf86SetDDCproperties(pScrn, MonInfo);
+        xf86SetDDCproperties(pScrn, MonInfo);        
+        if(MonInfo->rawData[0] == 0 &&
+           MonInfo->rawData[1] == 0xFF)
+        {
+            EDID_DETAILED_TIMING EDIDDetailedTimingList;
+            xf86DrvMsgVerb(pScrn->scrnIndex, X_INFO, DefaultLevel, "Get Device EDID, updating into CBIOS EDID table\n");
+            
+            
+            CreateEDIDDetailedTimingList(MonInfo->rawData, 128, &EDIDDetailedTimingList);
+            CBIOS_SetEDIDToModeTable(pScrn, &EDIDDetailedTimingList);
+            pRDC->pCBIOSExtension->bEDIDValid = TRUE;
+        }
     }
     else
     {
@@ -1741,9 +2150,9 @@ RDCModeInit(ScrnInfoPtr pScrn, DisplayModePtr mode)
 {
     vgaHWPtr hwp;
     RDCRecPtr pRDC;
-    CBIOS_Extension CBiosExtension;
-    CBIOS_ARGUMENTS CBiosArguments;
-
+    CBIOS_ARGUMENTS *pCBiosArguments;
+    UCHAR ucHdmiType;
+    
     hwp = VGAHWPTR(pScrn);
     pRDC = RDCPTR(pScrn);
 
@@ -1751,29 +2160,157 @@ RDCModeInit(ScrnInfoPtr pScrn, DisplayModePtr mode)
     
     xf86DrvMsgVerb(pScrn->scrnIndex, X_INFO, DefaultLevel, "==Enter RDCModeInit()== \n");
 
-#ifdef HWC
-    pRDC->HWCInfoPtr->HideCursor(pScrn);
-#endif
 
-#ifdef Accel_2D 
-    pRDC->CMDQInfo.Disable2D(pScrn, pRDC);
-#endif
-
-    CBiosExtension.pCBiosArguments = &CBiosArguments;
-    CBiosExtension.IOAddress = (USHORT)(pRDC->RelocateIO);
-    CBiosArguments.reg.x.AX = OEMFunction;
-    CBiosArguments.reg.x.BX = QueryDisplayPathInfo;
-    CInt10(&CBiosExtension);
-    pRDC->DeviceInfo.ucNewDeviceID = ((CBiosArguments.reg.ex.EBX >> 22) & 0xF);
     
-    if (pRDC->DeviceInfo.ucNewDeviceID != LCDINDEX) 
+    
+    pCBiosArguments = pRDC->pCBIOSExtension->pCBiosArguments;
+    memset(pCBiosArguments, 0, sizeof(CBIOS_ARGUMENTS));
+    
+    
+    if (pRDC->DeviceInfo.ucNewDeviceID == LCDIndex)
+    {
+        
+        pCBiosArguments->AX = OEMFunction;
+        pCBiosArguments->BX = QueryLCDPanelSizeMode;
+        pCBiosArguments->CL = 0;
+        
+        
+        CInt10(pRDC->pCBIOSExtension);
+        
+        
+        xf86DrvMsgVerb(pScrn->scrnIndex, X_INFO, ErrorLevel, " Query LCD Panel Size Mode \n");
+
+        if (pCBiosArguments->AX == VBEFunctionCallSuccessful)
+        {
+            pRDC->DeviceInfo.MonitorSize.ulHorMaxResolution = pCBiosArguments->DX;
+            pRDC->DeviceInfo.MonitorSize.ulVerMaxResolution = pCBiosArguments->Edx >> 16;
+        }
+        else
+        {
+            xf86DrvMsgVerb(pScrn->scrnIndex, X_ERROR, ErrorLevel, "Query LCD Panel Size Fail(%04X)\n", pCBiosArguments->AX);
+            return FALSE;
+        }
+
+        xf86DrvMsgVerb(pScrn->scrnIndex, X_INFO, ErrorLevel, " pRDC->DeviceInfo.MonitorSize.ulHorMaxResolution : %d \n", pRDC->DeviceInfo.MonitorSize.ulHorMaxResolution);
+        xf86DrvMsgVerb(pScrn->scrnIndex, X_INFO, ErrorLevel, " pRDC->DeviceInfo.MonitorSize.ulVerMaxResolution : %d \n", pRDC->DeviceInfo.MonitorSize.ulVerMaxResolution);
+        xf86DrvMsgVerb(pScrn->scrnIndex, X_INFO, ErrorLevel, " mode->HDisplay : %d \n", mode->HDisplay);
+        xf86DrvMsgVerb(pScrn->scrnIndex, X_INFO, ErrorLevel, " mode->VDisplay : %d \n", mode->VDisplay);
+        
+    }
+    else if (pRDC->DeviceInfo.ucNewDeviceID == HDMIIndex)
+    {
+        
+        xf86DrvMsgVerb(pScrn->scrnIndex, X_INFO, ErrorLevel, " Query HDMI Configuration \n");
+        
+            ucHdmiType = Get_HDMI_TYPE() & 0x0F;
+            switch (ucHdmiType)
+            {
+                case HDMI720P:
+                    pRDC->DeviceInfo.MonitorSize.ulHorMaxResolution = 1280;
+                    pRDC->DeviceInfo.MonitorSize.ulVerMaxResolution = 720;
+                    break;
+                case HDMI480P:
+                    pRDC->DeviceInfo.MonitorSize.ulHorMaxResolution = 720;
+                    pRDC->DeviceInfo.MonitorSize.ulVerMaxResolution = 480;
+                    break;
+                case HDMI1080P:
+                    pRDC->DeviceInfo.MonitorSize.ulHorMaxResolution = 1920;
+                    pRDC->DeviceInfo.MonitorSize.ulVerMaxResolution = 1080;
+                    break;
+                case HDMI640:
+                default:
+                    pRDC->DeviceInfo.MonitorSize.ulHorMaxResolution = 640;
+                    pRDC->DeviceInfo.MonitorSize.ulVerMaxResolution = 480;
+                    break;
+            }
+
+            if (pRDC->bHRatio != 100 || pRDC->bVRatio != 100)
+            {            
+                pRDC->DeviceInfo.MonitorSize.ulHorMaxResolution = (((pRDC->DeviceInfo.MonitorSize.ulHorMaxResolution*pRDC->bHRatio)/100) + 1) & ~1;
+                pRDC->DeviceInfo.MonitorSize.ulVerMaxResolution = (((pRDC->DeviceInfo.MonitorSize.ulVerMaxResolution*pRDC->bVRatio)/100) + 1) & ~1;
+            };
+    }
+    else if (pRDC->DeviceInfo.ucNewDeviceID == TVIndex)
+    {
+        UCHAR ucTvType;
+
+        if (pRDC->bEnableTVPanning)
+        {
+            pRDC->DeviceInfo.MonitorSize.ulHorMaxResolution = pRDC->TVEncoderInfo[0].TVOut_HSize;
+            pRDC->DeviceInfo.MonitorSize.ulVerMaxResolution = pRDC->TVEncoderInfo[0].TVOut_VSize;
+        }
+        else
+        {
+            pRDC->DeviceInfo.MonitorSize.ulHorMaxResolution = 1024;
+            pRDC->DeviceInfo.MonitorSize.ulVerMaxResolution = 768;
+        };
+        
+        xf86DrvMsgVerb(pScrn->scrnIndex, X_INFO, ErrorLevel, " Query TV Configuration \n");
+        
+        pCBiosArguments->AX = OEMFunction;
+        pCBiosArguments->BX = QueryTVConfiguration;
+        
+        
+        CInt10(pRDC->pCBIOSExtension);
+
+        ucTvType = pCBiosArguments->BL & (0x0f);
+
+        if (ucTvType == NTSC)
+        {
+            if (!(((mode->HDisplay == 640) && (mode->VDisplay == 480)) ||
+                  ((mode->HDisplay == 720) && (mode->VDisplay == 480)) ||
+                  ((mode->HDisplay == 800) && (mode->VDisplay == 600)) ||
+                  ((mode->HDisplay == 1024) && (mode->VDisplay == 768))))
+                return FALSE;
+        }
+        else if (ucTvType == PAL)
+        {
+            if (!(((mode->HDisplay == 640) && (mode->VDisplay == 480)) ||
+                  ((mode->HDisplay == 720) && (mode->VDisplay == 576)) ||
+                  ((mode->HDisplay == 800) && (mode->VDisplay == 600)) ||
+                  ((mode->HDisplay == 1024) && (mode->VDisplay == 768))))
+                return FALSE;
+        }
+    }
+    else 
+    {
+        if(pRDC->ENGCaps & ENG_CAP_CR_SUPPORT)
+        {
+            pRDC->DeviceInfo.MonitorSize.ulHorMaxResolution = 4095;
+            pRDC->DeviceInfo.MonitorSize.ulVerMaxResolution = 2047;
+        }else
+        {
+            pRDC->DeviceInfo.MonitorSize.ulHorMaxResolution = 1024;
+            pRDC->DeviceInfo.MonitorSize.ulVerMaxResolution = 768;
+        }
+    }
+
+    if (pRDC->DeviceInfo.ucNewDeviceID != LCDIndex &&
+        pRDC->DeviceInfo.ucNewDeviceID != TVIndex &&
+        pRDC->DeviceInfo.ucNewDeviceID != HDMIIndex) 
     {
         if (mode->PrivFlags & LCD_TIMING)
         {
             xf86DrvMsgVerb(pScrn->scrnIndex, X_INFO, ErrorLevel, "==RDCModeInit() Fail== LCD timing is not supported!!\n");
             return FALSE;
         }
+
+        
+        
+        if ((ULONG)mode->HDisplay > pRDC->DeviceInfo.MonitorSize.ulHorMaxResolution)
+            return FALSE;
+        if ((ULONG)mode->VDisplay > pRDC->DeviceInfo.MonitorSize.ulVerMaxResolution)
+            return FALSE;
     }
+
+
+    
+    if (!pRDC->noHWC)
+        pRDC->HWCInfoPtr->HideCursor(pScrn);
+
+    if ((!pRDC->noAccel) && pRDC->CMDQInfo.bInitialized)
+        pRDC->CMDQInfo.Disable2D(pRDC);
+
     
     vgaHWUnlock(hwp);
 
@@ -1801,42 +2338,118 @@ RDCModeInit(ScrnInfoPtr pScrn, DisplayModePtr mode)
     pRDC->VideoModeInfo.ScreenHeight = mode->VDisplay;
 
     
-    CBiosArguments.reg.x.AX = OEMFunction;
-    CBiosArguments.reg.x.BX = QueryDisplayPathInfo;
-    CInt10(&CBiosExtension);
-    if (CBiosArguments.reg.x.AX == VBEFunctionCallSuccessful)
+    memset(pCBiosArguments, 0, sizeof(CBIOS_ARGUMENTS));
+    pCBiosArguments->AX = OEMFunction;
+    pCBiosArguments->BX = QueryDisplayPathInfo;
+    
+    
+    CInt10(pRDC->pCBIOSExtension);
+    if (pCBiosArguments->AX == VBEFunctionCallSuccessful)
     {
-        pRDC->DeviceInfo.ucDeviceID = (CBiosArguments.reg.ex.EBX & 0x000F0000) >> 16;
+        pRDC->DeviceInfo.ucDeviceID = (pCBiosArguments->Ebx & 0x000F0000) >> 16;
         pRDC->DeviceInfo.ucDisplayPath = 1;
-        pRDC->DeviceInfo.ScalerConfig.EnableHorScaler = ((CBiosArguments.reg.ex.EBX & 0x00200000) ? true : false);
+        pRDC->DeviceInfo.ScalerConfig.EnableHorScaler = ((pCBiosArguments->Ebx & 0x00200000) ? TRUE : FALSE);
         xf86DrvMsgVerb(pScrn->scrnIndex, X_INFO, InternalLevel, "H scaler enable = %d\n", pRDC->DeviceInfo.ScalerConfig.EnableHorScaler);
-        pRDC->DeviceInfo.ScalerConfig.EnableVerScaler = ((CBiosArguments.reg.ex.EBX & 0x00100000) ? true : false);
+        pRDC->DeviceInfo.ScalerConfig.EnableVerScaler = ((pCBiosArguments->Ebx & 0x00100000) ? TRUE : FALSE);
         xf86DrvMsgVerb(pScrn->scrnIndex, X_INFO, InternalLevel, "V scaler enable = %d\n", pRDC->DeviceInfo.ScalerConfig.EnableVerScaler);
     }
     else
     {
-        xf86DrvMsgVerb(pScrn->scrnIndex, X_ERROR, ErrorLevel, "Query Display Path Info Fail(%04X)\n", CBiosArguments.reg.x.AX);
+        xf86DrvMsgVerb(pScrn->scrnIndex, X_ERROR, ErrorLevel, "Query Display Path Info Fail(%04X)\n", pCBiosArguments->AX);
+        pRDC->DeviceInfo.ScalerConfig.EnableHorScaler = FALSE;
+        pRDC->DeviceInfo.ScalerConfig.EnableVerScaler = FALSE;
     }
 
-    CBiosArguments.reg.x.AX = OEMFunction;
-    CBiosArguments.reg.x.BX = QueryLCDPanelSizeMode;
-    CBiosArguments.reg.lh.CL = 0;
-    CInt10(&CBiosExtension);
-    if (CBiosArguments.reg.x.AX == VBEFunctionCallSuccessful)
+    
+    
+    pRDC->DeviceInfo.ScalerConfig.EnableHorDownScaler = FALSE;
+    pRDC->DeviceInfo.ScalerConfig.EnableVerDownScaler = FALSE;
+    pRDC->DeviceInfo.ScalerConfig.EnableHorUpScaler = FALSE;
+    pRDC->DeviceInfo.ScalerConfig.EnableVerUpScaler = FALSE;
+    
+    if (pCBiosArguments->AX == VBEFunctionCallSuccessful)
     {
-        pRDC->DeviceInfo.MonitorSize.ulHorMaxResolution = CBiosArguments.reg.x.DX;
-        pRDC->DeviceInfo.ScalerConfig.ulHorScalingFactor = (pRDC->DeviceInfo.MonitorSize.ulHorMaxResolution << 12) / mode->HDisplay;
-        xf86DrvMsgVerb(pScrn->scrnIndex, X_INFO, InternalLevel, "LCD H Size = %d\n", pRDC->DeviceInfo.MonitorSize.ulHorMaxResolution);
-        xf86DrvMsgVerb(pScrn->scrnIndex, X_INFO, InternalLevel, "Mode H Size = %d\n", mode->HDisplay);
+        if (pRDC->DeviceInfo.ScalerConfig.EnableHorScaler)
+        {
+            if ((ULONG)mode->HDisplay > pRDC->DeviceInfo.MonitorSize.ulHorMaxResolution)
+            {
+                if (pRDC->DeviceInfo.ScalerConfig.EnableDownScaling)
+                {
+                    if (pRDC->DeviceInfo.ucDeviceID == LCDIndex)
+                    {
+                        pRDC->DeviceInfo.ScalerConfig.EnableHorDownScaler = TRUE;
 
-        pRDC->DeviceInfo.MonitorSize.ulVerMaxResolution = CBiosArguments.reg.ex.EDX >> 16;
-        pRDC->DeviceInfo.ScalerConfig.ulVerScalingFactor = (pRDC->DeviceInfo.MonitorSize.ulVerMaxResolution << 11) / mode->VDisplay;
-        xf86DrvMsgVerb(pScrn->scrnIndex, X_INFO, InternalLevel, "LCD V Size = %d\n", pRDC->DeviceInfo.MonitorSize.ulVerMaxResolution);
-        xf86DrvMsgVerb(pScrn->scrnIndex, X_INFO, InternalLevel, "Mode V Size = %d\n", mode->VDisplay);
+                        if ((ULONG)mode->HDisplay > 1024)
+                            pRDC->DeviceInfo.ScalerConfig.ulHorScalingFactor = (1024 << 8) / pRDC->DeviceInfo.MonitorSize.ulHorMaxResolution;
+                        else
+                            pRDC->DeviceInfo.ScalerConfig.ulHorScalingFactor = (((ULONG)mode->HDisplay) << 8) / pRDC->DeviceInfo.MonitorSize.ulHorMaxResolution;
+                            
+                        pRDC->DeviceInfo.ScalerConfig.ulHorScalingFactor++;
+                    }
+                }
+            }           
+            else if (pRDC->DeviceInfo.ucDeviceID == CRTIndex &&
+                     pRDC->pCBIOSExtension->bEDIDValid)
+            {
+                pRDC->DeviceInfo.ScalerConfig.EnableHorUpScaler = TRUE;
+                pRDC->DeviceInfo.ScalerConfig.ulHorScalingFactor = (((ULONG)mode->HDisplay) << 12) / pRDC->pCBIOSExtension->wCRTDefaultH;
+            }
+            else if ((ULONG)mode->HDisplay < pRDC->DeviceInfo.MonitorSize.ulHorMaxResolution)
+            {
+                pRDC->DeviceInfo.ScalerConfig.EnableHorUpScaler = TRUE;
+                pRDC->DeviceInfo.ScalerConfig.ulHorScalingFactor = (((ULONG)mode->HDisplay) << 12) / pRDC->DeviceInfo.MonitorSize.ulHorMaxResolution;
+            }
+        }
+
+        if (pRDC->DeviceInfo.ScalerConfig.EnableVerScaler)
+        {
+            if ((ULONG)mode->VDisplay > pRDC->DeviceInfo.MonitorSize.ulVerMaxResolution)
+            {
+                if (pRDC->DeviceInfo.ScalerConfig.EnableDownScaling)
+                {
+                    if (pRDC->DeviceInfo.ucDeviceID == LCDIndex)
+                    {
+                        pRDC->DeviceInfo.ScalerConfig.EnableVerDownScaler = TRUE;
+
+                        if ((ULONG)mode->VDisplay > 768)
+                            pRDC->DeviceInfo.ScalerConfig.ulVerScalingFactor = (768 << 8) / pRDC->DeviceInfo.MonitorSize.ulVerMaxResolution;
+                        else
+                            pRDC->DeviceInfo.ScalerConfig.ulVerScalingFactor = (((ULONG)mode->VDisplay) << 8) / pRDC->DeviceInfo.MonitorSize.ulVerMaxResolution;
+                            
+                        pRDC->DeviceInfo.ScalerConfig.ulVerScalingFactor++;
+                    }
+                }
+            }        
+            else if (pRDC->DeviceInfo.ucDeviceID == CRTIndex &&
+                     pRDC->pCBIOSExtension->bEDIDValid)
+            {
+                pRDC->DeviceInfo.ScalerConfig.EnableVerUpScaler = TRUE;
+                pRDC->DeviceInfo.ScalerConfig.ulVerScalingFactor =  (((ULONG)mode->VDisplay) << 11) / pRDC->pCBIOSExtension->wCRTDefaultV;
+            }
+            else if ((ULONG)mode->VDisplay < pRDC->DeviceInfo.MonitorSize.ulVerMaxResolution)
+            {
+                pRDC->DeviceInfo.ScalerConfig.EnableVerUpScaler = TRUE;
+                pRDC->DeviceInfo.ScalerConfig.ulVerScalingFactor =  (((ULONG)mode->VDisplay) << 11) /pRDC->DeviceInfo.MonitorSize.ulVerMaxResolution;
+            }
+        }
     }
-    else
+
+    
+    if(pRDC->DeviceInfo.ucDeviceID == TVIndex)
     {
-        xf86DrvMsgVerb(pScrn->scrnIndex, X_ERROR, ErrorLevel, "Query LCD Panel Size Fail(%04X)\n", CBiosArguments.reg.x.AX);
+        
+        if(pRDC->bEnableTVPanning && (mode->HDisplay > pRDC->TVEncoderInfo[TV_1].TVOut_HSize))
+            pRDC->TVEncoderInfo[TV_1].bEnableHPanning = TRUE;
+        else
+            pRDC->TVEncoderInfo[TV_1].bEnableHPanning = FALSE;
+        
+        if(pRDC->bEnableTVPanning && (mode->VDisplay > pRDC->TVEncoderInfo[TV_1].TVOut_VSize))
+            pRDC->TVEncoderInfo[TV_1].bEnableVPanning = TRUE;
+        else
+            pRDC->TVEncoderInfo[TV_1].bEnableVPanning = FALSE;
+        
+        pRDC->TVEncoderInfo[TV_1].ModeHSize = mode->HDisplay;
+        pRDC->TVEncoderInfo[TV_1].ModeVSize = mode->VDisplay;
     }
 
     
@@ -1846,19 +2459,16 @@ RDCModeInit(ScrnInfoPtr pScrn, DisplayModePtr mode)
  
     vgaHWProtect(pScrn, FALSE);
 
-#ifdef Accel_2D
     xf86DrvMsgVerb(pScrn->scrnIndex, X_INFO, 7, "==RDCModeInit() Enable 2D== \n");
     if (!pRDC->noAccel) 
     {
-        if (!pRDC->CMDQInfo.Enable2D(pScrn, pRDC)) 
+        if (!pRDC->CMDQInfo.Enable2D(pRDC)) 
         {
             xf86DrvMsg(pScrn->scrnIndex, X_ERROR, "Enable 2D failed\n");  
             pRDC->noAccel = TRUE;                        
         }           
     }
-#endif
 
-#ifdef HWC
     xf86DrvMsgVerb(pScrn->scrnIndex, X_INFO, 7, "==RDCModeInit() Enable Cursor== \n");
     if (!pRDC->noHWC) 
     {
@@ -1868,7 +2478,13 @@ RDCModeInit(ScrnInfoPtr pScrn, DisplayModePtr mode)
             pRDC->noHWC = TRUE;                         
         }           
     }
-#endif       
+
+    
+    if(pRDC->ENGCaps & ENG_CAP_CR_SUPPORT) 
+    {
+        pRDC->CMDQInfo.InitCMDQInfo(pScrn, pRDC);
+        pRDC->CMDQInfo.EnableCMDQ(pRDC);
+    }
 
     xf86DrvMsgVerb(pScrn->scrnIndex, X_INFO, DefaultLevel, "==Exit RDCModeInit()== return TRUE\n");
     return TRUE;
@@ -1882,18 +2498,37 @@ static void RDCSetHWCaps(RDCRecPtr pRDC)
     {
         case PCI_CHIP_M2010_A0:
             break;
+            
         case PCI_CHIP_M2010:
-            pRDC->ENGCaps |= ENG_CAP_VIDEO_DISP;
-            pRDC->ENGCaps |= ENG_CAP_HWC_MMIO;
+            pRDC->ENGCaps = ENG_CAP_2D;
+            pRDC->ENGCaps |= ENG_CAP_VIDEO_DISP |
+                             ENG_CAP_HWC_MMIO;
             break;
+            
         case PCI_CHIP_M2012:
-            pRDC->ENGCaps |= ENG_CAP_VIDEO_DISP;
-            pRDC->ENGCaps |= ENG_CAP_VIDEO_POST;
-            pRDC->ENGCaps |= ENG_CAP_HWC_MMIO;
-            pRDC->ENGCaps |= ENG_CAP_CR_SUPPORT;
+            pRDC->ENGCaps = ENG_CAP_2D;
+            pRDC->ENGCaps |= ENG_CAP_VIDEO_DISP |
+                             ENG_CAP_VIDEO_POST |
+                             ENG_CAP_HWC_MMIO |
+                             ENG_CAP_CR_SUPPORT;
+            break;
+            
+        case PCI_CHIP_M2013:
+            pRDC->ENGCaps = ENG_CAP_2D;
+            pRDC->ENGCaps |= ENG_CAP_VIDEO_DISP |
+                             ENG_CAP_VIDEO_POST |
+                             ENG_CAP_HWC_MMIO |
+                             ENG_CAP_CR_SUPPORT |
+                             ENG_CAP_HWROTATE;
+            break;
+            
+        case PCI_CHIP_M2200:
+            pRDC->ENGCaps = ENG_CAP_HWC_MMIO;
+            
             break;
         case PCI_CHIP_M2011:
             break;
+            
         default:
             break;
     }
@@ -1939,6 +2574,10 @@ RDCRandRSetConfig(ScrnInfoPtr pScrn, xorgRRConfig *config)
     {
         case RR_Rotate_0:
             xf86DrvMsgVerb(pScrn->scrnIndex, X_INFO, DefaultLevel, " case RR_Rotate_0\n");
+            if (pRDC->bDirectAccessFB)
+            {
+                TurnDirectAccessFBON(pScrn, TRUE);
+            }
             pRDC->rotate = config->rotation;
             *(ULONG *)(pRDC->MMIOVirtualAddr + 0x8094) = 0x0;
             ulROTAP_CTL0 &= ~(ROTAPS_ENABLE);
@@ -1953,6 +2592,10 @@ RDCRandRSetConfig(ScrnInfoPtr pScrn, xorgRRConfig *config)
 
         case RR_Rotate_90:
             xf86DrvMsgVerb(pScrn->scrnIndex, X_INFO, DefaultLevel, " case RR_Rotate_90\n");
+            if (pRDC->bDirectAccessFB)
+            {
+                TurnDirectAccessFBON(pScrn, FALSE);
+            }
             pRDC->rotate = config->rotation;
             *(ULONG *)(pRDC->MMIOVirtualAddr + 0x8094) = 0x5;
             *ROTAP_END_ADDR0 = pRDC->VideoModeInfo.ScreenPitch * pScrn->displayWidth;
@@ -1971,6 +2614,10 @@ RDCRandRSetConfig(ScrnInfoPtr pScrn, xorgRRConfig *config)
 
         case RR_Rotate_180:
             xf86DrvMsgVerb(pScrn->scrnIndex, X_INFO, DefaultLevel, " case RR_Rotate_180\n");
+            if (pRDC->bDirectAccessFB)
+            {
+                TurnDirectAccessFBON(pScrn, FALSE);
+            }
             pRDC->rotate = config->rotation;
             *(ULONG *)(pRDC->MMIOVirtualAddr + 0x8094) = 0x6;
             *ROTAP_END_ADDR0 = pRDC->VideoModeInfo.ScreenPitch * pScrn->virtualY;
@@ -1990,6 +2637,10 @@ RDCRandRSetConfig(ScrnInfoPtr pScrn, xorgRRConfig *config)
 
         case RR_Rotate_270:
             xf86DrvMsgVerb(pScrn->scrnIndex, X_INFO, DefaultLevel, " case RR_Rotate_270\n");
+            if (pRDC->bDirectAccessFB)
+            {
+                TurnDirectAccessFBON(pScrn, FALSE);
+            }
             pRDC->rotate = config->rotation;
             *(ULONG *)(pRDC->MMIOVirtualAddr + 0x8094) = 0x7;
             *ROTAP_END_ADDR0 = pRDC->VideoModeInfo.ScreenPitch * pScrn->displayWidth;
@@ -2008,12 +2659,18 @@ RDCRandRSetConfig(ScrnInfoPtr pScrn, xorgRRConfig *config)
 
         default:
             xf86DrvMsgVerb(pScrn->scrnIndex, X_ERROR, ErrorLevel, "Unexpected rotation in RDCRandRSetConfig\n");
+            if (pRDC->bDirectAccessFB)
+            {
+                TurnDirectAccessFBON(pScrn, TRUE);
+            }
             pRDC->rotate = RR_Rotate_0;
             return FALSE;
     }
 
     *ROTAP_CTL0 = ulROTAP_CTL0;
-            
+    
+    RDCAdjustFrame(pScrn->scrnIndex, 0, 0, 0);
+    
     return TRUE;
 }
 
@@ -2055,3 +2712,92 @@ static void RDCApertureInit(ScrnInfoPtr pScrn)
     *ROTAP_WH1              = 0;
 
 }
+
+static void TurnDirectAccessFBON(ScrnInfoPtr pScrn, Bool bTurnOn)
+{
+    RDCRecPtr   pRDC = RDCPTR(pScrn);
+    uint32_t ulNBID = 0x0, ulValue = 0x0;
+#if XSERVER_LIBPCIACCESS
+    struct pci_device *dev;
+#endif
+
+#if XSERVER_LIBPCIACCESS
+    dev = pci_device_find_by_slot(0, 0, 0, 0);
+    pci_device_cfg_read_u32(dev, &ulValue, 0x48);
+#else
+    ulValue = pciReadLong(pciTag(0, 0, 0), 0x48);
+#endif
+
+    if(bTurnOn)
+    {
+        ulValue |= DirectAccessFB;
+        xf86DrvMsgVerb(pScrn->scrnIndex, X_INFO, InternalLevel, "Direct Access FB turn ON\n");
+    }
+    else
+    {
+        ulValue &= ~(DirectAccessFB);
+        xf86DrvMsgVerb(pScrn->scrnIndex, X_INFO, InternalLevel, "Direct Access FB turn OFF\n");
+    }
+
+        
+#if XSERVER_LIBPCIACCESS
+    pci_device_cfg_write_u32(dev, ulValue, 0x48);
+#else
+    pciWriteLong(pciTag(0, 0, 0), 0x48, ulValue);
+#endif
+}
+
+
+static void
+RDCPointerMoved(int index, int x, int y)
+{
+
+}
+
+void vUpdateHDMIFakeMode(ScrnInfoPtr pScrn)
+{
+    WORD wHSize, wVSize;
+    RDCRecPtr pRDC;
+    WORD w8bppModeNum=0, w16bppModeNum=0, w32bppModeNum=0;
+    MODE_INFO *pMode = &VESATable;
+    pRDC = RDCPTR(pScrn);
+
+    switch(Get_HDMI_TYPE())
+    {
+    case HDMI1080P:
+         w8bppModeNum  = 0x156;
+         w16bppModeNum = 0x157;
+         w32bppModeNum = 0x158;
+         wHSize = 1920;
+         wVSize = 1080;
+         break;
+    case HDMI720P:
+         w8bppModeNum  = 0x147;
+         w16bppModeNum = 0x148;
+         w32bppModeNum = 0x149;
+         wHSize = 1280;
+         wVSize = 720;
+         break;
+    }
+    
+    xf86DrvMsgVerb(pScrn->scrnIndex, X_INFO, ErrorLevel, "Orginal H Size = %d, V Size = %d for HDMI type %d\n", wHSize, wVSize, Get_HDMI_TYPE());
+    wHSize = (((wHSize*(pRDC->bHRatio))/100) + 1) & ~1;
+    wVSize = (((wVSize*(pRDC->bVRatio))/100) + 1) & ~1;
+    cbSetHDMIModeInfo(wHSize, wVSize, Get_HDMI_TYPE());
+    xf86DrvMsgVerb(pScrn->scrnIndex, X_INFO, ErrorLevel, "Update  H Size = %d, V Size = %d for HDMI type %d\n", wHSize, wVSize, Get_HDMI_TYPE());
+
+    for (;;)
+    {
+        if (pMode->Mode_ID_8bpp == w8bppModeNum &&
+            pMode->Mode_ID_16bpp == w16bppModeNum &&
+            pMode->Mode_ID_32bpp == w32bppModeNum)
+            {
+                pMode->H_Size = wHSize;
+                pMode->V_Size = wVSize;
+                break;
+            }
+            else
+                pMode++;
+    };
+};
+

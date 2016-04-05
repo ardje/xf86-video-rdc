@@ -25,21 +25,23 @@
 # TODO: -nostdlib/-Bstatic/-lgcc platform magic, not installing the .a, etc.
 AM_CFLAGS = @XORG_CFLAGS@
 
-rdc_drv_la_LTLIBRARIES = rdc_drv.la
-rdc_drv_la_LDFLAGS = -module -avoid-version 
-rdc_drv_ladir = @moduledir@/drivers
+rdcm12_drv_la_LTLIBRARIES = rdcm12_drv.la
+rdcm12_drv_la_LDFLAGS = -module -avoid-version 
+rdcm12_drv_ladir = @moduledir@/drivers
 
-rdc_drv_la_SOURCES =	\
-	rdc_2dtool.c 	\
-	rdc_accel.c 	\
-	rdc_cursor.c 	\
-	rdc_driver.c 	\
-	rdc_mode.c 	\
-	rdc_tool.c 	\
-	rdc_vgatool.c 	\
+rdcm12_drv_la_SOURCES = \
+	rdc_2dtool.c \
+	rdc_accel.c \
+	rdc_cursor.c \
+	rdc_driver.c \
+	rdc_mode.c \
+	rdc_tool.c \
+	rdc_vgatool.c \
 	rdc_video.c	\
+	vidinit.c \
 	rdc_extension.c \
-	CInt10.c \
 	gamma.c \
-	saa7105.c \
-	vidinit.c
+	CInt10.c \
+	HDMI.c \
+	TV.c
+	

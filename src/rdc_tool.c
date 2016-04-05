@@ -1,31 +1,23 @@
-/*
+/* 
  * Copyright (C) 2009 RDC Semiconductor Co.,Ltd
- * All Rights Reserved.
  *
- * Permission is hereby granted, free of charge, to any person obtaining a
- * copy of this software and associated documentation files (the
- * "Software"), to deal in the Software without restriction, including
- * without limitation the rights to use, copy, modify, merge, publish,
- * distribute, sub license, and/or sell copies of the Software, and to
- * permit persons to whom the Software is furnished to do so, subject to
- * the following conditions:
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
- * The above copyright notice and this permission notice (including the
- * next paragraph) shall be included in all copies or substantial portions
- * of the Software.
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
  *
- * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS
- * OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
- * MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NON-INFRINGEMENT.
- * IN NO EVENT SHALL PRECISION INSIGHT AND/OR ITS SUPPLIERS BE LIABLE FOR
- * ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,
- * TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE
- * SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+ * You should have received a copy of the GNU General Public License
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  * For technical support : 
  *     <rdc_xorg@rdc.com.tw>
  */
- 
+
  
 #ifdef HAVE_CONFIG_H
 #include <config.h>
@@ -63,6 +55,7 @@
 
 
 #include "rdc.h"
+#include "rdc_extension.h"
 
 
 Bool RDCMapMem(ScrnInfoPtr pScrn);
@@ -76,7 +69,7 @@ void EC_WritePortUchar(BYTE *port, BYTE data);
 void EC_DetectCaps(ScrnInfoPtr pScrn, ECINFO* pECChip);
 
 
-// map, unmap frame buffer
+
 Bool
 RDCMapMem(ScrnInfoPtr pScrn)
 {
@@ -86,9 +79,11 @@ RDCMapMem(ScrnInfoPtr pScrn)
     struct pci_device *const device = pRDC->PciInfo;
     int err;
     
-    err = pci_device_map_range(device, pRDC->FBPhysAddr, pRDC->FbMapSize, 
-                                   PCI_DEV_MAP_FLAG_WRITABLE | PCI_DEV_MAP_FLAG_WRITE_COMBINE,
-                                   (void **) &pRDC->FBVirtualAddr);
+    err = pci_device_map_range(device, 
+                               pRDC->FBPhysAddr, 
+                               pRDC->FbMapSize, 
+                               PCI_DEV_MAP_FLAG_WRITABLE | PCI_DEV_MAP_FLAG_WRITE_COMBINE,
+                               (void **) &pRDC->FBVirtualAddr);
     
     if (err)
     {
@@ -126,7 +121,7 @@ RDCUnmapMem(ScrnInfoPtr pScrn)
     return TRUE;
 }
 
-// map, ummap MMIO
+
 Bool
 RDCMapMMIO(ScrnInfoPtr pScrn)
 {
@@ -173,12 +168,14 @@ RDCUnmapMMIO(ScrnInfoPtr pScrn)
    
 }
 
-// map, unmap VBIOS
+
 Bool RDCMapVBIOS(ScrnInfoPtr pScrn)
 {
     RDCRecPtr   pRDC = RDCPTR(pScrn);
     FILE        *fpVBIOS;
     int         i;
+    Bool        bVBIOSExist = FALSE;
+    WORD        VenID, DevID;
 
     xf86DrvMsgVerb(pScrn->scrnIndex, X_INFO, ErrorLevel, "==Enter RDCMapVBIOS()==\n");
     pRDC->ulROMType = 0;
@@ -187,14 +184,35 @@ Bool RDCMapVBIOS(ScrnInfoPtr pScrn)
     if (pRDC->ulROMType == 0)
     {
         pRDC->BIOSVirtualAddr = xf86MapVidMem(pScrn->scrnIndex, VIDMEM_READONLY, BIOS_ROM_PHY_BASE, BIOS_ROM_SIZE);
-        if (pRDC->BIOSVirtualAddr)
+
+        
+        VenID = *(USHORT*)(pRDC->BIOSVirtualAddr+0x40);
+        DevID = *(USHORT*)(pRDC->BIOSVirtualAddr+0x42);
+
+        xf86DrvMsgVerb(pScrn->scrnIndex, X_INFO, 0, "Vendor ID = %X, Device ID = %X\n", VenID, DevID);
+
+        if (VenID == PCI_VENDOR_RDC)
+        {
+            if (DevID == PCI_CHIP_M2010 ||
+                DevID == PCI_CHIP_M2011 ||
+                DevID == PCI_CHIP_M2012 ||
+                DevID == PCI_CHIP_M2013 ||
+                DevID == PCI_CHIP_M2200 ||
+                DevID == PCI_CHIP_M2010_A0)
+            {
+                xf86DrvMsgVerb(pScrn->scrnIndex, X_INFO, 0, "VBIOS exist\n");
+                bVBIOSExist = TRUE;
+            };
+        };
+        
+        if (bVBIOSExist)
         {
             xf86DrvMsgVerb(pScrn->scrnIndex, X_INFO, 0, "pRDC->BIOSVirtualAddr = 0x%08x\n", pRDC->BIOSVirtualAddr);
             pRDC->ulROMType = 1;
         }
         else
         {
-            xf86DrvMsgVerb(pScrn->scrnIndex, X_INFO, InfoLevel, "==BIOS ROM not found()==\n");
+            xf86DrvMsgVerb(pScrn->scrnIndex, X_INFO, InfoLevel, "VBIOS not exist\n");
         }
     }
 
@@ -205,7 +223,7 @@ Bool RDCMapVBIOS(ScrnInfoPtr pScrn)
         fpVBIOS = fopen(BIOS_ROM_PATH_FILE, "r");
         if (!fpVBIOS)
         {
-            xf86DrvMsgVerb(pScrn->scrnIndex, X_INFO, InfoLevel, "BIOS ROM file \"/root/RDCVBIOS.ROM\" not found()==\n");
+            xf86DrvMsgVerb(pScrn->scrnIndex, X_INFO, InfoLevel, "BIOS ROM file \"/usr/lib/xorg/modules/drivers/RDCVBIOS.ROM\" not found()==\n");
         }
     
         
@@ -231,7 +249,7 @@ Bool RDCMapVBIOS(ScrnInfoPtr pScrn)
     if (pRDC->ulROMType == 0)
     {
         xf86DrvMsgVerb(pScrn->scrnIndex, X_INFO, ErrorLevel, "==Exit1 RDCMapVBIOS()== No VBIOS\n");
-        return false; 
+        return FALSE; 
     }
 
     xf86DrvMsgVerb(pScrn->scrnIndex, X_INFO, InfoLevel, "pRDC->ulROMType = %d\n", pRDC->ulROMType);
@@ -246,7 +264,7 @@ Bool RDCMapVBIOS(ScrnInfoPtr pScrn)
         RDCUnmapVBIOS(pScrn);
 
         xf86DrvMsgVerb(pScrn->scrnIndex, X_INFO, ErrorLevel, "==Exit2 RDCMapVBIOS()== Not RDC VBIOS\n");
-        return false; 
+        return FALSE; 
     }
 }
 
@@ -270,7 +288,7 @@ Bool RDCUnmapVBIOS(ScrnInfoPtr pScrn)
 
 ULONG EC_ReadPortUchar(BYTE *port, BYTE *value)
 {
-    xf86DrvMsgVerb(0, X_INFO, ErrorLevel, "==Enter EC_ReadPortUchar()\n");
+    xf86DrvMsgVerb(0, X_INFO, DefaultLevel, "==Enter EC_ReadPortUchar()\n");
 
     int i;
     for (i=0 ; i<10 ; i++)
@@ -281,19 +299,19 @@ ULONG EC_ReadPortUchar(BYTE *port, BYTE *value)
         
         if (inb(0x66) & BIT0)
         {
-            *value = (BYTE)inb(port);
+            *value = (BYTE)inb((ULONG)port);
             return EC_ACCESS_SUCCESS;
         }
     };
 
-    xf86DrvMsgVerb(0, X_INFO, ErrorLevel, "==Leave EC_ReadPortUchar()\n");
+    xf86DrvMsgVerb(0, X_INFO, DefaultLevel, "==Leave EC_ReadPortUchar()\n");
     
     return EC_ACCESS_FAIL;
 };
 
 void EC_WritePortUchar(BYTE *port, BYTE data)
 {
-    xf86DrvMsgVerb(0, X_INFO, ErrorLevel, "==Enter EC_WritePortUchar()\n");
+    xf86DrvMsgVerb(0, X_INFO, DefaultLevel, "==Enter EC_WritePortUchar()\n");
     
     int i;
     for (i=0 ; i<10 ; i++)
@@ -304,17 +322,17 @@ void EC_WritePortUchar(BYTE *port, BYTE data)
         
         if (!(inb(0x66) & BIT1)) 
         {
-            outb(port, data);
+            outb((ULONG)port, data);
             break;
         };
     };
 
-    xf86DrvMsgVerb(0, X_INFO, ErrorLevel, "==Leave EC_WritePortUchar()\n");
+    xf86DrvMsgVerb(0, X_INFO, DefaultLevel, "==Leave EC_WritePortUchar()\n");
 };
 
 void EC_DetectCaps(ScrnInfoPtr pScrn, ECINFO* pECChip)
 {
-    xf86DrvMsgVerb(0, X_INFO, ErrorLevel, "==Enter EC_DetectCaps()\n");
+    xf86DrvMsgVerb(0, X_INFO, DefaultLevel, "==Enter EC_DetectCaps()\n");
     
     BYTE bP41Level = 0x0, bP80Level = 0x0, bP41temp = 0x0, bP80temp = 0x0;
     ULONG bSuccess = EC_ACCESS_FAIL;
@@ -364,7 +382,7 @@ void EC_DetectCaps(ScrnInfoPtr pScrn, ECINFO* pECChip)
         xf86DrvMsgVerb(pScrn->scrnIndex, X_INFO, ErrorLevel, "RDC: EC has been NOT detected.\n");
     }
 
-    xf86DrvMsgVerb(0, X_INFO, ErrorLevel, "==Leave EC_DetectCaps()\n");            
+    xf86DrvMsgVerb(0, X_INFO, DefaultLevel, "==Leave EC_DetectCaps()\n");            
     return;
 }
 

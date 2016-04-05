@@ -1,31 +1,23 @@
-/*
+/* 
  * Copyright (C) 2009 RDC Semiconductor Co.,Ltd
- * All Rights Reserved.
  *
- * Permission is hereby granted, free of charge, to any person obtaining a
- * copy of this software and associated documentation files (the
- * "Software"), to deal in the Software without restriction, including
- * without limitation the rights to use, copy, modify, merge, publish,
- * distribute, sub license, and/or sell copies of the Software, and to
- * permit persons to whom the Software is furnished to do so, subject to
- * the following conditions:
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
- * The above copyright notice and this permission notice (including the
- * next paragraph) shall be included in all copies or substantial portions
- * of the Software.
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
  *
- * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS
- * OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
- * MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NON-INFRINGEMENT.
- * IN NO EVENT SHALL PRECISION INSIGHT AND/OR ITS SUPPLIERS BE LIABLE FOR
- * ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,
- * TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE
- * SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+ * You should have received a copy of the GNU General Public License
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  * For technical support : 
  *     <rdc_xorg@rdc.com.tw>
  */
- 
+
 
 
 
@@ -39,10 +31,10 @@
 #define    ENG_CAP_CPUToScreenColorExpand       0x00000080
 #define    ENG_CAP_ScreenToScreenColorExpand    0x00000100
 #define    ENG_CAP_Clipping                     0x00000200    
-#define ENG_CAP_ALL (ENG_CAP_Sync | ENG_CAP_ScreenToScreenCopy | ENG_CAP_SolidFill |    \
-                     ENG_CAP_SolidLine | ENG_CAP_DashedLine |                \
-                     ENG_CAP_Mono8x8PatternFill | ENG_CAP_Color8x8PatternFill |        \
-                     ENG_CAP_Clipping);
+#define    ENG_CAP_2D   (ENG_CAP_Sync | ENG_CAP_ScreenToScreenCopy | ENG_CAP_SolidFill |    \
+                         ENG_CAP_SolidLine | ENG_CAP_DashedLine |                \
+                         ENG_CAP_Mono8x8PatternFill | ENG_CAP_Color8x8PatternFill |        \
+                         ENG_CAP_Clipping)
 
 #define    ENG_CAP_VIDEO_DISP                   0x00000400
 #define    ENG_CAP_VIDEO_POST                   0x00000800
@@ -59,6 +51,27 @@
 #define    CMD_QUEUE_SIZE_1M        0x00100000
 #define    CMD_QUEUE_SIZE_2M        0x00200000
 #define    CMD_QUEUE_SIZE_4M        0x00400000
+
+
+#define     CR_CTRL                     0x400
+#define     CRCTRL_ENABLE               BIT0
+#define     CRCTRL_RESET                BIT1
+#define     CRCTRL_VPOSTMMIO            BIT2
+#define     CRCTRL_DMAMMIO              BIT3
+#define     CRCTRL_VDISPMMIO            BIT4
+#define     CRCTRL_READPORT_DATABACK    BIT7
+#define     CRCTRL_THRESHOLD            0x20
+#define     CR_BUFFER_START             0x404
+#define     CR_BUFFER_WRITEPORT         0x408
+#define     CR_BUFFER_READPORT          0x40C
+#define     CR_BUFFER_END               0x410
+#define     CR_ENG_STATUS               0x414
+#define     CRENG_CRRESET               BIT11
+#define     CRENG_2DIDLE                BIT12
+#define     CRENG_DMAIDLE               BIT13
+#define     CRENG_VPOSTIDEL             BIT14
+#define     CRENG_CRIDLE                BIT15
+
 
 
 #define    PKT_NULL_CMD             0x00009561
@@ -91,7 +104,7 @@ typedef struct  _PKT_SC
 #define    MASK_RECT_WIDTH          0x7FF
 #define    MASK_RECT_HEIGHT         0x7FF
 #define MASK_CLIP                   0xFFF
-#define MASK_1ST_FLIP_BASE          0x0FFFFFF8
+#define MASK_1ST_FLIP_BASE          0x1FFFFFF8
 
 
 #define MASK_LINE_X                 0xFFF   
@@ -107,24 +120,26 @@ typedef struct  _PKT_SC
 
   
 
-#define MMIOREG_SRC_BASE    (pRDC->MMIOVirtualAddr + 0x8000)                
-#define MMIOREG_SRC_PITCH   (pRDC->MMIOVirtualAddr + 0x8004)
-#define MMIOREG_DST_BASE    (pRDC->MMIOVirtualAddr + 0x8008)
-#define MMIOREG_DST_PITCH   (pRDC->MMIOVirtualAddr + 0x800C)
-#define MMIOREG_DST_XY      (pRDC->MMIOVirtualAddr + 0x8010)
-#define MMIOREG_SRC_XY      (pRDC->MMIOVirtualAddr + 0x8014)
-#define MMIOREG_RECT_XY     (pRDC->MMIOVirtualAddr + 0x8018)
-#define MMIOREG_FG          (pRDC->MMIOVirtualAddr + 0x801C)
-#define MMIOREG_BG          (pRDC->MMIOVirtualAddr + 0x8020)
-#define MMIOREG_FG_SRC      (pRDC->MMIOVirtualAddr + 0x8024)
-#define MMIOREG_BG_SRC      (pRDC->MMIOVirtualAddr + 0x8028)
-#define MMIOREG_MONO1       (pRDC->MMIOVirtualAddr + 0x802C)
-#define MMIOREG_MONO2       (pRDC->MMIOVirtualAddr + 0x8030)
-#define MMIOREG_CLIP1       (pRDC->MMIOVirtualAddr + 0x8034)
-#define MMIOREG_CLIP2       (pRDC->MMIOVirtualAddr + 0x8038)
-#define MMIOREG_CMD         (pRDC->MMIOVirtualAddr + 0x803C)
-#define MMIOREG_1ST_FLIP    (pRDC->MMIOVirtualAddr + 0x8040)
-#define MMIOREG_PAT         (pRDC->MMIOVirtualAddr + 0x8100)    
+#define MMIOREG_SRC_BASE        (pRDC->MMIOVirtualAddr + 0x8000)                
+#define MMIOREG_SRC_PITCH       (pRDC->MMIOVirtualAddr + 0x8004)
+#define MMIOREG_DST_BASE        (pRDC->MMIOVirtualAddr + 0x8008)
+#define MMIOREG_DST_PITCH       (pRDC->MMIOVirtualAddr + 0x800C)
+#define MMIOREG_DST_XY          (pRDC->MMIOVirtualAddr + 0x8010)
+#define MMIOREG_SRC_XY          (pRDC->MMIOVirtualAddr + 0x8014)
+#define MMIOREG_RECT_XY         (pRDC->MMIOVirtualAddr + 0x8018)
+#define MMIOREG_FG              (pRDC->MMIOVirtualAddr + 0x801C)
+#define MMIOREG_BG              (pRDC->MMIOVirtualAddr + 0x8020)
+#define MMIOREG_FG_SRC          (pRDC->MMIOVirtualAddr + 0x8024)
+#define MMIOREG_BG_SRC          (pRDC->MMIOVirtualAddr + 0x8028)
+#define MMIOREG_MONO1           (pRDC->MMIOVirtualAddr + 0x802C)
+#define MMIOREG_MONO2           (pRDC->MMIOVirtualAddr + 0x8030)
+#define MMIOREG_CLIP1           (pRDC->MMIOVirtualAddr + 0x8034)
+#define MMIOREG_CLIP2           (pRDC->MMIOVirtualAddr + 0x8038)
+#define MMIOREG_CMD             (pRDC->MMIOVirtualAddr + 0x803C)
+#define MMIOREG_1ST_FLIP        (pRDC->MMIOVirtualAddr + 0x8040)
+#define MMIOREG_1ST_ADV_FLIP    (pRDC->MMIOVirtualAddr + 0x8048)
+#define MMIOREG_CMDQ_SET        (pRDC->MMIOVirtualAddr + 0x8044)
+#define MMIOREG_PAT             (pRDC->MMIOVirtualAddr + 0x8100)    
 
 #define MMIOREG_LINE_XY     (pRDC->MMIOVirtualAddr + 0x8010)  
 #define MMIOREG_LINE_Err    (pRDC->MMIOVirtualAddr + 0x8014)  
@@ -136,6 +151,10 @@ typedef struct  _PKT_SC
 #define MMIOREG_LINE_XY2    (pRDC->MMIOVirtualAddr + 0x8014)
 #define MMIOREG_LINE_NUMBER (pRDC->MMIOVirtualAddr + 0x8018)  
 #define MMIOREG_2D_FENCE    (pRDC->MMIOVirtualAddr + 0x8058)
+#define MMIOREG_STRETCH_CTRL1   (pRDC->MMIOVirtualAddr + 0x8064)
+#define MMIOREG_STRETCH_CTRL2   (pRDC->MMIOVirtualAddr + 0x8068)
+#define MMIOREG_STRETCH_CTRL3   (pRDC->MMIOVirtualAddr + 0x806C)
+#define MMIOREG_FUNCTION_ENABLE (pRDC->MMIOVirtualAddr + 0x8088)
 
 
 #define CMDQREG_SRC_BASE    (0x00 << 24)                       
@@ -154,8 +173,13 @@ typedef struct  _PKT_SC
 #define CMDQREG_CLIP1       (0x0D << 24)
 #define CMDQREG_CLIP2       (0x0E << 24)
 #define CMDQREG_CMD         (0x0F << 24)
+#define CMDQREG_2D_IDLE_COUNTER   (0x24 << 24)
 #define CMDQREG_PAT         (0x40 << 24)
 #define CMDQREQ_2DFENCE     (0x16 << 24)
+#define CMDQREG_STRETCH_CTRL1   (0x19 << 24)
+#define CMDQREG_STRETCH_CTRL2   (0x1A << 24)
+#define CMDQREG_STRETCH_CTRL3   (0x1B << 24)
+#define CMDQREG_FUNCTION_ENABLE (0x22 << 24)
 
 #define CMDQREG_LINE_XY     (0x04 << 24)
 #define CMDQREG_LINE_Err    (0x05 << 24)  
@@ -480,11 +504,36 @@ typedef struct {
         addr->PKT_SC_dwHeader  = (ULONG)(PKT_SINGLE_CMD_HEADER + CMDQREG_CMD);     \
         addr->PKT_SC_dwData[0] = (ULONG)(reg);                    \
       }
+#define RDCSetup2DIdleCounter(addr, reg) \
+      { \
+        addr->PKT_SC_dwHeader  = (ULONG)(PKT_SINGLE_CMD_HEADER + CMDQREG_2D_IDLE_COUNTER);     \
+        addr->PKT_SC_dwData[0] = (ULONG)(reg);                \
+      } 
 #define RDCSetupPatReg(addr, patreg, pat) \
       { \
         addr->PKT_SC_dwHeader  = (ULONG)(PKT_SINGLE_CMD_HEADER + (CMDQREG_PAT + (patreg << 24)));     \
         addr->PKT_SC_dwData[0] = (ULONG)(pat);                \
       }    
+#define RDCSetupScaleCtrl1(addr, srcWidth, srcHeight) \
+      { \
+        addr->PKT_SC_dwHeader  = (ULONG)(PKT_SINGLE_CMD_HEADER + CMDQREG_STRETCH_CTRL1);     \
+        addr->PKT_SC_dwData[0] = (ULONG)(((srcWidth) << 16) | (srcHeight));             \
+      }    
+#define RDCSetupScaleCtrl2(addr, horScaleFactor, horScaleFunc) \
+      { \
+        addr->PKT_SC_dwHeader  = (ULONG)(PKT_SINGLE_CMD_HEADER + CMDQREG_STRETCH_CTRL2);     \
+        addr->PKT_SC_dwData[0] = (ULONG)(((horScaleFactor) << 4) | ((horScaleFunc) << 1));             \
+      }    
+#define RDCSetupScaleCtrl3(addr, verScaleFactor, verScaleFunc) \
+      { \
+        addr->PKT_SC_dwHeader  = (ULONG)(PKT_SINGLE_CMD_HEADER + CMDQREG_STRETCH_CTRL3);     \
+        addr->PKT_SC_dwData[0] = (ULONG)(((verScaleFactor) << 4) | ((verScaleFunc) << 1));             \
+      }    
+#define RDCSetupFunctionEnable(addr, reg) \
+      { \
+        addr->PKT_SC_dwHeader  = (ULONG)(PKT_SINGLE_CMD_HEADER + CMDQREG_FUNCTION_ENABLE);     \
+        addr->PKT_SC_dwData[0] = (ULONG)(reg);                    \
+      }
 
 
 #define RDCSetupLineStyle1(addr, pat) \

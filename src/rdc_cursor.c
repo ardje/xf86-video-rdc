@@ -1,31 +1,23 @@
-/*
+/* 
  * Copyright (C) 2009 RDC Semiconductor Co.,Ltd
- * All Rights Reserved.
  *
- * Permission is hereby granted, free of charge, to any person obtaining a
- * copy of this software and associated documentation files (the
- * "Software"), to deal in the Software without restriction, including
- * without limitation the rights to use, copy, modify, merge, publish,
- * distribute, sub license, and/or sell copies of the Software, and to
- * permit persons to whom the Software is furnished to do so, subject to
- * the following conditions:
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
- * The above copyright notice and this permission notice (including the
- * next paragraph) shall be included in all copies or substantial portions
- * of the Software.
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
  *
- * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS
- * OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
- * MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NON-INFRINGEMENT.
- * IN NO EVENT SHALL PRECISION INSIGHT AND/OR ITS SUPPLIERS BE LIABLE FOR
- * ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,
- * TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE
- * SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+ * You should have received a copy of the GNU General Public License
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  * For technical support : 
  *     <rdc_xorg@rdc.com.tw>
  */
- 
+
 
 #ifdef HAVE_CONFIG_H
 #include <config.h>
@@ -63,7 +55,6 @@
 
 #include "rdc.h"
 
-#ifdef HWC
 
 Bool RDCCursorInit(ScreenPtr pScreen);
 Bool bInitHWC(ScrnInfoPtr pScrn, RDCRecPtr pRDC);
@@ -78,8 +69,8 @@ static Bool RDCUseHWCursorARGB(ScreenPtr pScreen, CursorPtr pCurs);
 
 static void RDCFireCursor(ScrnInfoPtr pScrn); 
 
-//
-// For 32bit data and MMIO control Hardware Cursor
+
+
 void RDCHideCursor_HQ(ScrnInfoPtr pScrn);
 static void RDCShowCursor_HQ(ScrnInfoPtr pScrn); 
 static void RDCSetCursorColors_HQ(ScrnInfoPtr pScrn, int bg, int fg);
@@ -133,6 +124,12 @@ RDCCursorInit(ScreenPtr pScreen)
         infoPtr->HideCursor = RDCHideCursor;
         infoPtr->LoadCursorARGB = RDCLoadCursorARGB;
     }
+
+    if (pRDC->DeviceInfo.ScalerConfig.EnableDownScaling)
+    {
+        SetIndexRegMask(SEQ_INDEX, 0x78, ~BIT2, BIT2);
+    }
+
 #if HWC_DEBUG
     xf86DrvMsgVerb(pScrn->scrnIndex, X_INFO, DefaultLevel, "==Exit RDCCursorInit()== \n");
 #endif
@@ -177,7 +174,7 @@ RDCShowCursor(ScrnInfoPtr pScrn)
     else
         jReg &= ~BIT0;
         
-    SetIndexRegMask(CRTC_PORT, 0xCB, 0xFC, jReg);         
+    SetIndexRegMask(COLOR_CRTC_INDEX, 0xCB, 0xFC, jReg);         
 #if HWC_DEBUG
     xf86DrvMsgVerb(pScrn->scrnIndex, X_INFO, DefaultLevel, "==Exit RDCShowCursor()== \n");
 #endif
@@ -191,7 +188,7 @@ RDCHideCursor(ScrnInfoPtr pScrn)
 #if HWC_DEBUG
     xf86DrvMsgVerb(pScrn->scrnIndex, X_INFO, DefaultLevel, "==Enter RDCHideCursor()== \n");
 #endif
-    SetIndexRegMask(CRTC_PORT, 0xCB, 0xFC, 0x00);         
+    SetIndexRegMask(COLOR_CRTC_INDEX, 0xCB, 0xFC, 0x00);         
 #if HWC_DEBUG
     xf86DrvMsgVerb(pScrn->scrnIndex, X_INFO, DefaultLevel, "==Exit RDCHideCursor()== \n");
 #endif
@@ -239,22 +236,22 @@ RDCSetCursorPosition(ScrnInfoPtr pScrn, int x, int y)
 
     if (pRDC->DeviceInfo.ScalerConfig.EnableVerScaler)
     {
-        y = (y * pRDC->DeviceInfo.ScalerConfig.ulVerScalingFactor + 2047) >> 11;
-        y_end = y + (((MAX_HWC_HEIGHT - y_offset) * pRDC->DeviceInfo.ScalerConfig.ulVerScalingFactor + 2047) >> 11) - 1;
+        y = (y * pRDC->DeviceInfo.ScalerConfig.ulVerScalingFactor + 2048) >> 11;
+        y_end = y + (((MAX_HWC_HEIGHT - y_offset) * pRDC->DeviceInfo.ScalerConfig.ulVerScalingFactor + 4094) >> 12) - 1;
     }
 
     if(mode->Flags & V_DBLSCAN)
         y *= 2;
  
     
-    SetIndexReg(CRTC_PORT, 0xC2, (UCHAR) (x_offset));     
-    SetIndexReg(CRTC_PORT, 0xC3, (UCHAR) (y_offset));     
-    SetIndexReg(CRTC_PORT, 0xC4, (UCHAR) (x & 0xFF));     
-    SetIndexReg(CRTC_PORT, 0xC5, (UCHAR) ((x >> 8) & 0x0F));     
-    SetIndexReg(CRTC_PORT, 0xC6, (UCHAR) (y & 0xFF));     
-    SetIndexReg(CRTC_PORT, 0xC7, (UCHAR) ((y >> 8) & 0x07));     
-    SetIndexReg(CRTC_PORT, 0xCC, (UCHAR) (y_end & 0xFF));     
-    SetIndexReg(CRTC_PORT, 0xCD, (UCHAR) ((y_end >> 8) & 0x07));     
+    SetIndexReg(COLOR_CRTC_INDEX, 0xC2, (UCHAR) (x_offset));     
+    SetIndexReg(COLOR_CRTC_INDEX, 0xC3, (UCHAR) (y_offset));     
+    SetIndexReg(COLOR_CRTC_INDEX, 0xC4, (UCHAR) (x & 0xFF));     
+    SetIndexReg(COLOR_CRTC_INDEX, 0xC5, (UCHAR) ((x >> 8) & 0x0F));     
+    SetIndexReg(COLOR_CRTC_INDEX, 0xC6, (UCHAR) (y & 0xFF));     
+    SetIndexReg(COLOR_CRTC_INDEX, 0xC7, (UCHAR) ((y >> 8) & 0x07));     
+    SetIndexReg(COLOR_CRTC_INDEX, 0xCC, (UCHAR) (y_end & 0xFF));     
+    SetIndexReg(COLOR_CRTC_INDEX, 0xCD, (UCHAR) ((y_end >> 8) & 0x07));     
     
     
     RDCFireCursor(pScrn);
@@ -338,9 +335,9 @@ RDCLoadCursorImage(ScrnInfoPtr pScrn, UCHAR *src)
     
     ulPatternAddr = ((pRDC->HWCInfo.ulHWCOffsetAddr+(HWC_SIZE+HWC_SIGNATURE_SIZE)*pRDC->HWCInfo.HWC_NUM_Next) >> 3);
     
-    SetIndexReg(CRTC_PORT, 0xC8, (UCHAR) (ulPatternAddr & 0xFF));     
-    SetIndexReg(CRTC_PORT, 0xC9, (UCHAR) ((ulPatternAddr >> 8) & 0xFF));     
-    SetIndexReg(CRTC_PORT, 0xCA, (UCHAR) ((ulPatternAddr >> 16) & 0xFF)); 
+    SetIndexReg(COLOR_CRTC_INDEX, 0xC8, (UCHAR) (ulPatternAddr & 0xFF));     
+    SetIndexReg(COLOR_CRTC_INDEX, 0xC9, (UCHAR) ((ulPatternAddr >> 8) & 0xFF));     
+    SetIndexReg(COLOR_CRTC_INDEX, 0xCA, (UCHAR) ((ulPatternAddr >> 16) & 0xFF)); 
     
     
     pRDC->HWCInfo.HWC_NUM_Next = (pRDC->HWCInfo.HWC_NUM_Next+1) % pRDC->HWCInfo.HWC_NUM;
@@ -507,9 +504,9 @@ RDCLoadCursorARGB(ScrnInfoPtr pScrn, CursorPtr pCurs)
            
     
     ulPatternAddr = ((pRDC->HWCInfo.ulHWCOffsetAddr +(HWC_SIZE+HWC_SIGNATURE_SIZE)*pRDC->HWCInfo.HWC_NUM_Next) >> 3);
-    SetIndexReg(CRTC_PORT, 0xC8, (UCHAR) (ulPatternAddr & 0xFF));     
-    SetIndexReg(CRTC_PORT, 0xC9, (UCHAR) ((ulPatternAddr >> 8) & 0xFF));     
-    SetIndexReg(CRTC_PORT, 0xCA, (UCHAR) ((ulPatternAddr >> 16) & 0xFF)); 
+    SetIndexReg(COLOR_CRTC_INDEX, 0xC8, (UCHAR) (ulPatternAddr & 0xFF));     
+    SetIndexReg(COLOR_CRTC_INDEX, 0xC9, (UCHAR) ((ulPatternAddr >> 8) & 0xFF));     
+    SetIndexReg(COLOR_CRTC_INDEX, 0xCA, (UCHAR) ((ulPatternAddr >> 16) & 0xFF)); 
     
     
     pRDC->HWCInfo.HWC_NUM_Next = (pRDC->HWCInfo.HWC_NUM_Next+1) % pRDC->HWCInfo.HWC_NUM;
@@ -593,14 +590,14 @@ RDCFireCursor(ScrnInfoPtr pScrn)
 #if HWC_DEBUG
     xf86DrvMsgVerb(pScrn->scrnIndex, X_INFO, DefaultLevel, "==Enter RDCFireCursor()== \n");
 #endif
-    SetIndexRegMask(CRTC_PORT, 0xCB, 0xFF, 0x00);         
+    SetIndexRegMask(COLOR_CRTC_INDEX, 0xCB, 0xFF, 0x00);         
 #if HWC_DEBUG
     xf86DrvMsgVerb(pScrn->scrnIndex, X_INFO, DefaultLevel, "==Exit RDCFireCursor()== \n");
 #endif
 }
 
-//
-// For 32bit data and MMIO control Hardware Cursor
+
+
 void RDCHideCursor_HQ(ScrnInfoPtr pScrn)
 {
     ULONG      ulCursorCTRL;
@@ -724,7 +721,7 @@ static void RDCLoadCursorImage_HQ(ScrnInfoPtr pScrn, UCHAR *src)
 
     
     ulPatternOffset = pRDC->HWCInfo.ulHWCOffsetAddr + HQ_HWC_SIZE * pRDC->HWCInfo.HWC_NUM_Next;
-    *((ULONG*)(pRDC->MMIOVirtualAddr + HWC_MMIO_ADDRESS)) = ((ulPatternOffset >> 3) & 0xFFFFFF);
+    *((ULONG*)(pRDC->MMIOVirtualAddr + HWC_MMIO_ADDRESS)) = ulPatternOffset >> 3;
 
     
 #if HWC_DEBUG
@@ -861,7 +858,7 @@ static void RDCLoadCursorARGB_HQ(ScrnInfoPtr pScrn, CursorPtr pCurs)
     ulPatternAddr = 
         ((pRDC->HWCInfo.ulHWCOffsetAddr +HQ_HWC_SIZE*pRDC->HWCInfo.HWC_NUM_Next) >> 3);
 
-    *((volatile ULONG*)(pRDC->MMIOVirtualAddr + HWC_MMIO_ADDRESS)) = (ulPatternAddr & 0xFFFFFF);
+    *((volatile ULONG*)(pRDC->MMIOVirtualAddr + HWC_MMIO_ADDRESS)) = ulPatternAddr;
     
     
     pRDC->HWCInfo.HWC_NUM_Next = (pRDC->HWCInfo.HWC_NUM_Next+1) % pRDC->HWCInfo.HWC_NUM;
@@ -887,18 +884,19 @@ static void RDCSetCursorPosition_HQ(ScrnInfoPtr pScrn, int x, int y)
     int         iPanningVDDstWdith;
     int         iOverlayFetchCnt;
     ULONG       ulCursorCtrl;
-    Bool        bNeedAdjustFrame = false;
+    Bool        bNeedAdjustFrame = FALSE;
     ULONG       ulHorScalingFactor = pRDC->DeviceInfo.ScalerConfig.ulHorScalingFactor;
     ULONG       ulVerScalingFactor = pRDC->DeviceInfo.ScalerConfig.ulVerScalingFactor;
-
+    int         iMaxHorCoor, iMaxVerCoor;
+    int         iBpp = pRDC->VideoModeInfo.Bpp;
+    PKT_SC      *pSingleCMD;
     
-    y++;
+    
 
     int         ori_x = x, ori_y = y;
 #if HWC_DEBUG
     xf86DrvMsgVerb(pScrn->scrnIndex, X_INFO, InternalLevel, "==Enter RDCSetCursorPosition_HQ(x = %d, y = %d)== \n", x, y);
 #endif
-
     if (pRDC->bRandRRotation)
     {
         switch (pRDC->rotate)
@@ -907,24 +905,18 @@ static void RDCSetCursorPosition_HQ(ScrnInfoPtr pScrn, int x, int y)
                 break;
             case RR_Rotate_90:
                 x = ori_y;
-                y = pRDC->VideoModeInfo.ScreenHeight - ori_x -1;
-                y -= (pRDC->HWCInfo.height- 1);
+                y = pRDC->VideoModeInfo.ScreenHeight - ori_x - pRDC->HWCInfo.height;
                 break;
             case RR_Rotate_180:
-                x = pRDC->VideoModeInfo.ScreenWidth - ori_x -1;
-                y = pRDC->VideoModeInfo.ScreenHeight - ori_y -1;
-                x -= (pRDC->HWCInfo.width - 1);
-                y -= (pRDC->HWCInfo.height- 1);
+                x = pRDC->VideoModeInfo.ScreenWidth - ori_x - pRDC->HWCInfo.width;
+                y = pRDC->VideoModeInfo.ScreenHeight - ori_y - pRDC->HWCInfo.height;
                 break;
             case RR_Rotate_270:
-                x = pRDC->VideoModeInfo.ScreenWidth - ori_y -1;
+                x = pRDC->VideoModeInfo.ScreenWidth - ori_y - pRDC->HWCInfo.width;
                 y = ori_x;
-                x -= (pRDC->HWCInfo.width - 1);
                 break;
-
         }
     }
-
     xhot = pRDC->HWCInfo.xhot;
     yhot = pRDC->HWCInfo.yhot;
 #if HWC_DEBUG
@@ -964,47 +956,154 @@ static void RDCSetCursorPosition_HQ(ScrnInfoPtr pScrn, int x, int y)
                    pHWCInfo->iScreenOffset_x, pHWCInfo->iScreenOffset_y);
 #endif
 
-    
-    if ((pRDC->DeviceInfo.ucDeviceID == LCDINDEX) &&
-        (DEVICE_ID(pRDC->PciInfo) == PCI_CHIP_M2010))
+    if ((pRDC->DeviceInfo.ScalerConfig.EnableDownScaling) && (pRDC->DeviceInfo.ScalerConfig.EnableHorDownScaler))
     {
-        if (x+xhot >= pHWCInfo->iScreenOffset_x + (int)pRDC->DeviceInfo.MonitorSize.ulHorMaxResolution)
+        if (mode->HDisplay > 1024)
         {
-           pHWCInfo->iScreenOffset_x = x + xhot - ((int)(pRDC->DeviceInfo.MonitorSize.ulHorMaxResolution) - 1);
-           x = (int)(pRDC->DeviceInfo.MonitorSize.ulHorMaxResolution) - 1 - xhot;
-           bNeedAdjustFrame = true;
+            iMaxHorCoor = 1024 - 1;
+        }
+        else
+        {
+            iMaxHorCoor = (int)mode->HDisplay - 1;
+        }
+    }
+    else
+    {
+        iMaxHorCoor = (int)pRDC->DeviceInfo.MonitorSize.ulHorMaxResolution - 1;
+    }
+
+    if ((pRDC->DeviceInfo.ScalerConfig.EnableDownScaling) && (pRDC->DeviceInfo.ScalerConfig.EnableVerDownScaler))
+    {
+        if (mode->VDisplay > 768)
+        {
+            iMaxVerCoor = 768 - 1;
+        }
+        else
+        {
+            iMaxVerCoor = (int)mode->VDisplay - 1;
+        }
+    }
+    else
+    {
+        iMaxVerCoor = (int)pRDC->DeviceInfo.MonitorSize.ulVerMaxResolution - 1;
+    }
+
+#if HWC_DEBUG
+    xf86DrvMsgVerb(pScrn->scrnIndex, X_INFO, InternalLevel, "(int)mode->HDisplay = %d\n", (int)mode->HDisplay);
+    xf86DrvMsgVerb(pScrn->scrnIndex, X_INFO, InternalLevel, "(int)mode->VDisplay = %d\n", (int)mode->VDisplay);
+    xf86DrvMsgVerb(pScrn->scrnIndex, X_INFO, InternalLevel, "iMaxHorCoor = %d\n", iMaxHorCoor);
+    xf86DrvMsgVerb(pScrn->scrnIndex, X_INFO, InternalLevel, "iMaxVerCoor = %d\n", iMaxVerCoor);
+    xf86DrvMsgVerb(pScrn->scrnIndex, X_INFO, InternalLevel, "ulHorMaxResolution = %d\n", pRDC->DeviceInfo.MonitorSize.ulHorMaxResolution);
+    xf86DrvMsgVerb(pScrn->scrnIndex, X_INFO, InternalLevel, "ulVerMaxResolution = %d\n", pRDC->DeviceInfo.MonitorSize.ulVerMaxResolution);
+#endif
+
+    
+    if (pRDC->DeviceInfo.ucDeviceID == LCDIndex ||
+        pRDC->DeviceInfo.ucDeviceID == HDMIIndex ||
+        (pRDC->DeviceInfo.ucDeviceID == TVIndex && pRDC->bEnableTVPanning))
+    {
+        if (x+xhot > pHWCInfo->iScreenOffset_x + iMaxHorCoor)
+        {
+            pHWCInfo->iScreenOffset_x = x + xhot - iMaxHorCoor;
+            if (pRDC->DeviceInfo.ScalerConfig.EnableDownScaling && pRDC->DeviceInfo.ScalerConfig.EnableHorDownScaler)
+            {
+                
+                if ((iBpp == 4) || (iBpp == 3))
+                {
+                    pHWCInfo->iScreenOffset_x = ALIGN_TO_UB_16(pHWCInfo->iScreenOffset_x);
+                }
+                else if (iBpp == 2)
+                {
+                    pHWCInfo->iScreenOffset_x = ALIGN_TO_UB_32(pHWCInfo->iScreenOffset_x);
+                }
+            }
+            else
+            {
+                
+                if ((iBpp == 4) || (iBpp == 3))
+                    pHWCInfo->iScreenOffset_x = ALIGN_TO_UB_2(pHWCInfo->iScreenOffset_x);
+                else if (iBpp == 2)
+                    pHWCInfo->iScreenOffset_x = ALIGN_TO_UB_4(pHWCInfo->iScreenOffset_x);
+            }
+            bNeedAdjustFrame = TRUE;
         }
         else if (x+xhot < pHWCInfo->iScreenOffset_x)
         {
             pHWCInfo->iScreenOffset_x = x + xhot;
-            x = -xhot;
-            bNeedAdjustFrame = true;
-        }
-        else
-        {
-            x -= pHWCInfo->iScreenOffset_x;
+            if (pRDC->DeviceInfo.ScalerConfig.EnableDownScaling && pRDC->DeviceInfo.ScalerConfig.EnableHorDownScaler)
+            {
+                
+                if ((iBpp == 4) || (iBpp == 3))
+                {
+                    pHWCInfo->iScreenOffset_x = ALIGN_TO_LB_16(pHWCInfo->iScreenOffset_x);
+                }
+                else if (iBpp == 2)
+                {
+                    pHWCInfo->iScreenOffset_x = ALIGN_TO_LB_32(pHWCInfo->iScreenOffset_x);
+                }
+            }
+            else
+            {
+                
+                if ((iBpp == 4) || (iBpp == 3))
+                    pHWCInfo->iScreenOffset_x = ALIGN_TO_LB_2(pHWCInfo->iScreenOffset_x);
+                else if (iBpp == 2)
+                    pHWCInfo->iScreenOffset_x = ALIGN_TO_LB_4(pHWCInfo->iScreenOffset_x);
+            }
+            bNeedAdjustFrame = TRUE;
         }
 
-        if (y+yhot >= pHWCInfo->iScreenOffset_y + (int)pRDC->DeviceInfo.MonitorSize.ulVerMaxResolution)
+        x -= pHWCInfo->iScreenOffset_x;
+
+
+        if (y+yhot > pHWCInfo->iScreenOffset_y + iMaxVerCoor)
         {
-           pHWCInfo->iScreenOffset_y = y + yhot - ((int)pRDC->DeviceInfo.MonitorSize.ulVerMaxResolution - 1);
-           y = (int)pRDC->DeviceInfo.MonitorSize.ulVerMaxResolution - 1 - yhot;
-           bNeedAdjustFrame = true;
+           pHWCInfo->iScreenOffset_y = y + yhot - iMaxVerCoor;
+           bNeedAdjustFrame = TRUE;
         }
         else if (y+yhot < pHWCInfo->iScreenOffset_y)
         {
             pHWCInfo->iScreenOffset_y = y + yhot;
-            y = -yhot;
-            bNeedAdjustFrame = true;
+            bNeedAdjustFrame = TRUE;
         }
-        else
-        {
-            y -= pHWCInfo->iScreenOffset_y;
-        }
+
+        y -= pHWCInfo->iScreenOffset_y;
+
+#if HWC_DEBUG
+    xf86DrvMsgVerb(pScrn->scrnIndex, X_INFO, InternalLevel, "pHWCInfo->iScreenOffset (x,y) = (%d, %d)\n", pHWCInfo->iScreenOffset_x, pHWCInfo->iScreenOffset_y);
+    xf86DrvMsgVerb(pScrn->scrnIndex, X_INFO, InternalLevel, "bNeedAdjustFrame = %d\n", bNeedAdjustFrame);
+
+#endif
 
         if (bNeedAdjustFrame)
         {
-            RDCAdjustFrame(pScrn->scrnIndex, pHWCInfo->iScreenOffset_x, pHWCInfo->iScreenOffset_y, 0);
+            
+            if (pRDC->bRandRRotation)
+            {
+                switch (pRDC->rotate)
+                {
+                    case RR_Rotate_0:
+                        vSetStartAddressCRT1(pRDC, pHWCInfo->iScreenOffset_x * pRDC->VideoModeInfo.Bpp + pHWCInfo->iScreenOffset_y * pRDC->VideoModeInfo.ScreenPitch);
+                        break;
+                    case RR_Rotate_90:
+                        vSetStartAddressCRT1(pRDC,   pHWCInfo->iScreenOffset_x * pRDC->VideoModeInfo.Bpp + (pHWCInfo->iScreenOffset_y +pScrn->displayWidth - pRDC->VideoModeInfo.ScreenHeight) * pRDC->VideoModeInfo.ScreenPitch);
+                        break;
+                    case RR_Rotate_180:
+                        vSetStartAddressCRT1(pRDC, (pScrn->displayWidth - pRDC->VideoModeInfo.ScreenWidth + pHWCInfo->iScreenOffset_x) * pRDC->VideoModeInfo.Bpp + pHWCInfo->iScreenOffset_y * pRDC->VideoModeInfo.ScreenPitch);
+                        break;
+                    case RR_Rotate_270:
+                        vSetStartAddressCRT1(pRDC,   (pScrn->displayWidth - pRDC->VideoModeInfo.ScreenWidth + pHWCInfo->iScreenOffset_x) * pRDC->VideoModeInfo.Bpp + pHWCInfo->iScreenOffset_y * pRDC->VideoModeInfo.ScreenPitch);
+                        break;
+                    default:
+                        xf86DrvMsgVerb(pScrn->scrnIndex, X_ERROR, ErrorLevel, "  Unexpected rotation in RDCAdjustFrame\n");
+                        return;
+                }
+            }
+            else
+            {
+                vSetStartAddressCRT1(pRDC, pHWCInfo->iScreenOffset_x * pRDC->VideoModeInfo.Bpp + pHWCInfo->iScreenOffset_y * pRDC->VideoModeInfo.ScreenPitch);
+            }
+            
             
             if (pRDC->OverlayStatus.bOverlayEnable)
             {
@@ -1019,6 +1118,23 @@ static void RDCSetCursorPosition_HQ(ScrnInfoPtr pScrn, int x, int y)
                 
                 iOverlayEndX = iOverlayStartX + iOverlayDstWidth - 1;
                 iOverlayEndY = iOverlayStartY + iOverlayDstHeight - 1;
+
+                
+                if (pRDC->ENGCaps & ENG_CAP_VIDEO_POST)
+                {
+                    if (iOverlayDstWidth < iOverlaySrcWidth)
+                    {
+                        iOverlayEndX = iOverlayStartX + iOverlayDstWidth;
+                        iOverlaySrcWidth = iOverlayDstWidth;
+                    }
+
+                    if (iOverlayDstHeight < iOverlaySrcHeight)
+                    {
+                        iOverlayEndY = iOverlayStartY + iOverlayDstHeight;
+                        iOverlaySrcHeight = iOverlayDstHeight;
+                    }
+                }
+                
                 
                 iOverlayStartOffsetX = 0;
                 iOverlayStartOffsetY = 0;
@@ -1092,7 +1208,7 @@ static void RDCSetCursorPosition_HQ(ScrnInfoPtr pScrn, int x, int y)
                     pRDC->OverlayStatus.ulVidDispCtrl &= ~VDPS_ENABLE;
                     pRDC->OverlayStatus.bPanningOverlayEnable = FALSE;
                     
-                    while (!(GetReg(INPUT_STATUS1_READ) & 0x08))
+                    while (!(GetReg(COLOR_INPUT_STATUS1_READ) & 0x08))
                     {
                         xf86DrvMsgVerb(0, X_INFO, InternalLevel, "wait v sync\n");
                     }
@@ -1106,12 +1222,37 @@ static void RDCSetCursorPosition_HQ(ScrnInfoPtr pScrn, int x, int y)
                     *(ULONG*)(pRDC->MMIOVirtualAddr + VDP_CTL) = pRDC->OverlayStatus.ulVidDispCtrl; 
                 }
 
-                *(ULONG*)(pRDC->MMIOVirtualAddr + VDP_START_LOCATION) = (iOverlayStartX << 16) | iOverlayStartY;
-                *(ULONG*)(pRDC->MMIOVirtualAddr + VDP_END_LOCATION) = (iOverlayEndX << 16) | iOverlayEndY;
-                *(ULONG*)(pRDC->MMIOVirtualAddr + VDP_START_OFFSET) = (iOverlayStartOffsetX << 16) | iOverlayStartOffsetY;
-                *(ULONG*)(pRDC->MMIOVirtualAddr + VDP_SRC_DISP_COUNT_ON_SCR) = (iOverlayDispCntY << 16) | iOverlayDispCntX;
-                *(ULONG*)(pRDC->MMIOVirtualAddr + VDP_FETCH_COUNT) = iOverlayFetchCnt;
-                *(ULONG*)(pRDC->MMIOVirtualAddr + VDP_REG_UPDATE_MOD_SELECT) = VDPS_FIRE;
+                if (pRDC->MMIOVPost)
+                {
+                    *(ULONG*)(pRDC->MMIOVirtualAddr + VDP_START_LOCATION) = (iOverlayStartX << 16) | iOverlayStartY;
+                    *(ULONG*)(pRDC->MMIOVirtualAddr + VDP_END_LOCATION) = (iOverlayEndX << 16) | iOverlayEndY;
+                    *(ULONG*)(pRDC->MMIOVirtualAddr + VDP_START_OFFSET) = (iOverlayStartOffsetX << 16) | iOverlayStartOffsetY;
+                    *(ULONG*)(pRDC->MMIOVirtualAddr + VDP_SRC_DISP_COUNT_ON_SCR) = (iOverlayDispCntY << 16) | iOverlayDispCntX;
+                    *(ULONG*)(pRDC->MMIOVirtualAddr + VDP_FETCH_COUNT) = iOverlayFetchCnt;
+                    *(ULONG*)(pRDC->MMIOVirtualAddr + VDP_REG_UPDATE_MOD_SELECT) = VDPS_FIRE;
+                }
+                else
+                {
+                    pSingleCMD = (PKT_SC *) pjRequestCMDQ(pRDC, PKT_SINGLE_LENGTH*6);
+                    pSingleCMD->PKT_SC_dwHeader  = (ULONG) PKT_VIDEO_CMD_HEADER | VDP_START_LOCATION_I;
+                    pSingleCMD->PKT_SC_dwData[0] = (iOverlayStartX << 16) | iOverlayStartY;
+                    pSingleCMD++;
+                    pSingleCMD->PKT_SC_dwHeader  = (ULONG) PKT_VIDEO_CMD_HEADER | VDP_END_LOCATION_I;
+                    pSingleCMD->PKT_SC_dwData[0] = (iOverlayEndX << 16) | iOverlayEndY;
+                    pSingleCMD++;
+                    pSingleCMD->PKT_SC_dwHeader  = (ULONG) PKT_VIDEO_CMD_HEADER | VDP_START_OFFSET_I;
+                    pSingleCMD->PKT_SC_dwData[0] = (iOverlayStartOffsetX << 16) | iOverlayStartOffsetY;
+                    pSingleCMD++;
+                    pSingleCMD->PKT_SC_dwHeader  = (ULONG) PKT_VIDEO_CMD_HEADER | VDP_SRC_DISP_COUNT_ON_SCR_I;
+                    pSingleCMD->PKT_SC_dwData[0] = (iOverlayDispCntY << 16) | iOverlayDispCntX;
+                    pSingleCMD++;
+                    pSingleCMD->PKT_SC_dwHeader  = (ULONG) PKT_VIDEO_CMD_HEADER | VDP_FETCH_COUNT_I;
+                    pSingleCMD->PKT_SC_dwData[0] = iOverlayFetchCnt;
+                    pSingleCMD++;
+                    pSingleCMD->PKT_SC_dwHeader  = (ULONG) PKT_VIDEO_CMD_HEADER | VDP_REG_UPDATE_MOD_SELECT_I;
+                    pSingleCMD->PKT_SC_dwData[0] = VDPS_FIRE;
+                    mUpdateWritePointer;
+                }
             }
             else
             {
@@ -1131,10 +1272,27 @@ static void RDCSetCursorPosition_HQ(ScrnInfoPtr pScrn, int x, int y)
         y_offset = (-y) + pRDC->HWCInfo.offset_y;
         y = 0;
     }
+#if HWC_DEBUG
+    xf86DrvMsgVerb(pScrn->scrnIndex, X_INFO, InternalLevel, "x =%d\n", x);
+    xf86DrvMsgVerb(pScrn->scrnIndex, X_INFO, InternalLevel, "xhot = %d\n", xhot);
+    xf86DrvMsgVerb(pScrn->scrnIndex, X_INFO, InternalLevel, "x_offset =%d\n", x_offset);
+#endif
 
     if ( pRDC->DeviceInfo.ScalerConfig.EnableHorScaler)
     {
-        x = (x * ulHorScalingFactor) / 4096;
+        if ((pRDC->DeviceInfo.ScalerConfig.EnableDownScaling) && (pRDC->DeviceInfo.ScalerConfig.EnableHorDownScaler))
+        {
+            x += xhot;
+            x = (((x << 8) + ulHorScalingFactor - 1) / ulHorScalingFactor);
+            x -= xhot;
+            if (x < 0)
+            {
+                x_offset -= x;
+                x = 0;
+            }
+        }
+        else
+            x = (((x << 12) + ulHorScalingFactor - 1) / ulHorScalingFactor);
 #if HWC_DEBUG
         xf86DrvMsgVerb(pScrn->scrnIndex, X_INFO, InternalLevel, "H scaling factor = %x\n", ulHorScalingFactor);
 #endif
@@ -1147,14 +1305,41 @@ static void RDCSetCursorPosition_HQ(ScrnInfoPtr pScrn, int x, int y)
 #if HWC_DEBUG
         xf86DrvMsgVerb(pScrn->scrnIndex, X_INFO, InternalLevel, "V scaling factor = %x\n", ulVerScalingFactor);
 #endif
-        y = (y * ulVerScalingFactor) / 2048;
-        y_end = (((y_end - 1) * ulVerScalingFactor) / 2048);
+        if ((pRDC->DeviceInfo.ScalerConfig.EnableDownScaling) && (pRDC->DeviceInfo.ScalerConfig.EnableVerDownScaler))
+        {
+            y += yhot;
+            y = (((y << 8) + ulVerScalingFactor - 1) / ulVerScalingFactor);
+            y -= yhot;
+            y_end += yhot;
+            y_end =  (((y_end << 8) + ulVerScalingFactor - 1) / ulVerScalingFactor) - 1;
+            y_end -= yhot;
+            if (y < 0)
+            {
+                y_offset -= y;
+                y = 0;
+            }
+
+        }
+        else
+        {
+            y = (((y << 11) + ulVerScalingFactor - 2) / ulVerScalingFactor);
+            y_end =  (((y_end << 11) + ulVerScalingFactor - 2) / ulVerScalingFactor) - 1;
+        }
     }
     else
     {
         y_end--;
     }
 
+    if (x_offset > 63)
+        x_offset = 63;
+
+    if (y_offset > 63)
+        y_offset = 63;
+       
+    if (y_end < 0)
+        y_end = 0;
+        
     if(mode->Flags & V_DBLSCAN)
         y *= 2;
 
@@ -1176,4 +1361,3 @@ static void RDCSetCursorPosition_HQ(ScrnInfoPtr pScrn, int x, int y)
     xf86DrvMsgVerb(pScrn->scrnIndex, X_INFO, InternalLevel, "==Exit RDCSetCursorPosition()== \n");
 #endif
 }
-#endif    
