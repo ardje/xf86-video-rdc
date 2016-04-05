@@ -324,10 +324,7 @@ RDC_STATIC Bool rdc_pci_probe (DriverPtr driver, int entity_num, struct pci_devi
             break;
 
 	default:
-        RL2D("Unsupported chip sends us to dual setup?");
-#ifdef HAVE_DUAL
-	    RDCInitpScrnDual(pScrn);
-#endif
+        RL2D("Unsupported setup? Why are we here?");
 	    break;
 	}
     }

@@ -36,10 +36,6 @@
 #define HAVE_XAA
 #endif
 
-#if GET_ABI_MAJOR(ABI_VIDEODRV_VERSION) < 10
-#define HAVE_DUAL
-#endif
-
  
 #if XSERVER_LIBPCIACCESS
 #include <pciaccess.h>
@@ -145,8 +141,7 @@ typedef enum {
     OPTION_DOWN_SCALE
 } RDCOpts;
 
-// What the fuck code...
-#if defined( _rdc_driver_c_) || defined(_rdcdual_driver_c_)
+#if defined( _rdc_driver_c_)
 static const OptionInfoRec RDCOptions[] = {
     {OPTION_NOACCEL,       "NoAccel",       OPTV_BOOLEAN,  {0}, TRUE},
     {OPTION_MMIO2D,        "MMIO2D",        OPTV_BOOLEAN,  {0}, FALSE},   

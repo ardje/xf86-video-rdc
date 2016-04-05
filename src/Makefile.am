@@ -43,9 +43,5 @@ rdc_drv_la_SOURCES = \
 	gamma.c \
 	CInt10.c \
 	HDMI.c \
-	TV.c \
-	rdcdual_driver.c \
-	rdcdual_display.c
-
-	
+	TV.c
 	
