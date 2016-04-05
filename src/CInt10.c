@@ -1183,6 +1183,10 @@ RDC_EXPORT void SetTimingCentering(CBIOS_Extension *pCBIOSExtension, BYTE Displa
         if(ucDeviceID != CRTIndex)  
             UpdatePLLByTVEnc(pRRateTable->Clock);
 
+        if(ucDeviceID == DVIIndex || ucDeviceID == HDMIIndex)
+            SetTMDSDPAReg(pRRateTable->Clock, ucDeviceID);
+
+
         SetPolarity(ucDevicePort, pRRateTable->Attribute);
     }
     
