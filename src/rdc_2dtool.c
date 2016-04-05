@@ -386,7 +386,7 @@ RDC_EXPORT void vCRWaitEngIdle(RDCRecPtr pRDC)
         int ioctlPara[2];
         int ret_val;
         int status = 0;
-        RL2D("Using busywait IOCTL to wait");
+        RL2D("Using busywait IOCTL to wait\n");
 
         while (!status)
         {
@@ -402,7 +402,7 @@ RDC_EXPORT void vCRWaitEngIdle(RDCRecPtr pRDC)
     else
     {
         volatile ULONG  ulReadPointor, ulWritePointor, ulEngState;
-        RL2D("Using busywait MMIO to wait");
+        RL2D("Using busywait MMIO to wait\n");
         
         do
         {

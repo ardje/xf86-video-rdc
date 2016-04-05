@@ -1770,7 +1770,7 @@ RDC_EXPORT Bool RDCGetRec(ScrnInfoPtr pScrn)
 
     if (pScrn->driverPrivate)
     {
-        xf86DrvMsgVerb(pScrn->scrnIndex, X_INFO, DefaultLevel, "==RDCGetRec() driverPrivate is TRUE== return TRUE\n");
+        RL("driverPrivate already allocated before allocating?\n");
         return TRUE;
     }
 
