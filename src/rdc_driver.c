@@ -1381,7 +1381,7 @@ RDC_STATIC Bool RDCScreenInit(ScreenPtr pScreen, int argc, char **argv)
     RDCDisplayExtensionInit(pScrn);
 
     
-    if (pRDC->ENGCaps & ENG_CAP_VIDEO_DISP)
+    if ((pRDC->ENGCaps & ENG_CAP_VIDEO_DISP) && (!pRDC->noAccel))
         RDCVideoInit(pScreen);
     
     if (serverGeneration == 1)
