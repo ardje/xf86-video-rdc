@@ -284,7 +284,7 @@ RDC_EXPORT const OptionInfoRec * RDCAvailableOptions(int chipid, int busid)
 
 #if XSERVER_LIBPCIACCESS
 
-RDC_STATIC Bool rdc_pci_probe (DriverPtr		driver, int		        entity_num, struct pci_device	*device, intptr_t		match_data)
+RDC_STATIC Bool rdc_pci_probe (DriverPtr driver, int entity_num, struct pci_device *device, intptr_t match_data)
 {
     ScrnInfoPtr	    pScrn = NULL;
     EntityInfoPtr   entity;
@@ -324,6 +324,7 @@ RDC_STATIC Bool rdc_pci_probe (DriverPtr		driver, int		        entity_num, struc
             break;
 
 	default:
+        RL2D("Unsupported chip sends us to dual setup?");
 #ifdef HAVE_DUAL
 	    RDCInitpScrnDual(pScrn);
 #endif
