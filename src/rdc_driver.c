@@ -64,7 +64,6 @@
 
 #define _rdc_driver_c_
 #include "rdc.h"
-#include "rdcdual_driver_proto.h"
 
 #include "CInt10FunProto.h"
 
