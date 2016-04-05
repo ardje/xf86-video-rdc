@@ -1377,10 +1377,6 @@ RDC_STATIC Bool RDCScreenInit(ScreenPtr pScreen, int argc, char **argv)
     pScreen->SaveScreen = RDCSaveScreen;
     pRDC->CloseScreen = pScreen->CloseScreen;
     pScreen->CloseScreen = RDCCloseScreen;
-#if 0
-    
-    UTRemoveRestartFlag(pBIOSInfo);
-#endif
     
     RDCDisplayExtensionInit(pScrn);
 
