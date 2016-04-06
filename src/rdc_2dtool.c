@@ -62,9 +62,7 @@
 RDC_EXPORT Bool bInitCMDQInfo(ScrnInfoPtr pScrn, RDCRecPtr pRDC)
 {
 
-    ScreenPtr pScreen;
-    
-    xf86DrvMsgVerb(0, X_INFO, InternalLevel, "==Init CMDQ Info== \n");
+    RL2D("Initialize 2D with MMIO @ %p\n", pRDC->MMIOVirtualAddr); 
     
     pRDC->CMDQInfo.pjCmdQBasePort    = pRDC->MMIOVirtualAddr+ 0x8044; 
     pRDC->CMDQInfo.pjWritePort       = pRDC->MMIOVirtualAddr+ 0x8048;
@@ -76,18 +74,13 @@ RDC_EXPORT Bool bInitCMDQInfo(ScrnInfoPtr pScrn, RDCRecPtr pRDC)
     
     if (!pRDC->MMIO2D) 
     {
+        RL2D("Using 2D command queue\n");
         pRDC->CMDQInfo.ulCMDQType = VM_CMD_QUEUE;    
-       
-        pScreen = screenInfo.screens[pScrn->scrnIndex];
-        
         pRDC->CMDQInfo.pjCMDQVirtualAddr = pRDC->FBVirtualAddr + pRDC->CMDQInfo.ulCMDQOffsetAddr;
         pRDC->CMDQInfo.ulCurCMDQueueLen = pRDC->CMDQInfo.ulCMDQSize - CMD_QUEUE_GUARD_BAND;
         pRDC->CMDQInfo.ulCMDQMask = pRDC->CMDQInfo.ulCMDQSize - 1 ; 
-    }
-    
-      
-    if (pRDC->MMIO2D)
-    {        
+    } else {
+        RL2D("Using 2D MMIO accel\n");
         pRDC->CMDQInfo.ulCMDQType = VM_CMD_MMIO;        
     }
 
@@ -162,10 +155,8 @@ RDC_EXPORT Bool bEnableCMDQ(RDCRecPtr pRDC)
 RDC_EXPORT Bool bEnable2D(RDCRecPtr pRDC)
 {
 
-    xf86DrvMsgVerb(0, X_INFO, InternalLevel, "==Enable 2D== \n");
-    
+    RL2D("Enable2D\n");
     SetIndexRegMask(COLOR_CRTC_INDEX, 0xA4, 0xFE, 0x01);        
-
     SetIndexRegMask(COLOR_CRTC_INDEX, 0xA3, ~0x20, 0x20);           
     *(ULONG *)MMIOREG_1ST_FLIP |=  0x80000000;
 
@@ -174,13 +165,12 @@ RDC_EXPORT Bool bEnable2D(RDCRecPtr pRDC)
 
 RDC_EXPORT void vDisable2D(RDCRecPtr pRDC)
 {
-   xf86DrvMsgVerb(0, X_INFO, InternalLevel, "==Engine Disable 2D== \n");
-
+    RL2D("Disabling 2D engine\n");
     vWaitEngIdle(pRDC);
     SetIndexRegMask(COLOR_CRTC_INDEX, 0xA4, 0xFE, 0x00);
-
     SetIndexRegMask(COLOR_CRTC_INDEX, 0xA3, ~0x20, 0x00);       
     *(ULONG *)MMIOREG_1ST_FLIP &=  ~0x80000000;
+    RL2D("2D engine disabled\n");
 }
 
 
@@ -188,16 +178,17 @@ RDC_EXPORT void vWaitEngIdle(RDCRecPtr pRDC)
 {
     ULONG  ulEngState, ulEngState2;
 
+    RL2D("Wait until 2D engine idle\n");
     xf86DrvMsgVerb(0, X_INFO, 10, "==Entry Wait Idle== \n");
 
     do  
     {
         ulEngState = *((volatile ULONG*)(pRDC->CMDQInfo.pjEngStatePort));    
         ulEngState2 = *((volatile ULONG*)(pRDC->CMDQInfo.pjWritePort));        
+        RL2D("state 1 %08lx, state 2 %08lx\n",ulEngState,ulEngState2);
     } while ((ulEngState & 0x80000000) || 
             ((ulEngState&0x3ffff) != (ulEngState2&0x3ffff)));
-            
-    xf86DrvMsgVerb(0, X_INFO, 10, "==Exit Wait Idle== \n");
+    RL2D("2D engine idle\n");        
 }    
 
 
@@ -290,8 +281,6 @@ RDC_EXPORT UCHAR *pjRequestCMDQ( RDCRecPtr pRDC, ULONG   ulDataLen)
 RDC_EXPORT Bool bCRInitCMDQInfo(ScrnInfoPtr pScrn, RDCRecPtr pRDC)
 {
 
-    ScreenPtr pScreen;
-    
     xf86DrvMsgVerb(0, X_INFO, InternalLevel, "==bCRInitCMDQInfo()== \n");
     
     pRDC->CMDQInfo.pjCmdQCtrlPort    = pRDC->MMIOVirtualAddr+ CR_CTRL; 
@@ -303,8 +292,6 @@ RDC_EXPORT Bool bCRInitCMDQInfo(ScrnInfoPtr pScrn, RDCRecPtr pRDC)
 
     pRDC->CMDQInfo.ulReadPointerMask = 0x000FFFFF;
 
-    pScreen = screenInfo.screens[pScrn->scrnIndex];
-    
     pRDC->CMDQInfo.pjCMDQVirtualAddr = pRDC->FBVirtualAddr + pRDC->CMDQInfo.ulCMDQOffsetAddr;
     pRDC->CMDQInfo.ulCurCMDQueueLen = pRDC->CMDQInfo.ulCMDQSize - CMD_QUEUE_GUARD_BAND;
     pRDC->CMDQInfo.ulCMDQMask = pRDC->CMDQInfo.ulCMDQSize - 1 ; 
