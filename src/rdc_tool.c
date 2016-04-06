@@ -119,10 +119,10 @@ RDC_EXPORT Bool RDCMapMMIO(ScrnInfoPtr pScrn)
 
 #if XSERVER_LIBPCIACCESS
     struct pci_device *const device = pRDC->PciInfo;
-        
     pci_device_map_range(device, pRDC->MMIOPhysAddr, pRDC->MMIOMapSize,
                          PCI_DEV_MAP_FLAG_WRITABLE | PCI_DEV_MAP_FLAG_WRITE_COMBINE,
                          (void **) &pRDC->MMIOVirtualAddr);
+    RL2D("pci mapping MMIO: %08lx/%08lx to %p\n",pRDC->MMIOPhysAddr,pRDC->MMIOMapSize,pRDC->MMIOVirtualAddr);
 #else
     pRDC->MMIOVirtualAddr = xf86MapPciMem(pScrn->scrnIndex, mmioFlags,
                                           pRDC->PciTag,
