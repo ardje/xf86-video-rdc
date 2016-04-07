@@ -339,29 +339,20 @@ RDC_EXPORT Bool bCREnableCMDQ(RDCRecPtr pRDC)
 
 RDC_EXPORT Bool bCREnable2D(RDCRecPtr pRDC)
 {
-
-    xf86DrvMsgVerb(0, X_INFO, InternalLevel, "==bCREnable2D()== \n");
-    
+    RL2D("CREnable2D\n");
     SetIndexRegMask(COLOR_CRTC_INDEX, 0xA4, 0xFE, 0x01);        
-
     SetIndexRegMask(COLOR_CRTC_INDEX, 0xA3, ~0x20, 0x20);           
     *(ULONG *)MMIOREG_1ST_FLIP |=  0x80000000;
-
-    xf86DrvMsgVerb(0, X_INFO, InternalLevel, "<<== bCREnable2D()\n");
     return (TRUE);    
 }
 
 RDC_EXPORT void vCRDisable2D(RDCRecPtr pRDC)
 {
-   xf86DrvMsgVerb(0, X_INFO, InternalLevel, "==vCRDisable2D()== \n");
-
+    RL2D("CRDisable2D\n");
     vCRWaitEngIdle(pRDC);
     SetIndexRegMask(COLOR_CRTC_INDEX, 0xA4, 0xFE, 0x00);
-
     SetIndexRegMask(COLOR_CRTC_INDEX, 0xA3, ~0x20, 0x00);       
     *(ULONG *)MMIOREG_1ST_FLIP &=  ~0x80000000;
-
-    xf86DrvMsgVerb(0, X_INFO, InternalLevel, "<<== vCRDisable2D()\n");
 }
 
 RDC_EXPORT void vCRWaitEngIdle(RDCRecPtr pRDC)
