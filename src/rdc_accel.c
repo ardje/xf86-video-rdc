@@ -98,7 +98,7 @@ int RDCXAAPatternROP[16]=
 
 RDC_EXPORT Bool RDCAccelInit(ScreenPtr pScreen)
 {
-    ScrnInfoPtr    pScrn = xf86Screens[pScreen->myNum];
+    ScrnInfoPtr pScrn = xf86ScreenToScrn(pScreen);;
     RDCRecPtr      pRDC = RDCPTR(pScrn);
     
 #if Accel_2D_DEBUG
@@ -243,15 +243,9 @@ RDC_EXPORT Bool RDCAccelInit(ScreenPtr pScreen)
 RDC_STATIC void RDCSync(ScrnInfoPtr pScrn)
 {
     RDCRecPtr pRDC = RDCPTR(pScrn);
-
-#if Accel_2D_DEBUG
-    xf86DrvMsgVerb(0, X_INFO, DefaultLevel, "==Enter RDCSync()== \n");
-#endif
-    
+    RL2D("RDCSync\n");
     pRDC->CMDQInfo.WaitEngIdle(pRDC);
-#if Accel_2D_DEBUG
-    xf86DrvMsgVerb(0, X_INFO, DefaultLevel, "==Exit RDCSync()== \n");
-#endif
+    RL2D("RDCSync done\n");
 } 
 
 
@@ -2072,7 +2066,7 @@ RDC_STATIC void RDCSubsequentDashedTwoPointLine(ScrnInfoPtr pScrn, int x1, int y
 
 RDC_EXPORT void RDCAccelWaitMarker(ScreenPtr pScreen, int marker)
 {
-    ScrnInfoPtr pScrn = xf86Screens[pScreen->myNum];
+    ScrnInfoPtr pScrn = xf86ScreenToScrn(pScreen);;
     RDCRecPtr pRDC = RDCPTR(pScrn);
     ULONG uMarker = marker;
 
@@ -2113,7 +2107,7 @@ RDC_EXPORT void RDCAccelWaitMarker(ScreenPtr pScreen, int marker)
 RDC_EXPORT int RDCAccelMarkSync(ScreenPtr pScreen)
 {
     PKT_SC *pSingleCMD;
-    ScrnInfoPtr pScrn = xf86Screens[pScreen->myNum];
+    ScrnInfoPtr pScrn = xf86ScreenToScrn(pScreen);;
     RDCRecPtr pRDC = RDCPTR(pScrn);
     
     xf86DrvMsgVerb(0, X_INFO, DefaultLevel, "==Entry RDCAccelMarkSync== \n");
@@ -2170,7 +2164,8 @@ RDC_EXPORT int RDCAccelMarkSync(ScreenPtr pScreen)
 
 RDC_STATIC Bool RDCExaPrepareSolid(PixmapPtr pPixmap, int alu, Pixel planeMask, Pixel fg)
 {
-    ScrnInfoPtr pScrn = xf86Screens[pPixmap->drawable.pScreen->myNum];
+    //ScrnInfoPtr pScrn = xf86Screens[pPixmap->drawable.pScreen->myNum];
+    ScrnInfoPtr pScrn = xf86ScreenToScrn(pPixmap->drawable.pScreen);
     RDCRecPtr pRDC = RDCPTR(pScrn);
     ULONG   cmdreg;
     unsigned ModeMaskShift = 0;
@@ -2221,7 +2216,8 @@ RDC_STATIC Bool RDCExaPrepareSolid(PixmapPtr pPixmap, int alu, Pixel planeMask, 
 
 RDC_STATIC void RDCExaSolid(PixmapPtr pPixmap, int x1, int y1, int x2, int y2)
 {
-    ScrnInfoPtr pScrn = xf86Screens[pPixmap->drawable.pScreen->myNum];
+    //ScrnInfoPtr pScrn = xf86Screens[pPixmap->drawable.pScreen->myNum];
+    ScrnInfoPtr pScrn = xf86ScreenToScrn(pPixmap->drawable.pScreen);
     RDCRecPtr pRDC = RDCPTR(pScrn);
     PKT_SC *pSingleCMD;
     
@@ -2292,7 +2288,8 @@ RDC_STATIC void RDCExaDoneSolidCopy(PixmapPtr pPixmap)
 
 RDC_STATIC Bool RDCExaPrepareCopy( PixmapPtr pSrcPixmap, PixmapPtr pDstPixmap, int xdir, int ydir, int alu, Pixel planeMask)
 {
-    ScrnInfoPtr pScrn = xf86Screens[pDstPixmap->drawable.pScreen->myNum];
+    //ScrnInfoPtr pScrn = xf86Screens[pDstPixmap->drawable.pScreen->myNum];
+    ScrnInfoPtr pScrn = xf86ScreenToScrn(pPixmap->drawable.pScreen);
     RDCRecPtr pRDC = RDCPTR(pScrn);
     unsigned ModeMaskShift = 0;
     ULONG ModeMask;
@@ -2354,7 +2351,8 @@ RDC_STATIC Bool RDCExaPrepareCopy( PixmapPtr pSrcPixmap, PixmapPtr pDstPixmap, i
 
 RDC_STATIC void RDCExaCopy( PixmapPtr pDstPixmap, int srcX, int srcY, int dstX, int dstY, int width, int height)
 {
-    ScrnInfoPtr pScrn = xf86Screens[pDstPixmap->drawable.pScreen->myNum];
+    //ScrnInfoPtr pScrn = xf86Screens[pDstPixmap->drawable.pScreen->myNum];
+    ScrnInfoPtr pScrn = xf86ScreenToScrn(pPixmap->drawable.pScreen);
     RDCRecPtr pRDC = RDCPTR(pScrn);
     PKT_SC *pSingleCMD;
     
@@ -2441,7 +2439,8 @@ RDC_STATIC void RDCExaDoneCopy(PixmapPtr pPixmap)
 
 RDC_EXPORT Bool RDCExaUploadToScreen ( PixmapPtr   pDst, int x, int y, int w, int h, char *src, int src_pitch)
 {
-    ScrnInfoPtr pScrn = xf86Screens[pDst->drawable.pScreen->myNum];
+    //ScrnInfoPtr pScrn = xf86Screens[pDst->drawable.pScreen->myNum];
+    ScrnInfoPtr pScrn = xf86ScreenToScrn(pPixmap->drawable.pScreen);
     RDCRecPtr pRDC = RDCPTR(pScrn);
     unsigned  DstPitch = exaGetPixmapPitch(pDst);
     unsigned  wBytes = (pDst->drawable.bitsPerPixel * w + 7) >> 3;
@@ -2474,7 +2473,8 @@ RDC_EXPORT Bool RDCExaUploadToScreen ( PixmapPtr   pDst, int x, int y, int w, in
 
 RDC_EXPORT Bool RDCExaDownloadFromScreen (PixmapPtr pSrc, int x,  int y, int w,  int h, char *dst,  int dst_pitch)
 {
-    ScrnInfoPtr pScrn = xf86Screens[pSrc->drawable.pScreen->myNum];
+    ScrnInfoPtr pScrn = xf86ScreenToScrn(pPixmap->drawable.pScreen);
+    //ScrnInfoPtr pScrn = xf86Screens[pSrc->drawable.pScreen->myNum];
     RDCRecPtr pRDC = RDCPTR(pScrn);
     unsigned srcPitch = exaGetPixmapPitch(pSrc);
     unsigned wBytes = (pSrc->drawable.bitsPerPixel * w + 7) >> 3;
@@ -2508,7 +2508,7 @@ RDC_EXPORT Bool RDCExaDownloadFromScreen (PixmapPtr pSrc, int x,  int y, int w, 
 
 RDC_STATIC ExaDriverPtr RDCInitExa(ScreenPtr pScreen)
 {
-    ScrnInfoPtr pScrn = xf86Screens[pScreen->myNum];
+    ScrnInfoPtr pScrn = xf86ScreenToScrn(pScreen);;
     RDCRecPtr pRDC = RDCPTR(pScrn);
     ExaDriverPtr pExa = exaDriverAlloc();
 
