@@ -1162,9 +1162,12 @@ RDC_STATIC Bool RDCPreInit(ScrnInfoPtr pScrn, int flags)
     // This is new from m12. We might have to remove it or not...
     if(pRDC->noAccel)
     {        
+        pRDC->CMDQInfo.Disable2d(pRDC)
+/*
         SetIndexRegMask(COLOR_CRTC_INDEX, 0xA4, 0xFE, 0x00);       
         SetIndexRegMask(COLOR_CRTC_INDEX, 0xA3, ~0x20, 0x00);       
         *(ULONG *)MMIOREG_1ST_FLIP &=  ~0x80000000;
+*/
     }
     
     
