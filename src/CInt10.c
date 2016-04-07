@@ -3176,9 +3176,29 @@ RDC_EXPORT BYTE DetectMonitor(BYTE I2CPort)
 
 RDC_EXPORT void WaitLong()
 {
+#if 1
+    BYTE n1;
+    RL2D("WaitLong(1)\n");
+    do {
+        n1=InPort(COLOR_INPUT_STATUS1_READ);
+        RL2D("n1:%02x\n",(unsigned int)n1);
+    } while (!(n1&BIT3));
+    RL2D("WaitLong(2)\n");
+    do {
+        n1=InPort(COLOR_INPUT_STATUS1_READ);
+        RL2D("n1:%02x\n",(unsigned int)n1);
+    } while (n1&BIT3);
+    RL2D("WaitLong(3)\n");
+    do {
+        n1=InPort(COLOR_INPUT_STATUS1_READ);
+        RL2D("n1:%02x\n",(unsigned int)n1);
+    } while (!(n1&BIT3));
+
+#else
     while(!(InPort(COLOR_INPUT_STATUS1_READ) & BIT3));
     while(InPort(COLOR_INPUT_STATUS1_READ) & BIT3);
     while(!(InPort(COLOR_INPUT_STATUS1_READ) & BIT3));
+#endif
 }
 
 

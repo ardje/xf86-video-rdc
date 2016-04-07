@@ -108,31 +108,29 @@ RDC_EXPORT Bool RDCUnmapMem(ScrnInfoPtr pScrn)
 
 RDC_EXPORT Bool RDCMapMMIO(ScrnInfoPtr pScrn)
 {
-   int mmioFlags;
     RDCRecPtr pRDC = RDCPTR(pScrn);
-
+#if XSERVER_LIBPCIACCESS
+    int err= pci_device_map_range(pRDC->PciInfo, pRDC->MMIOPhysAddr, pRDC->MMIOMapSize,
+                 PCI_DEV_MAP_FLAG_WRITABLE | PCI_DEV_MAP_FLAG_WRITE_COMBINE,
+                 (void **) &pRDC->MMIOVirtualAddr);
+    RL2D("pci mapping MMIO: %08lx/%08lx to %p, stat=%d\n",pRDC->MMIOPhysAddr,pRDC->MMIOMapSize,pRDC->MMIOVirtualAddr,err);
+    return !err; 
+#else
+   int mmioFlags;
 #if !defined(__alpha__)
     mmioFlags = VIDMEM_MMIO | VIDMEM_READSIDEEFFECT;
 #else
     mmioFlags = VIDMEM_MMIO | VIDMEM_READSIDEEFFECT | VIDMEM_SPARSE;
 #endif
-
-#if XSERVER_LIBPCIACCESS
-    struct pci_device *const device = pRDC->PciInfo;
-    pci_device_map_range(device, pRDC->MMIOPhysAddr, pRDC->MMIOMapSize,
-                         PCI_DEV_MAP_FLAG_WRITABLE | PCI_DEV_MAP_FLAG_WRITE_COMBINE,
-                         (void **) &pRDC->MMIOVirtualAddr);
-    RL2D("pci mapping MMIO: %08lx/%08lx to %p\n",pRDC->MMIOPhysAddr,pRDC->MMIOMapSize,pRDC->MMIOVirtualAddr);
-#else
     pRDC->MMIOVirtualAddr = xf86MapPciMem(pScrn->scrnIndex, mmioFlags,
                                           pRDC->PciTag,
                                           pRDC->MMIOPhysAddr, pRDC->MMIOMapSize);
-#endif
 
     if (!pRDC->MMIOVirtualAddr)
         return FALSE;
 
     return TRUE;
+#endif
 }
 
 RDC_EXPORT void RDCUnmapMMIO(ScrnInfoPtr pScrn)

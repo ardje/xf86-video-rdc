@@ -676,15 +676,20 @@ RDC_STATIC Bool RDCPreInit(ScrnInfoPtr pScrn, int flags)
     	    {
     		    pRDC->useEXA = FALSE;
     	    }
-    	    else if(!xf86NameCmp(s,"EXA"))
-    	    {
+    	    else
 #endif
+            if(!xf86NameCmp(s,"EXA"))
+    	    {
     		    pRDC->useEXA = TRUE;
-#ifdef HAVE_XAA
     	    }
 #endif
     	}
-        
+#ifndef HAVE_XAA
+        else {
+            /* EXA is the default if no method is given and noaccel is off */
+    		pRDC->useEXA = TRUE;
+        }
+#endif
         pRDC->noAccel = FALSE; 
     }
     else
@@ -1106,6 +1111,7 @@ RDC_STATIC Bool RDCPreInit(ScrnInfoPtr pScrn, int flags)
         		return FALSE;
     		}
 	    }        
+#ifdef HAVE_XAA
 	    else
         {
             if (!xf86LoadSubModule(pScrn, "xaa"))
@@ -1115,6 +1121,7 @@ RDC_STATIC Bool RDCPreInit(ScrnInfoPtr pScrn, int flags)
                 return FALSE;
             }       
         }
+#endif
     }
     
     
