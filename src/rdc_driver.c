@@ -682,7 +682,6 @@ RDC_STATIC Bool RDCPreInit(ScrnInfoPtr pScrn, int flags)
     	    {
     		    pRDC->useEXA = TRUE;
     	    }
-#endif
     	}
 #ifndef HAVE_XAA
         else {
